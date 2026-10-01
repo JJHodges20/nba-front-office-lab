@@ -33,10 +33,6 @@ class PlannedTable:
 # The roadmap's core database design (section 12). An entry is deleted from this list in
 # the same commit that adds the table's contract.
 PLANNED_TABLES: tuple[PlannedTable, ...] = (
-    PlannedTable(
-        "contracts", "contracts", "Contract-level metadata, guarantees, options, start/end.", 3
-    ),
-    PlannedTable("contract_years", "contracts", "Salary by season and cap percentage.", 3),
     PlannedTable("custom_rosters", "user_rosters", "User-created roster scenarios.", 4),
     PlannedTable("roster_players", "user_rosters", "Members of each custom roster.", 4),
     PlannedTable("player_archetypes", "player_value", "Role classification outputs.", 9),

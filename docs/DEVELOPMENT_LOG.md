@@ -3,6 +3,78 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone 3 - Contracts and salary-cap data (2026-10-01)
+
+**Built**
+
+- `providers/contract_file.py`: reads a contract file the user supplies and returns its
+  text unchanged as a snapshot, with the user's statement of where the figures came from
+  and when they were current.
+- `processing/contracts.py`: parses the wide and long layouts, reads dollar amounts and
+  option/guarantee markers, matches rows to known players and teams, and builds
+  `contracts` and `contract_years` with each salary's share of its season's cap.
+- `salary_cap_rules`, `contracts` and `contract_years` are now part of every build.
+- `pipelines/contracts.py`: `fol contracts import` validates a file before storing it;
+  `fol contracts template` writes a file listing every rostered player.
+- Ten more quality checks: five foreign keys and five contract checks.
+- `docs/CONTRACT_DATA.md`: the file format.
+
+**The permissions check, and what it changed**
+
+The roadmap requires checking automated-use permissions before building a contract
+scraper. The check found that Basketball Reference's terms prohibit this project's use
+of its data, that Spotrac refuses automated requests, and that the one API offering
+contracts charges for them. No scraper was built. Contract data enters through a file
+the user supplies ([0004](decisions/0004-contract-data-from-user-files.md)).
+
+**Consequence for version 1.0.** The acceptance criterion "player contracts ... are
+available in the workspace" is met by the import path, not by shipped data. Until a
+contract file is imported the contract tables are empty and the build says so.
+
+**Defects found by tests in this milestone**
+
+- *Raw store ordering.* Snapshot file names were written to the second, so two imports
+  within one second could sort in hash order and the older be taken as the newest. Names
+  now carry microseconds and versions are ordered by fetch time. Names written to the
+  second are still read.
+- *Data read as markup.* The command line passed data through rich's markup, which
+  swallowed a scope printed as `[all seasons]`. Data is now printed as plain text.
+- *An unpaired game crashed its own check.* `games_are_paired` failed with a type error
+  on exactly the input it exists to report. (Found and fixed in milestone 2's tests.)
+
+**Decisions**
+
+- A file-level problem rejects the whole contract file; a row that cannot be matched to
+  a player is left out and reported. The first means the file is not what the user
+  thinks it is; the second is an ordinary spelling difference.
+- A contract file is validated before it is stored, so a bad file never becomes the
+  newest snapshot and cannot break the next build.
+- Cap share is null for seasons with no configured cap. It is never extrapolated.
+
+**Verification**
+
+- `fol contracts template` on the real store lists 622 rostered players.
+- `fol check` on the real store: 44 checks, 42 passed, 0 errors, the same 2 standing
+  warnings, and a note that no contract file has been imported.
+- Contract logic is tested with an invented cast and invented salaries only. No real
+  salary figure appears anywhere in the repository.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| Automated tests | 636 passed, 1 skipped (UI boundary test) |
+| Test sensitivity | 15 planted bugs in the contract import, checks and raw store: 14 caught; the survivor was a redundant filter, since removed |
+| Data-quality checks | `fol check` on the real store: 0 errors, 2 standing warnings |
+| UI review | Not applicable |
+| Architectural boundaries | `tests/architecture` passes; no rule changed |
+| Lint | `ruff check` and `ruff format --check` clean |
+
+**Open items carried forward**
+
+- A contract file has to be supplied before salaries, payroll and cap share can be used.
+- Cap rules exist for 2024-25 to 2026-27 only; later contract seasons have no cap share.
+
 ## Milestone 2 - NBA data ingestion (2026-10-01)
 
 **Built**

@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import sys
 from datetime import date
+from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
+from rich.text import Text
 
 from front_office import __version__
 from front_office.config import ConfigError, load_all_season_rules, load_settings
@@ -16,6 +19,12 @@ from front_office.domain import PayrollLine, Season
 from front_office.domain.dictionary import render_data_dictionary
 from front_office.domain.tables import ALL_TABLES, PLANNED_TABLES
 from front_office.pipelines.check import CheckSeverity, check_raw_data
+from front_office.pipelines.contracts import (
+    TEMPLATE_SEASONS,
+    ContractImportError,
+    import_contract_file,
+    write_contract_template,
+)
 from front_office.pipelines.ingest import (
     FetchOutcome,
     FetchStatus,
@@ -31,11 +40,29 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+contracts_app = typer.Typer(
+    help="Bring in player contract data from a file you supply.", no_args_is_help=True
+)
+app.add_typer(contracts_app, name="contracts")
 console = Console()
 
 
+def _say(text: str, *, style: str = "") -> None:
+    """Print text exactly as given.
+
+    Data is never passed to rich as markup: a season scope such as ``[all seasons]`` or
+    a name in square brackets would otherwise be swallowed as a style tag.
+    """
+    console.print(Text(text, style=style), highlight=False)
+
+
+def _tagged(tag: str, style: str, text: str) -> None:
+    """Print a coloured tag followed by text that is not read as markup."""
+    console.print(Text.assemble((tag, style), "  ", text), highlight=False)
+
+
 def _fail(error: Exception) -> typer.Exit:
-    console.print(f"[bold red]Error:[/bold red] {error}")
+    console.print(Text.assemble(("Error:", "bold red"), " ", str(error)), highlight=False)
     return typer.Exit(code=1)
 
 
@@ -55,9 +82,9 @@ def info() -> None:
     table = Table(title=f"NBA Front Office Lab {__version__}", show_header=False)
     table.add_column(style="bold", no_wrap=True)
     table.add_column(overflow="fold")
-    table.add_row("Project root", str(settings.project_root))
-    table.add_row("Data directory", str(settings.data_dir))
-    table.add_row("Database", str(settings.database_path))
+    table.add_row("Project root", escape(str(settings.project_root)))
+    table.add_row("Data directory", escape(str(settings.data_dir)))
+    table.add_row("Database", escape(str(settings.database_path)))
     table.add_row("Team history from", settings.seasons.history_start)
     table.add_row("Player detail seasons", str(settings.seasons.player_detail_seasons))
     table.add_row("Cap rules configured", ", ".join(season.label for season in rules) or "none")
@@ -73,7 +100,7 @@ def seasons() -> None:
     except ConfigError as error:
         raise _fail(error) from error
     if not rules:
-        console.print(f"No season rules found in {settings.season_rules_dir}")
+        _say(f"No season rules found in {settings.season_rules_dir}")
         raise typer.Exit(code=1)
 
     # One column per season: the lines of a single season read top to bottom, lowest
@@ -117,7 +144,7 @@ def dictionary(
         raise _fail(error) from error
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(document, encoding="utf-8", newline="\n")
-    console.print(f"Wrote {target} ({len(ALL_TABLES)} tables)")
+    _say(f"Wrote {target} ({len(ALL_TABLES)} tables)")
 
 
 _STATUS_STYLE = {
@@ -164,8 +191,11 @@ def ingest(
         style = _STATUS_STYLE[outcome.status]
         detail = outcome.error if outcome.error else f"{outcome.rows} rows"
         console.print(
-            f"[{style}]{outcome.status.value:>9}[/{style}]  {outcome.request.describe()}  "
-            f"[dim]{detail}[/dim]",
+            Text.assemble(
+                (f"{outcome.status.value:>9}", style),
+                f"  {outcome.request.describe()}  ",
+                (detail, "dim"),
+            ),
             highlight=False,
         )
 
@@ -180,9 +210,9 @@ def ingest(
     for outcome in outcomes:
         counts[outcome.status] += 1
     summary = ", ".join(f"{count} {status.value}" for status, count in counts.items() if count)
-    console.print(f"\n{len(outcomes)} requests: {summary}", highlight=False)
+    _say(f"\n{len(outcomes)} requests: {summary}")
     if counts[FetchStatus.FAILED]:
-        console.print("[bold red]Some requests failed; run the command again to retry them.[/]")
+        _say("Some requests failed; run the command again to retry them.", style="bold red")
         raise typer.Exit(code=1)
 
 
@@ -195,10 +225,10 @@ def raw() -> None:
         raise _fail(error) from error
     inventory = raw_inventory(settings)
     if not inventory:
-        console.print(f"The raw store at {settings.raw_dir} is empty. Run: fol ingest")
+        _say(f"The raw store at {settings.raw_dir} is empty. Run: fol ingest")
         return
 
-    table = Table(title=f"Raw store: {settings.raw_dir}")
+    table = Table(title=escape(f"Raw store: {settings.raw_dir}"))
     table.add_column("Source")
     table.add_column("Dataset", style="bold")
     table.add_column("Partitions", justify="right")
@@ -235,31 +265,106 @@ def check() -> None:
     console.print(tables)
 
     for issue in report.tables.errors:
-        console.print(f"[bold red]not built[/]  {issue.table} [{issue.scope}]: {issue.message}")
+        _tagged("not built", "bold red", f"{issue.table} [{issue.scope}]: {issue.message}")
     for issue in report.tables.notes:
-        console.print(
-            f"[cyan]note[/]  {issue.table} [{issue.scope}]: {issue.message}", highlight=False
-        )
+        _tagged("note", "cyan", f"{issue.table} [{issue.scope}]: {issue.message}")
 
     for result in report.failed_checks:
         style = "bold red" if result.severity is CheckSeverity.ERROR else "yellow"
-        console.print(
-            f"[{style}]{result.severity.value}[/]  {result.check}: {result.failures:,} of "
-            f"{result.examined:,} failed. {result.description}",
-            highlight=False,
+        _tagged(
+            result.severity.value,
+            style,
+            f"{result.check}: {result.failures:,} of {result.examined:,} failed. "
+            f"{result.description}",
         )
         for example in result.examples:
-            console.print(f"         [dim]{example}[/dim]", highlight=False)
+            _say(f"         {example}", style="dim")
 
     passed = len(report.checks) - len(report.failed_checks)
-    console.print(
+    _say(
         f"\n{len(report.checks)} checks: {passed} passed, "
         f"{len(report.check_warnings)} with warnings, {len(report.check_errors)} with errors; "
-        f"{len(report.tables.errors)} table parts not built.",
-        highlight=False,
+        f"{len(report.tables.errors)} table parts not built."
     )
     if not report.ok:
         raise typer.Exit(code=1)
+
+
+@contracts_app.command("template")
+def contracts_template(
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Where to write it. Default: data/imports."),
+    ] = None,
+    seasons: Annotated[
+        int, typer.Option("--seasons", min=1, max=10, help="How many season columns to include.")
+    ] = TEMPLATE_SEASONS,
+) -> None:
+    """Write a contract file listing every rostered player, with the salaries left blank."""
+    try:
+        settings = load_settings()
+        path, players = write_contract_template(
+            settings, today=date.today(), output=output, seasons=seasons
+        )
+    except (ConfigError, ContractImportError) as error:
+        raise _fail(error) from error
+    _say(f"Wrote {path}")
+    _say(
+        f"{players} players listed. Fill in the salaries from a source you are entitled to "
+        'use, then run: fol contracts import <file> --source "<where the figures came from>"'
+    )
+
+
+@contracts_app.command("import")
+def contracts_import(
+    file: Annotated[Path, typer.Argument(help="The contract file (CSV, UTF-8).")],
+    source: Annotated[
+        str,
+        typer.Option("--source", help="Where the figures came from. Stored with the data."),
+    ],
+    as_of: Annotated[
+        str | None,
+        typer.Option("--as-of", help="Date the figures were current (YYYY-MM-DD). Default: today."),
+    ] = None,
+) -> None:
+    """Validate a contract file and store it. See docs/CONTRACT_DATA.md for the format."""
+    try:
+        settings = load_settings()
+        current = date.fromisoformat(as_of) if as_of else date.today()
+    except ConfigError as error:
+        raise _fail(error) from error
+    except ValueError:
+        raise _fail(ValueError(f"--as-of must be a date like 2026-10-01, not {as_of!r}")) from None
+    try:
+        report = import_contract_file(settings, file, source_label=source, as_of=current)
+    except ContractImportError as error:
+        raise _fail(error) from error
+
+    _say(
+        f"Read {report.rows_read} rows: {report.contracts} contracts for {report.players} "
+        f"players, {report.contract_years} contract seasons "
+        f"({report.seasons[0]} to {report.seasons[-1]})."
+    )
+    if report.seasons_without_cap:
+        _tagged(
+            "note",
+            "cyan",
+            f"No salary cap is configured for {', '.join(report.seasons_without_cap)}; "
+            "salaries in those seasons have no cap share until a rules file is added to "
+            "configs/seasons.",
+        )
+    if report.unmatched:
+        _tagged(
+            "warning",
+            "yellow",
+            f"{len(report.unmatched)} row(s) could not be matched and were left out:",
+        )
+        for row in report.unmatched:
+            team = f" ({row.team})" if row.team else ""
+            _say(f"         line {row.line}: {row.player}{team} - {row.reason}")
+    if not report.stored:
+        _say("This file is identical to the last import; nothing new was stored.")
+    _say("Run 'fol check' to validate the contract data against the rest.")
 
 
 def main() -> None:

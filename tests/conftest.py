@@ -9,8 +9,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from front_office.config import Settings, load_settings
+from front_office.config import Settings, load_all_season_rules, load_settings
 from front_office.config.settings import ENV_DATA_DIR, ENV_HOME
+from front_office.domain.cap_rules import SeasonRules
 from front_office.domain.datasets import NBA_STATS, partition_for
 from front_office.domain.snapshots import Snapshot
 from front_office.pipelines.normalize import NormalizedTables, normalize
@@ -67,9 +68,15 @@ def raw(fixture_store: RawStore) -> Callable[..., Snapshot]:
 
 
 @pytest.fixture(scope="session")
-def normalized(fixture_store: RawStore) -> NormalizedTables:
+def season_rules() -> list[SeasonRules]:
+    """The cap rules shipped in configs/seasons."""
+    return list(load_all_season_rules(REPO_ROOT / "configs" / "seasons").values())
+
+
+@pytest.fixture(scope="session")
+def normalized(fixture_store: RawStore, season_rules: list[SeasonRules]) -> NormalizedTables:
     """Every table built from the fixture store. Shared: copy a frame before changing it."""
-    return normalize(fixture_store)
+    return normalize(fixture_store, season_rules=season_rules)
 
 
 @pytest.fixture

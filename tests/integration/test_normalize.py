@@ -11,6 +11,7 @@ from front_office.domain.schema import validate_frame
 from front_office.domain.seasons import Season
 from front_office.pipelines.check import check_store
 from front_office.pipelines.normalize import (
+    BUILT_TABLES,
     NBA_STATS_TABLES,
     IssueSeverity,
     normalize,
@@ -43,10 +44,27 @@ class TestFixtureStore:
         ]
 
     def test_every_table_is_built_and_satisfies_its_contract(self, normalized) -> None:
-        assert set(normalized.frames) == {contract.name for contract in NBA_STATS_TABLES}
-        for contract in NBA_STATS_TABLES:
+        assert set(normalized.frames) == {contract.name for contract in BUILT_TABLES}
+        for contract in BUILT_TABLES:
             assert validate_frame(normalized[contract.name], contract) == [], contract.name
+        for contract in NBA_STATS_TABLES:
             assert len(normalized[contract.name]) > 0, contract.name
+
+    def test_cap_rules_are_tabulated_from_configuration(self, normalized) -> None:
+        assert normalized["salary_cap_rules"]["season"].tolist() == [
+            "2024-25",
+            "2025-26",
+            "2026-27",
+        ]
+
+    def test_without_a_contract_file_the_contract_tables_are_empty_and_say_why(
+        self, normalized
+    ) -> None:
+        assert len(normalized["contracts"]) == 0
+        assert len(normalized["contract_years"]) == 0
+        note = normalized.notes[-1]
+        assert (note.table, note.scope) == ("contracts", "all seasons")
+        assert "no contract file has been imported" in note.message
 
     def test_row_counts(self, normalized) -> None:
         counts = {name: len(frame) for name, frame in normalized.frames.items()}
@@ -60,6 +78,7 @@ class TestFixtureStore:
         assert [(note.table, note.scope, note.severity) for note in normalized.notes] == [
             ("team_seasons", "1996-97", IssueSeverity.NOTE),
             ("team_games", "2012-13", IssueSeverity.NOTE),
+            ("contracts", "all seasons", IssueSeverity.NOTE),
         ]
         assert "rounded" in normalized.notes[0].message
         assert "0021201214" in normalized.notes[1].message
@@ -85,8 +104,10 @@ class TestFixtureStore:
             assert "2026-27" not in set(normalized[table]["season"]), table
         assert "2026-27" in set(normalized["team_rosters"]["season"])
 
-    def test_building_twice_gives_identical_tables(self, fixture_store, normalized) -> None:
-        again = normalize(fixture_store)
+    def test_building_twice_gives_identical_tables(
+        self, fixture_store, normalized, season_rules
+    ) -> None:
+        again = normalize(fixture_store, season_rules=season_rules)
         for name, frame in normalized.frames.items():
             assert frame.equals(again[name]), name
 

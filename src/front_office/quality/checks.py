@@ -35,6 +35,13 @@ TOTALS_TOLERANCE = 0.02
 RATING_TOLERANCE = 0.1
 # Game-log minutes are whole minutes; a season total is exact.
 MINUTES_ROUNDING_PER_GAME = 0.51
+# The largest contracts start at 35% of the cap and grow 8% a year; the smallest
+# (two-way, ten-day) are a few tenths of a percent. Outside this band, suspect a typo.
+MAX_PLAUSIBLE_CAP_SHARE = 0.45
+MIN_PLAUSIBLE_CAP_SHARE = 0.0002
+# A team carries 14-15 standard contracts in season and up to 21 players in the offseason.
+MIN_PLAUSIBLE_ROSTER = 10
+MAX_PLAUSIBLE_ROSTER = 21
 
 ROUND_SIZES = {1: 8, 2: 4, 3: 2, 4: 1}
 
@@ -449,6 +456,88 @@ def _starts_within_games(tables: Tables) -> tuple[int, pd.DataFrame]:
     return len(known), known.loc[wrong, columns]
 
 
+# --- contracts ----------------------------------------------------------------------
+
+
+def _contract_totals_match_years(tables: Tables) -> tuple[int, pd.DataFrame]:
+    contracts = tables["contracts"].set_index("contract_id")
+    years = (
+        tables["contract_years"]
+        .groupby("contract_id")
+        .agg(
+            total=("salary", "sum"),
+            seasons=("season", "size"),
+            first=("season", "min"),
+            last=("season", "max"),
+        )
+        .reindex(contracts.index)
+    )
+    wrong = (
+        (contracts["total_salary"] != years["total"])
+        | (contracts["seasons"] != years["seasons"])
+        | (contracts["first_season"] != years["first"])
+        | (contracts["last_season"] != years["last"])
+    )
+    failing = _failing(
+        contracts,
+        wrong,
+        ["player_name", "total_salary", "seasons"],
+        total_in_years=years["total"],
+        seasons_in_years=years["seasons"],
+    )
+    return len(contracts), failing
+
+
+def _cap_shares_are_consistent(tables: Tables) -> tuple[int, pd.DataFrame]:
+    years = tables["contract_years"]
+    caps = tables["salary_cap_rules"].set_index("season")["salary_cap"]
+    cap = years["season"].map(caps).astype("float64")
+    expected = years["salary"] / cap
+    has_cap = cap.notna()
+    stated = years["salary_cap_pct"]
+    wrong = (has_cap & ~((stated - expected).abs() < 1e-9)) | (~has_cap & stated.notna())
+    failing = _failing(
+        years, wrong, ["contract_id", "season", "salary", "salary_cap_pct"], expected=expected
+    )
+    return len(years), failing
+
+
+def _one_active_contract_per_player_season(tables: Tables) -> tuple[int, pd.DataFrame]:
+    statuses = tables["contracts"][["contract_id", "status"]]
+    years = tables["contract_years"].merge(statuses, on="contract_id")
+    active = years[years["status"] == "active"]
+    counts = active.groupby(["player_id", "season"]).size().rename("active_contracts")
+    return len(counts), counts[counts > 1].reset_index()
+
+
+def _salaries_are_plausible(tables: Tables) -> tuple[int, pd.DataFrame]:
+    years = tables["contract_years"]
+    known = years[years["salary_cap_pct"].notna()]
+    odd = (known["salary_cap_pct"] > MAX_PLAUSIBLE_CAP_SHARE) | (
+        known["salary_cap_pct"] < MIN_PLAUSIBLE_CAP_SHARE
+    )
+    return len(known), known.loc[odd, ["contract_id", "season", "salary", "salary_cap_pct"]]
+
+
+def _teams_have_plausible_rosters(tables: Tables) -> tuple[int, pd.DataFrame]:
+    years = tables["contract_years"]
+    if years.empty:
+        return 0, pd.DataFrame(columns=["team_id", "season", "standard_contracts"])
+    contracts = tables["contracts"][["contract_id", "status", "contract_type"]]
+    first_season = years["season"].min()
+    current = years[years["season"] == first_season].merge(contracts, on="contract_id")
+    standard = current[(current["status"] == "active") & (current["contract_type"] == "standard")]
+    counts = standard.groupby("team_id").size()
+    per_team = tables["teams"][["team_id"]].assign(
+        season=first_season,
+        standard_contracts=lambda frame: frame["team_id"].map(counts).fillna(0).astype(int),
+    )
+    odd = (per_team["standard_contracts"] < MIN_PLAUSIBLE_ROSTER) | (
+        per_team["standard_contracts"] > MAX_PLAUSIBLE_ROSTER
+    )
+    return len(per_team), per_team[odd]
+
+
 E, W = Severity.ERROR, Severity.WARNING
 
 _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
@@ -574,6 +663,45 @@ _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
         "Every team game in a season with player logs has player rows.",
         E,
         _logged_games_have_players,
+    ),
+    Check(
+        "totals_match_years",
+        "contracts",
+        "Each contract's total, length and first and last seasons agree with its seasons.",
+        E,
+        _contract_totals_match_years,
+    ),
+    Check(
+        "one_active_contract_per_player_season",
+        "contract_years",
+        "No player is under two active contracts in the same season.",
+        E,
+        _one_active_contract_per_player_season,
+    ),
+    Check(
+        "cap_shares_are_consistent",
+        "contract_years",
+        "Cap share equals salary divided by that season's configured cap, and is null "
+        "when no cap is configured.",
+        E,
+        _cap_shares_are_consistent,
+    ),
+    Check(
+        "salaries_are_plausible",
+        "contract_years",
+        f"Salaries fall between {MIN_PLAUSIBLE_CAP_SHARE:.2%} and {MAX_PLAUSIBLE_CAP_SHARE:.0%} "
+        "of the cap; anything else is probably a typing slip.",
+        W,
+        _salaries_are_plausible,
+    ),
+    Check(
+        "teams_have_plausible_rosters",
+        "contract_years",
+        f"In the first season of the contract file every team has between "
+        f"{MIN_PLAUSIBLE_ROSTER} and {MAX_PLAUSIBLE_ROSTER} standard contracts; fewer "
+        "means the file is incomplete.",
+        W,
+        _teams_have_plausible_rosters,
     ),
 )
 

@@ -16,20 +16,41 @@ from enum import StrEnum
 
 import pandas as pd
 
-from front_office.domain.datasets import NBA_STATS, NbaStatsDataset, partition_for
+from front_office.domain.cap_rules import SeasonRules
+from front_office.domain.datasets import (
+    CONTRACT_FILE,
+    CONTRACT_FILE_DATASET,
+    NBA_STATS,
+    NbaStatsDataset,
+    partition_for,
+)
 from front_office.domain.schema import ContractViolationError, TableContract
 from front_office.domain.seasons import Season, SeasonType
 from front_office.domain.snapshots import Snapshot
+from front_office.domain.tables import finance as finance_tables
 from front_office.domain.tables import players as player_tables
 from front_office.domain.tables import teams as team_tables
+from front_office.processing.cap_rules import cap_rules_frame
+from front_office.processing.contracts import (
+    ContractFileError,
+    build_contracts,
+    describe_unmatched,
+)
 from front_office.processing.nba_stats import players, playoffs, teams
 from front_office.processing.nba_stats.resultsets import PayloadError
 from front_office.rawstore import RawStore, RawStoreError
 
 D = NbaStatsDataset
 REGULAR, PLAYOFFS, PLAY_IN = SeasonType.REGULAR, SeasonType.PLAYOFFS, SeasonType.PLAY_IN
+ALL_SEASONS = "all seasons"
 
-_BUILD_ERRORS = (PayloadError, playoffs.BracketError, ContractViolationError, RawStoreError)
+_BUILD_ERRORS = (
+    PayloadError,
+    playoffs.BracketError,
+    ContractViolationError,
+    RawStoreError,
+    ContractFileError,
+)
 
 NBA_STATS_TABLES: tuple[TableContract, ...] = (
     team_tables.TEAMS,
@@ -42,6 +63,13 @@ NBA_STATS_TABLES: tuple[TableContract, ...] = (
     player_tables.TEAM_ROSTERS,
     player_tables.PLAYER_ON_OFF,
 )
+FINANCE_TABLES: tuple[TableContract, ...] = (
+    finance_tables.SALARY_CAP_RULES,
+    finance_tables.CONTRACTS,
+    finance_tables.CONTRACT_YEARS,
+)
+BUILT_TABLES: tuple[TableContract, ...] = (*NBA_STATS_TABLES, *FINANCE_TABLES)
+"""Every table normalisation produces, in an order where references come first."""
 
 
 class IssueSeverity(StrEnum):
@@ -111,7 +139,7 @@ class _Builder:
         found = self.snapshot(dataset, season, season_type)
         if found is None:
             wanted = partition_for(dataset, season=season, season_type=season_type)
-            where = "/".join(wanted.values()) or "all seasons"
+            where = "/".join(wanted.values()) or ALL_SEASONS
             raise _Missing(f"raw dataset {dataset.value} ({where}) has not been fetched")
         return found
 
@@ -157,8 +185,16 @@ def stored_seasons(store: RawStore) -> list[Season]:
     return sorted(Season.parse(partition["season"]) for partition in partitions)
 
 
-def normalize(store: RawStore, seasons: Sequence[Season] | None = None) -> NormalizedTables:
-    """Build every stats.nba.com table from the newest snapshots in the raw store."""
+def normalize(
+    store: RawStore,
+    seasons: Sequence[Season] | None = None,
+    season_rules: Sequence[SeasonRules] = (),
+) -> NormalizedTables:
+    """Build every table from the newest snapshots in the raw store.
+
+    ``season_rules`` are the configured cap rules; they become ``salary_cap_rules`` and
+    supply the cap that each contract season's salary is measured against.
+    """
     builder = _Builder(store)
     chosen = sorted(seasons) if seasons is not None else stored_seasons(store)
 
@@ -166,7 +202,7 @@ def normalize(store: RawStore, seasons: Sequence[Season] | None = None) -> Norma
         newest = chosen[-1]
         builder.attempt(
             "teams",
-            "all seasons",
+            ALL_SEASONS,
             lambda notes: teams.build_teams(
                 builder.require(D.TEAM_YEARS), builder.require(D.STANDINGS, newest)
             ),
@@ -179,7 +215,7 @@ def normalize(store: RawStore, seasons: Sequence[Season] | None = None) -> Norma
     ]
     builder.attempt(
         "players",
-        "all seasons",
+        ALL_SEASONS,
         lambda notes: players.build_players(builder.require(D.PLAYER_INDEX), roster_snapshots),
     )
 
@@ -189,7 +225,68 @@ def normalize(store: RawStore, seasons: Sequence[Season] | None = None) -> Norma
         frames[contract.name] = (
             pd.concat(parts, ignore_index=True) if parts else contract.empty_frame()
         )
+    frames.update(_finance_tables(builder, frames, season_rules))
     return NormalizedTables(frames, builder.issues)
+
+
+def reference_tables(store: RawStore) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """``(teams, players)`` alone: what a contract file is matched against.
+
+    Raises ``LookupError`` if league data has not been ingested yet.
+    """
+    seasons = stored_seasons(store)
+    builder = _Builder(store)
+    try:
+        if not seasons:
+            raise _Missing("no league data has been ingested")
+        team_frame = teams.build_teams(
+            builder.require(D.TEAM_YEARS), builder.require(D.STANDINGS, seasons[-1])
+        )
+        player_frame = players.build_players(builder.require(D.PLAYER_INDEX))
+    except _Missing as error:
+        raise LookupError(f"{error}; run: fol ingest") from error
+    return team_frame, player_frame
+
+
+def _finance_tables(
+    builder: _Builder, frames: dict[str, pd.DataFrame], season_rules: Sequence[SeasonRules]
+) -> dict[str, pd.DataFrame]:
+    built = {
+        "salary_cap_rules": cap_rules_frame(season_rules),
+        "contracts": finance_tables.CONTRACTS.empty_frame(),
+        "contract_years": finance_tables.CONTRACT_YEARS.empty_frame(),
+    }
+    try:
+        snapshot = builder.store.latest(CONTRACT_FILE, CONTRACT_FILE_DATASET, {})
+    except RawStoreError as error:
+        builder.issues.append(BuildIssue(ALL_SEASONS, "contracts", str(error)))
+        return built
+    if snapshot is None:
+        builder.issues.append(
+            BuildIssue(
+                ALL_SEASONS,
+                "contracts",
+                "no contract file has been imported; salaries and payroll are unavailable",
+                IssueSeverity.NOTE,
+            )
+        )
+        return built
+    try:
+        result = build_contracts(
+            snapshot,
+            players=frames["players"],
+            teams=frames["teams"],
+            caps={rules.season: rules.salary_cap for rules in season_rules},
+        )
+    except _BUILD_ERRORS as error:
+        builder.issues.append(BuildIssue(ALL_SEASONS, "contracts", str(error)))
+        return built
+    left_out = describe_unmatched(result.unmatched)
+    if left_out:
+        builder.issues.append(BuildIssue(ALL_SEASONS, "contracts", left_out, IssueSeverity.NOTE))
+    built["contracts"] = result.contracts
+    built["contract_years"] = result.contract_years
+    return built
 
 
 def _normalize_season(builder: _Builder, season: Season) -> None:

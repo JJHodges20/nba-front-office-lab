@@ -15,6 +15,11 @@ from front_office.domain.seasons import Season, SeasonType
 NBA_STATS = "nba_stats"
 """Source name for stats.nba.com."""
 
+CONTRACT_FILE = "contract_file"
+"""Source name for contract data supplied by the user as a file."""
+
+CONTRACT_FILE_DATASET = "contracts"
+
 
 class NbaStatsDataset(StrEnum):
     TEAM_YEARS = "team_years"

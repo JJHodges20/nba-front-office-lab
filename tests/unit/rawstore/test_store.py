@@ -29,9 +29,49 @@ def test_save_writes_one_file_under_the_partition(store: RawStore) -> None:
         store.root / "nba_stats" / "team_game_logs" / "season=2025-26" / "season_type=regular"
     )
     assert result.stored.path.parent == expected_dir
-    assert result.stored.path.name.startswith("20261001T120000Z_")
+    assert result.stored.path.name.startswith("20261001T120000000000Z_")
     assert result.stored.path.name.endswith(".json.gz")
     assert [path.name for path in expected_dir.iterdir()] == [result.stored.path.name]
+
+
+def test_snapshots_saved_within_the_same_second_keep_their_order(store: RawStore) -> None:
+    """Two imports a moment apart: the later one must be the newest, whatever its hash."""
+    partition = {"season": "2025-26"}
+    for microsecond in range(1, 13):
+        moment = FETCHED_AT + timedelta(microseconds=microsecond)
+        store.save(snapshot("standings", payload(microsecond), partition, fetched_at=moment))
+    versions = store.versions("nba_stats", "standings", partition)
+    assert [store.load(version).payload for version in versions] == [
+        payload(value) for value in range(1, 13)
+    ]
+    assert store.latest("nba_stats", "standings", partition).payload == payload(12)
+    assert store.latest_info("nba_stats", "standings", partition).fetched_at == (
+        FETCHED_AT + timedelta(microseconds=12)
+    )
+
+
+def test_file_names_written_to_the_second_are_still_read_and_ordered(store: RawStore) -> None:
+    """Stores written before microsecond names existed must keep working."""
+    partition = {"season": "2025-26"}
+    newest = store.save(
+        snapshot("standings", payload(2), partition, fetched_at=FETCHED_AT + timedelta(seconds=45))
+    ).stored
+    older = store.save(snapshot("standings", payload(1), partition, fetched_at=FETCHED_AT)).stored
+    # Rename both to the old to-the-second form.
+    old_style = {}
+    for stored, seconds in ((older, "00"), (newest, "45")):
+        renamed = stored.path.with_name(f"20261001T1200{seconds}Z_{stored.hash_prefix}.json.gz")
+        stored.path.rename(renamed)
+        old_style[seconds] = renamed
+    versions = store.versions("nba_stats", "standings", partition)
+    assert [version.path for version in versions] == [old_style["00"], old_style["45"]]
+    assert versions[1].fetched_at == FETCHED_AT + timedelta(seconds=45)
+    assert store.latest("nba_stats", "standings", partition).payload == payload(2)
+
+    # A new snapshot in the same second as an old-style one still sorts after it.
+    later = FETCHED_AT + timedelta(seconds=45, microseconds=7)
+    store.save(snapshot("standings", payload(3), partition, fetched_at=later))
+    assert store.latest("nba_stats", "standings", partition).payload == payload(3)
 
 
 def test_round_trip_preserves_the_snapshot_exactly(store: RawStore) -> None:

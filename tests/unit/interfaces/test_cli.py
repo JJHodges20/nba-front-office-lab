@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -201,3 +202,100 @@ class TestRawAndCheck:
         assert result.exit_code == 1
         assert "not built" in result.output
         assert "player_index" in result.output
+
+    def test_check_says_when_no_contract_file_has_been_imported(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv(ENV_DATA_DIR, str(FIXTURE_RAW.parent))
+        result = runner.invoke(app, ["check"])
+        assert "note  contracts [all seasons]: no contract file has been imported" in result.output
+        assert "salary_cap_rules" in result.output
+
+
+class TestContracts:
+    """The contracts commands, against a private copy of the fixture store."""
+
+    @pytest.fixture(autouse=True)
+    def _lab(self, project: Path) -> None:
+        shutil.copytree(FIXTURE_RAW, project / "data" / "raw")
+
+    def contract_file(self, directory: Path, text: str) -> Path:
+        path = directory / "contracts.csv"
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def test_template_is_written_to_the_imports_folder(self, project: Path) -> None:
+        result = runner.invoke(app, ["contracts", "template"])
+        assert result.exit_code == 0, result.output
+        template = project / "data" / "imports" / "contract_template.csv"
+        assert template.is_file()
+        assert "players listed" in result.output
+        assert "fol contracts import" in result.output
+
+    def test_template_honours_output_and_seasons(self, tmp_path: Path) -> None:
+        target = tmp_path / "mine.csv"
+        result = runner.invoke(
+            app, ["contracts", "template", "--output", str(target), "--seasons", "2"]
+        )
+        assert result.exit_code == 0, result.output
+        header = target.read_text(encoding="utf-8-sig").splitlines()[0]
+        assert header.count("-") == 2  # exactly two season columns
+
+    def test_import_reports_what_was_read(self, tmp_path: Path) -> None:
+        path = self.contract_file(
+            tmp_path,
+            "player,team,2026-27,2027-28\nJayson Tatum,BOS,40000000,44000000 PO\n"
+            "Nobody Atall,NYK,1000000,\n",
+        )
+        result = runner.invoke(
+            app, ["contracts", "import", str(path), "--source", "invented for tests"]
+        )
+        assert result.exit_code == 0, result.output
+        assert "Read 2 rows: 1 contracts for 1 players, 2 contract seasons" in result.output
+        assert "(2026-27 to 2027-28)" in result.output
+        assert "No salary cap is configured for 2027-28" in result.output
+        assert "1 row(s) could not be matched" in result.output
+        assert "line 3: Nobody Atall (NYK) - no player with this name" in result.output
+
+    def test_importing_twice_says_nothing_new_was_stored(self, tmp_path: Path) -> None:
+        path = self.contract_file(tmp_path, "player,team,2026-27\nJayson Tatum,BOS,40000000\n")
+        arguments = [
+            "contracts",
+            "import",
+            str(path),
+            "--source",
+            "invented",
+            "--as-of",
+            "2026-09-30",
+        ]
+        assert runner.invoke(app, arguments).exit_code == 0
+        again = runner.invoke(app, arguments)
+        assert again.exit_code == 0
+        assert "identical to the last import" in again.output
+
+    def test_the_source_is_required(self, tmp_path: Path) -> None:
+        path = self.contract_file(tmp_path, "player,team,2026-27\nJayson Tatum,BOS,40000000\n")
+        result = runner.invoke(app, ["contracts", "import", str(path)])
+        assert result.exit_code == 2
+        assert "--source" in result.output
+
+    def test_a_bad_file_is_refused_with_the_reason(self, tmp_path: Path) -> None:
+        path = self.contract_file(tmp_path, "player,team,2026-2027\nJayson Tatum,BOS,1\n")
+        result = runner.invoke(app, ["contracts", "import", str(path), "--source", "invented"])
+        assert result.exit_code == 1
+        assert "look like seasons" in result.output
+
+    def test_a_bad_date_is_refused(self, tmp_path: Path) -> None:
+        path = self.contract_file(tmp_path, "player,team,2026-27\nJayson Tatum,BOS,1000000\n")
+        result = runner.invoke(
+            app, ["contracts", "import", str(path), "--source", "x", "--as-of", "October 1"]
+        )
+        assert result.exit_code == 1
+        assert "--as-of must be a date like 2026-10-01" in result.output
+
+    def test_imported_contracts_appear_in_check(self, tmp_path: Path) -> None:
+        path = self.contract_file(tmp_path, "player,team,2026-27\nJayson Tatum,BOS,40000000\n")
+        runner.invoke(app, ["contracts", "import", str(path), "--source", "invented"])
+        result = runner.invoke(app, ["check"])
+        assert "no contract file has been imported" not in result.output
+        assert "contract_years.teams_have_plausible_rosters" in result.output

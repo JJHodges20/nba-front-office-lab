@@ -42,6 +42,8 @@ measured statistics, modeled estimates and user assumptions visibly apart.
 | [`team_rosters`](#team_rosters) | players | One row per player per team per season. | V1 |
 | [`player_on_off`](#player_on_off) | player_performance | One row per player per team per season per season type. | V1 |
 | [`salary_cap_rules`](#salary_cap_rules) | cap_rules | One row per NBA season. | V0 |
+| [`contracts`](#contracts) | contracts | One row per player per team per run of consecutive seasons. | V1 |
+| [`contract_years`](#contract_years) | contracts | One row per contract per season. | V1 |
 
 ### teams
 
@@ -386,14 +388,56 @@ Season-specific salary-cap thresholds, salary exceptions and roster limits, tabu
 | `source_urls` | string | yes | operational |  | Where the figures were verified; one URL per line. |
 | `rules_version` | string | yes | operational |  | Fingerprint of the figures, recorded with anything computed from them. |
 
+### contracts
+
+Player salary agreements as supplied in an imported contract file: one row for each run of consecutive seasons a team owes a player.
+
+- **Grain:** One row per player per team per run of consecutive seasons.
+- **Primary key:** `contract_id`
+- **Indexes:** `player_id`; `team_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `contract_id` | string | yes | identifier |  | Key built from player, team, first season and status. |
+| `player_id` | integer | yes | identifier |  | Player id. References `players.player_id`. |
+| `team_id` | integer | no | identifier |  | Team that owes the salary. Null if the file gave no team. References `teams.team_id`. |
+| `player_name` | string | yes | identifier |  | Player name as written in the contract file. |
+| `contract_type` | string | yes | identifier |  | Standard contracts count against the roster limit of fifteen; two-way contracts have their own limit and do not count against the cap. One of: `standard`, `two_way`. |
+| `status` | string | yes | identifier |  | Active: the player is under contract. Dead money: salary still owed to a player who was waived. One of: `active`, `dead_money`. |
+| `first_season` | string | yes | identifier |  | First season the file lists salary for. |
+| `last_season` | string | yes | identifier |  | Last season the file lists salary for. |
+| `seasons` | integer | yes | measured | seasons | Number of seasons listed. |
+| `total_salary` | integer | yes | derived | USD | Sum of the listed seasons' salaries. |
+| `guaranteed_amount` | integer | no | measured | USD | Total guaranteed money, as the file states it. Null if not stated. |
+| `source_label` | string | yes | operational |  | Where the person who supplied the file got the figures. |
+| `as_of_date` | date | yes | operational |  | Date the figures were current, as stated at import. |
+
+### contract_years
+
+Salary for each season of each contract, with its share of that season's cap.
+
+- **Grain:** One row per contract per season.
+- **Primary key:** `contract_id`, `season`
+- **Indexes:** `season`, `team_id`; `player_id`, `season`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `contract_id` | string | yes | identifier |  | The contract this season belongs to. References `contracts.contract_id`. |
+| `season` | string | yes | identifier |  | Season label, e.g. 2025-26. |
+| `player_id` | integer | yes | identifier |  | Player id. References `players.player_id`. |
+| `team_id` | integer | no | identifier |  | Team that owes the salary. References `teams.team_id`. |
+| `salary` | integer | yes | measured | USD | Salary for the season. |
+| `salary_cap_pct` | float | no | derived | fraction | Salary as a fraction of that season's cap. Null when the season's cap is not configured, as for future seasons the league has not set. |
+| `option` | string | no | identifier |  | Option attached to the season, if any. One of: `player`, `team`, `early_termination`. |
+| `guarantee` | string | no | identifier |  | How much of the season's salary is guaranteed. Null if the file does not say. One of: `full`, `partial`, `none`. |
+| `years_remaining` | integer | yes | derived | seasons | Seasons left on the contract after this one. |
+
 ## Planned tables
 
 Called for by the roadmap; each gets a contract in the milestone that builds it.
 
 | Table | Domain | Purpose | Milestone |
 | --- | --- | --- | --- |
-| `contracts` | contracts | Contract-level metadata, guarantees, options, start/end. | 3 |
-| `contract_years` | contracts | Salary by season and cap percentage. | 3 |
 | `custom_rosters` | user_rosters | User-created roster scenarios. | 4 |
 | `roster_players` | user_rosters | Members of each custom roster. | 4 |
 | `player_archetypes` | player_value | Role classification outputs. | 9 |

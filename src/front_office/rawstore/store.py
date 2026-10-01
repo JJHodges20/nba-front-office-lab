@@ -22,7 +22,10 @@ from pathlib import Path
 
 from front_office.domain.snapshots import GLOBAL_PARTITION, Snapshot, partition_key
 
-_TIMESTAMP = "%Y%m%dT%H%M%SZ"
+# Microseconds, so that two snapshots saved in quick succession still sort in order.
+_TIMESTAMP = "%Y%m%dT%H%M%S%fZ"
+# Snapshots written before the store kept microseconds; still read, never written.
+_TIMESTAMP_TO_THE_SECOND = "%Y%m%dT%H%M%SZ"
 _SUFFIX = ".json.gz"
 _HASH_CHARS = 16
 
@@ -98,9 +101,10 @@ class RawStore:
         directory = self._directory(source, dataset, partition)
         if not directory.is_dir():
             return []
-        return [
-            self._describe(path, source, dataset) for path in sorted(directory.glob(f"*{_SUFFIX}"))
-        ]
+        found = [self._describe(path, source, dataset) for path in directory.glob(f"*{_SUFFIX}")]
+        # Ordered by when each was fetched, not by file name: names written to the
+        # second and names written to the microsecond do not sort together.
+        return sorted(found, key=lambda stored: (stored.fetched_at, stored.path.name))
 
     def latest_info(
         self, source: str, dataset: str, partition: Mapping[str, str]
@@ -168,8 +172,11 @@ class RawStore:
         stem = path.name[: -len(_SUFFIX)]
         try:
             timestamp, hash_prefix = stem.split("_", 1)
-            fetched_at = datetime.strptime(timestamp, _TIMESTAMP).replace(tzinfo=UTC)
-        except ValueError as error:
+            # Chosen by length: parsing a to-the-second name with the microsecond format
+            # would quietly read its last digit of seconds as a fraction.
+            layout = {22: _TIMESTAMP, 16: _TIMESTAMP_TO_THE_SECOND}[len(timestamp)]
+            fetched_at = datetime.strptime(timestamp, layout).replace(tzinfo=UTC)
+        except (ValueError, KeyError) as error:
             raise RawStoreError(f"unrecognised snapshot file name: {path}") from error
         relative = path.parent.relative_to(self.root / source / dataset).as_posix()
         return StoredSnapshot(

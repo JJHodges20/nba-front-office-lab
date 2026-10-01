@@ -11,9 +11,14 @@ before roster scoring, optimisation or any predictive claim. The plan is in
 
 ## Status
 
-Milestones 1-2 of 14 are complete: the architecture, and ingestion of league data from
-stats.nba.com into a validated set of tables. There is no database or user interface
-yet. See the milestone table in the roadmap for what exists and what does not.
+Milestones 1-3 of 14 are complete: the architecture, ingestion of league data from
+stats.nba.com into a validated set of tables, and import of contract data with
+cap-normalised salaries. There is no database or user interface yet. See the milestone
+table in the roadmap for what exists and what does not.
+
+**Contract data is not included.** No free source permits collecting NBA contracts
+automatically for this kind of project, so salaries come from a file you supply. See
+[docs/CONTRACT_DATA.md](docs/CONTRACT_DATA.md).
 
 ## Setup
 
@@ -38,6 +43,8 @@ python -m venv .venv
 .\.venv\Scripts\fol.exe ingest      # fetch league data from stats.nba.com into the raw store
 .\.venv\Scripts\fol.exe raw         # what the raw store holds
 .\.venv\Scripts\fol.exe check       # normalise the raw store and run the data-quality checks
+.\.venv\Scripts\fol.exe contracts template            # a contract file to fill in
+.\.venv\Scripts\fol.exe contracts import FILE --source "where the figures came from"
 .\.venv\Scripts\fol.exe dictionary  # the data dictionary, generated from the table contracts
 ```
 
@@ -70,6 +77,7 @@ tests/              unit, architecture and integration tests
 - [Roadmap and milestone status](docs/ROADMAP.md)
 - [Architecture](docs/ARCHITECTURE.md) - the layers and the rules between them
 - [Data dictionary](docs/DATA_DICTIONARY.md) - generated from the table contracts
+- [Contract data](docs/CONTRACT_DATA.md) - how to supply salaries, and the file format
 - [Data source register](docs/DATA_SOURCE_REGISTER.md)
 - [Development log](docs/DEVELOPMENT_LOG.md)
 

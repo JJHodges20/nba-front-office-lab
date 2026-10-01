@@ -9,7 +9,10 @@ something new.
 | NBA salary-cap announcements | Cap, tax line, aprons, minimum team salary, exceptions | Read by hand, transcribed into `configs/seasons/` | In use |
 | NBA "CBA 101" | Roster limits | Read by hand, transcribed into `configs/seasons/` | In use |
 | stats.nba.com (via `nba_api`) | Player, team, game, standings and advanced statistics | Public JSON endpoints, no key | In use |
-| Player contract data | Salaries, guarantees, options | To be decided in milestone 3 after a permissions check | Not selected |
+| Contract file supplied by the user | Salaries, options, guarantees | CSV placed by hand, imported with `fol contracts import` | In use (no file imported yet) |
+| Basketball Reference | - | - | Not used: terms prohibit this project's use |
+| Spotrac | - | - | Not used: refuses automated requests |
+| BALLDONTLIE API | - | - | Not used: contracts are on its paid tier only |
 
 ## Salary-cap figures
 
@@ -61,5 +64,22 @@ Known quirks of this source, and the rule applied to each, are recorded in
 
 No free, official feed of NBA contracts exists. The roadmap names Basketball Reference
 as an example of a public reference and requires that automated-use permissions be
-checked before a scraper is built. That check is part of milestone 3; until it is done
-no contract source is used.
+checked before a scraper is built. The check was done on 2026-10-01 and the answer is
+no; the reasoning is in
+[decisions/0004-contract-data-from-user-files.md](decisions/0004-contract-data-from-user-files.md).
+
+| Source | Checked | Finding |
+| --- | --- | --- |
+| Basketball Reference | Terms of Use (updated 2023-05-19), `robots.txt`, data-use and bot-traffic pages | Terms forbid building a substitute data store (§5j) and forbid using site data to prompt or train AI models or to support machine-learning methods that predict, classify, label or score (§5k). The lab's value, optimiser and probability stages would do exactly that. |
+| Spotrac | Site response | Automated requests are refused (HTTP 403). |
+| BALLDONTLIE API | Published tiers | Player and team contract endpoints are available only on the paid top tier. |
+| stats.nba.com | Endpoints | Publishes no salary data. |
+
+Contract data therefore comes from a CSV the user supplies from a source they are
+entitled to use. The format is described in [CONTRACT_DATA.md](CONTRACT_DATA.md). The
+user states the source at import, and that statement is stored on every contract row
+(`contracts.source_label`, `contracts.as_of_date`).
+
+Whoever supplies the figures is responsible for the terms they came under. Figures taken
+from a site whose terms resemble §5(k) above may not be used in the lab's modeling
+stages.

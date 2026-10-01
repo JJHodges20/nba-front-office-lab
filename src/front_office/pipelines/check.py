@@ -6,10 +6,13 @@ before it is loaded anywhere.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
+from front_office.config.season_rules import load_all_season_rules
 from front_office.config.settings import Settings
-from front_office.pipelines.normalize import NBA_STATS_TABLES, NormalizedTables, normalize
+from front_office.domain.cap_rules import SeasonRules
+from front_office.pipelines.normalize import BUILT_TABLES, NormalizedTables, normalize
 from front_office.quality import CheckResult, Severity, all_checks, run_checks
 from front_office.rawstore import RawStore
 
@@ -40,11 +43,12 @@ class DataReport:
         return not self.tables.errors and not self.check_errors
 
 
-def check_store(store: RawStore) -> DataReport:
-    tables = normalize(store)
-    return DataReport(tables, run_checks(tables.frames, all_checks(NBA_STATS_TABLES)))
+def check_store(store: RawStore, season_rules: Sequence[SeasonRules] = ()) -> DataReport:
+    tables = normalize(store, season_rules=season_rules)
+    return DataReport(tables, run_checks(tables.frames, all_checks(BUILT_TABLES)))
 
 
 def check_raw_data(settings: Settings) -> DataReport:
     """Normalise the project's raw store and run the quality checks on the result."""
-    return check_store(RawStore(settings.raw_dir))
+    season_rules = list(load_all_season_rules(settings.season_rules_dir).values())
+    return check_store(RawStore(settings.raw_dir), season_rules)

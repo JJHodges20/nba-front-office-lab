@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from front_office.domain.schema import DType, Field, Provenance, TableContract
+from front_office.domain.tables import _fields as f
 
 _USD = "USD"
 
@@ -86,4 +87,125 @@ SALARY_CAP_RULES = TableContract(
     introduced_in="V0",
 )
 
-TABLES: tuple[TableContract, ...] = (SALARY_CAP_RULES,)
+CONTRACT_TYPES = ("standard", "two_way")
+CONTRACT_STATUSES = ("active", "dead_money")
+OPTION_TYPES = ("player", "team", "early_termination")
+GUARANTEE_LEVELS = ("full", "partial", "none")
+
+CONTRACTS = TableContract(
+    name="contracts",
+    domain="contracts",
+    description=(
+        "Player salary agreements as supplied in an imported contract file: one row for "
+        "each run of consecutive seasons a team owes a player."
+    ),
+    grain="One row per player per team per run of consecutive seasons.",
+    fields=(
+        f.label(
+            "contract_id", "Key built from player, team, first season and status.", nullable=False
+        ),
+        f.player_id(),
+        f.team_id(
+            description="Team that owes the salary. Null if the file gave no team.", nullable=True
+        ),
+        f.label("player_name", "Player name as written in the contract file.", nullable=False),
+        f.label(
+            "contract_type",
+            "Standard contracts count against the roster limit of fifteen; two-way contracts "
+            "have their own limit and do not count against the cap.",
+            nullable=False,
+            allowed=CONTRACT_TYPES,
+        ),
+        f.label(
+            "status",
+            "Active: the player is under contract. Dead money: salary still owed to a "
+            "player who was waived.",
+            nullable=False,
+            allowed=CONTRACT_STATUSES,
+        ),
+        f.label("first_season", "First season the file lists salary for.", nullable=False),
+        f.label("last_season", "Last season the file lists salary for.", nullable=False),
+        f.count("seasons", "Number of seasons listed.", unit="seasons"),
+        Field(
+            "total_salary",
+            DType.INTEGER,
+            "Sum of the listed seasons' salaries.",
+            nullable=False,
+            provenance=Provenance.DERIVED,
+            unit=_USD,
+            minimum=0,
+        ),
+        Field(
+            "guaranteed_amount",
+            DType.INTEGER,
+            "Total guaranteed money, as the file states it. Null if not stated.",
+            unit=_USD,
+            minimum=0,
+        ),
+        Field(
+            "source_label",
+            DType.STRING,
+            "Where the person who supplied the file got the figures.",
+            nullable=False,
+            provenance=Provenance.OPERATIONAL,
+        ),
+        Field(
+            "as_of_date",
+            DType.DATE,
+            "Date the figures were current, as stated at import.",
+            nullable=False,
+            provenance=Provenance.OPERATIONAL,
+        ),
+    ),
+    primary_key=("contract_id",),
+    indexes=(("player_id",), ("team_id",)),
+)
+
+CONTRACT_YEARS = TableContract(
+    name="contract_years",
+    domain="contracts",
+    description="Salary for each season of each contract, with its share of that season's cap.",
+    grain="One row per contract per season.",
+    fields=(
+        f.label(
+            "contract_id",
+            "The contract this season belongs to.",
+            nullable=False,
+            references="contracts.contract_id",
+        ),
+        f.season(),
+        f.player_id(),
+        f.team_id(description="Team that owes the salary.", nullable=True),
+        Field(
+            "salary", DType.INTEGER, "Salary for the season.", nullable=False, unit=_USD, minimum=0
+        ),
+        Field(
+            "salary_cap_pct",
+            DType.FLOAT,
+            "Salary as a fraction of that season's cap. Null when the season's cap is not "
+            "configured, as for future seasons the league has not set.",
+            provenance=Provenance.DERIVED,
+            unit="fraction",
+            minimum=0,
+        ),
+        f.label("option", "Option attached to the season, if any.", allowed=OPTION_TYPES),
+        f.label(
+            "guarantee",
+            "How much of the season's salary is guaranteed. Null if the file does not say.",
+            allowed=GUARANTEE_LEVELS,
+        ),
+        Field(
+            "years_remaining",
+            DType.INTEGER,
+            "Seasons left on the contract after this one.",
+            nullable=False,
+            provenance=Provenance.DERIVED,
+            unit="seasons",
+            minimum=0,
+        ),
+    ),
+    primary_key=("contract_id", "season"),
+    indexes=(("season", "team_id"), ("player_id", "season")),
+)
+
+TABLES: tuple[TableContract, ...] = (SALARY_CAP_RULES, CONTRACTS, CONTRACT_YEARS)
