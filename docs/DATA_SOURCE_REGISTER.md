@@ -8,7 +8,7 @@ something new.
 | --- | --- | --- | --- |
 | NBA salary-cap announcements | Cap, tax line, aprons, minimum team salary, exceptions | Read by hand, transcribed into `configs/seasons/` | In use |
 | NBA "CBA 101" | Roster limits | Read by hand, transcribed into `configs/seasons/` | In use |
-| stats.nba.com (via `nba_api`) | Player, team, game, standings and advanced statistics | Public JSON endpoints, no key | Planned (milestone 2) |
+| stats.nba.com (via `nba_api`) | Player, team, game, standings and advanced statistics | Public JSON endpoints, no key | In use |
 | Player contract data | Salaries, guarantees, options | To be decided in milestone 3 after a permissions check | Not selected |
 
 ## Salary-cap figures
@@ -36,8 +36,26 @@ the cap, and maximum salaries are 25%, 30% and 35% of it.
   this machine on 2026-10-01.
 - Team advanced statistics (possessions, offensive and defensive rating) are published
   from the 1996-97 season onwards, which sets the start of the lab's team history.
-- The lab throttles its requests and stores every response in the raw store, so a
-  season is fetched once rather than repeatedly.
+- The lab throttles its requests (one every 1.2 seconds by default) and stores every
+  response in the raw store, so a finished season is fetched once rather than repeatedly.
+- Play-in games exist from 2019-20. Player detail is ingested for the current league
+  year and the three seasons before it; raise `seasons.player_detail_seasons` in
+  `configs/base.yaml` for more.
+
+| Dataset | Endpoint | One snapshot per |
+| --- | --- | --- |
+| `team_years` | CommonTeamYears | (all franchises) |
+| `player_index` | PlayerIndex, historical | (every player in league history) |
+| `standings` | LeagueStandingsV3 | season |
+| `team_season_base`, `team_season_advanced`, `team_season_opponent` | LeagueDashTeamStats | season and season type |
+| `team_game_logs` | LeagueGameLog, teams | season and season type |
+| `player_season_base`, `player_season_advanced`, `player_season_starters` | LeagueDashPlayerStats | season and season type |
+| `player_game_logs` | LeagueGameLog, players | season and season type |
+| `team_roster` | CommonTeamRoster | season and team |
+| `team_on_off` | TeamPlayerOnOffSummary | season, season type and team |
+
+Known quirks of this source, and the rule applied to each, are recorded in
+[decisions/0003-source-quirks.md](decisions/0003-source-quirks.md).
 
 ## Player contracts
 

@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from front_office.config import Settings, load_settings
 from front_office.config.settings import ENV_DATA_DIR, ENV_HOME
+from front_office.domain.datasets import NBA_STATS, partition_for
+from front_office.domain.snapshots import Snapshot
+from front_office.pipelines.normalize import NormalizedTables, normalize
+from front_office.rawstore import RawStore
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -36,3 +42,37 @@ def project(tmp_path: Path) -> Path:
 def settings(project: Path) -> Settings:
     """Settings for the throwaway project, so nothing touches the real data directory."""
     return load_settings(project)
+
+
+FIXTURE_RAW = REPO_ROOT / "tests" / "fixtures" / "raw"
+
+
+@pytest.fixture(scope="session")
+def fixture_store() -> RawStore:
+    """The miniature raw store built by scripts/make_fixtures.py from real responses."""
+    return RawStore(FIXTURE_RAW)
+
+
+@pytest.fixture(scope="session")
+def raw(fixture_store: RawStore) -> Callable[..., Snapshot]:
+    """Fetch one fixture snapshot: ``raw(D.STANDINGS, Season(2025))``."""
+
+    def fetch(dataset, season=None, season_type=None, team_id=None) -> Snapshot:
+        partition = partition_for(dataset, season=season, season_type=season_type, team_id=team_id)
+        snapshot = fixture_store.latest(NBA_STATS, dataset.value, partition)
+        assert snapshot is not None, f"fixture missing: {dataset.value} {partition}"
+        return snapshot
+
+    return fetch
+
+
+@pytest.fixture(scope="session")
+def normalized(fixture_store: RawStore) -> NormalizedTables:
+    """Every table built from the fixture store. Shared: copy a frame before changing it."""
+    return normalize(fixture_store)
+
+
+@pytest.fixture
+def tables(normalized: NormalizedTables) -> dict[str, pd.DataFrame]:
+    """A private copy of the normalised fixture tables that a test may freely break."""
+    return {name: frame.copy() for name, frame in normalized.frames.items()}

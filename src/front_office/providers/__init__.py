@@ -2,5 +2,9 @@
 
 An adapter fetches and returns what the source sent, unchanged. It does no cleaning,
 renaming or interpretation; that is the processing layer's job. This is the only layer
-allowed to talk to the network. May import: domain, config.
+allowed to talk to the network. May import: domain.
 """
+
+from front_office.providers.nba_stats import NbaStatsProvider, ProviderError
+
+__all__ = ["NbaStatsProvider", "ProviderError"]

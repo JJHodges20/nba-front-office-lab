@@ -10,9 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from front_office.domain.schema import TableContract
-from front_office.domain.tables import finance
+from front_office.domain.tables import finance, players, teams
 
-ALL_TABLES: tuple[TableContract, ...] = (*finance.TABLES,)
+# Listed so that a table always comes after the tables it references.
+ALL_TABLES: tuple[TableContract, ...] = (*teams.TABLES, *players.TABLES, *finance.TABLES)
 
 _BY_NAME = {contract.name: contract for contract in ALL_TABLES}
 if len(_BY_NAME) != len(ALL_TABLES):
@@ -32,21 +33,6 @@ class PlannedTable:
 # The roadmap's core database design (section 12). An entry is deleted from this list in
 # the same commit that adds the table's contract.
 PLANNED_TABLES: tuple[PlannedTable, ...] = (
-    PlannedTable("players", "players", "Stable player identity and profile fields.", 2),
-    PlannedTable(
-        "player_seasons",
-        "player_performance",
-        "Season-level player statistics and advanced metrics.",
-        2,
-    ),
-    PlannedTable(
-        "player_game_logs", "player_performance", "Game-level performance and availability.", 2
-    ),
-    PlannedTable("teams", "teams", "Stable team identity.", 2),
-    PlannedTable("team_seasons", "teams", "Season-level team performance and outcomes.", 2),
-    PlannedTable("team_games", "teams", "Game-level team results.", 2),
-    PlannedTable("team_rosters", "players", "Player membership by team and season.", 2),
-    PlannedTable("playoff_results", "historical_outcomes", "Series and postseason advancement.", 2),
     PlannedTable(
         "contracts", "contracts", "Contract-level metadata, guarantees, options, start/end.", 3
     ),

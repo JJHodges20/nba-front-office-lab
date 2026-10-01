@@ -2,15 +2,27 @@
 
 from __future__ import annotations
 
+import sys
+from datetime import date
+from typing import Annotated
+
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from front_office import __version__
 from front_office.config import ConfigError, load_all_season_rules, load_settings
-from front_office.domain import PayrollLine
+from front_office.domain import PayrollLine, Season
 from front_office.domain.dictionary import render_data_dictionary
 from front_office.domain.tables import ALL_TABLES, PLANNED_TABLES
+from front_office.pipelines.check import CheckSeverity, check_raw_data
+from front_office.pipelines.ingest import (
+    FetchOutcome,
+    FetchStatus,
+    build_ingestor,
+    default_plan,
+)
+from front_office.pipelines.inventory import raw_inventory
 
 DATA_DICTIONARY = "docs/DATA_DICTIONARY.md"
 
@@ -90,9 +102,9 @@ def seasons() -> None:
 
 @app.command()
 def dictionary(
-    write: bool = typer.Option(
-        False, "--write", help=f"Write {DATA_DICTIONARY} instead of printing."
-    ),
+    write: Annotated[
+        bool, typer.Option("--write", help=f"Write {DATA_DICTIONARY} instead of printing.")
+    ] = False,
 ) -> None:
     """Render the data dictionary from the table contracts."""
     document = render_data_dictionary(ALL_TABLES, PLANNED_TABLES)
@@ -108,7 +120,154 @@ def dictionary(
     console.print(f"Wrote {target} ({len(ALL_TABLES)} tables)")
 
 
+_STATUS_STYLE = {
+    FetchStatus.STORED: "green",
+    FetchStatus.UNCHANGED: "cyan",
+    FetchStatus.SKIPPED: "dim",
+    FetchStatus.FAILED: "bold red",
+}
+
+
+@app.command()
+def ingest(
+    season: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--season",
+            "-s",
+            help="Season to fetch, e.g. 2025-26. Repeat for several. Default: the full plan.",
+        ),
+    ] = None,
+    teams_only: Annotated[
+        bool, typer.Option("--teams-only", help="Skip player-level datasets.")
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Refetch even when the stored snapshot is still current."),
+    ] = False,
+) -> None:
+    """Fetch raw data from stats.nba.com into the raw store.
+
+    With no --season, fetches team history from the configured start plus player detail
+    for the most recent seasons. Finished seasons already in the store are skipped.
+    """
+    try:
+        settings = load_settings()
+        plan = default_plan(settings, date.today())
+        chosen = [Season.parse(label) for label in season] if season else list(plan.seasons)
+    except (ConfigError, ValueError) as error:
+        raise _fail(error) from error
+
+    def report(outcome: FetchOutcome) -> None:
+        if outcome.status is FetchStatus.SKIPPED:
+            return
+        style = _STATUS_STYLE[outcome.status]
+        detail = outcome.error if outcome.error else f"{outcome.rows} rows"
+        console.print(
+            f"[{style}]{outcome.status.value:>9}[/{style}]  {outcome.request.describe()}  "
+            f"[dim]{detail}[/dim]",
+            highlight=False,
+        )
+
+    ingestor = build_ingestor(settings, force=force, on_outcome=report)
+    outcomes = ingestor.ingest_globals(plan.current)
+    for one_season in chosen:
+        # A season named explicitly gets player detail unless --teams-only says otherwise.
+        players = not teams_only and (bool(season) or one_season in plan.player_detail)
+        outcomes += ingestor.ingest_season(one_season, players=players)
+
+    counts = {status: 0 for status in FetchStatus}
+    for outcome in outcomes:
+        counts[outcome.status] += 1
+    summary = ", ".join(f"{count} {status.value}" for status, count in counts.items() if count)
+    console.print(f"\n{len(outcomes)} requests: {summary}", highlight=False)
+    if counts[FetchStatus.FAILED]:
+        console.print("[bold red]Some requests failed; run the command again to retry them.[/]")
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def raw() -> None:
+    """Summarise what the raw store holds."""
+    try:
+        settings = load_settings()
+    except ConfigError as error:
+        raise _fail(error) from error
+    inventory = raw_inventory(settings)
+    if not inventory:
+        console.print(f"The raw store at {settings.raw_dir} is empty. Run: fol ingest")
+        return
+
+    table = Table(title=f"Raw store: {settings.raw_dir}")
+    table.add_column("Source")
+    table.add_column("Dataset", style="bold")
+    table.add_column("Partitions", justify="right")
+    table.add_column("Snapshots", justify="right")
+    table.add_column("Seasons")
+    table.add_column("Newest fetch (UTC)")
+    for entry in inventory:
+        seasons_held = f"{entry.first_season} to {entry.last_season}" if entry.first_season else "-"
+        table.add_row(
+            entry.source,
+            entry.dataset,
+            str(entry.partitions),
+            str(entry.snapshots),
+            seasons_held,
+            entry.newest_fetch.strftime("%Y-%m-%d %H:%M"),
+        )
+    console.print(table)
+
+
+@app.command()
+def check() -> None:
+    """Normalise the raw store and run every data-quality check. Writes nothing."""
+    try:
+        settings = load_settings()
+    except ConfigError as error:
+        raise _fail(error) from error
+    report = check_raw_data(settings)
+
+    tables = Table(title="Normalised tables")
+    tables.add_column("Table", style="bold")
+    tables.add_column("Rows", justify="right")
+    for name, frame in report.tables.frames.items():
+        tables.add_row(name, f"{len(frame):,}")
+    console.print(tables)
+
+    for issue in report.tables.errors:
+        console.print(f"[bold red]not built[/]  {issue.table} [{issue.scope}]: {issue.message}")
+    for issue in report.tables.notes:
+        console.print(
+            f"[cyan]note[/]  {issue.table} [{issue.scope}]: {issue.message}", highlight=False
+        )
+
+    for result in report.failed_checks:
+        style = "bold red" if result.severity is CheckSeverity.ERROR else "yellow"
+        console.print(
+            f"[{style}]{result.severity.value}[/]  {result.check}: {result.failures:,} of "
+            f"{result.examined:,} failed. {result.description}",
+            highlight=False,
+        )
+        for example in result.examples:
+            console.print(f"         [dim]{example}[/dim]", highlight=False)
+
+    passed = len(report.checks) - len(report.failed_checks)
+    console.print(
+        f"\n{len(report.checks)} checks: {passed} passed, "
+        f"{len(report.check_warnings)} with warnings, {len(report.check_errors)} with errors; "
+        f"{len(report.tables.errors)} table parts not built.",
+        highlight=False,
+    )
+    if not report.ok:
+        raise typer.Exit(code=1)
+
+
 def main() -> None:
+    # Player names include characters the legacy Windows code page cannot encode. When
+    # output is piped or redirected, write UTF-8 instead of failing on them.
+    for stream in (sys.stdout, sys.stderr):
+        if not stream.isatty() and hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     app()
 
 

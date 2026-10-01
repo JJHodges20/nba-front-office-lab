@@ -11,8 +11,9 @@ before roster scoring, optimisation or any predictive claim. The plan is in
 
 ## Status
 
-Milestone 1 of 14 (repository and architecture) is complete. See the milestone table in
-the roadmap for what exists and what does not.
+Milestones 1-2 of 14 are complete: the architecture, and ingestion of league data from
+stats.nba.com into a validated set of tables. There is no database or user interface
+yet. See the milestone table in the roadmap for what exists and what does not.
 
 ## Setup
 
@@ -34,8 +35,16 @@ python -m venv .venv
 ```powershell
 .\.venv\Scripts\fol.exe info        # version, data locations, configured seasons
 .\.venv\Scripts\fol.exe seasons     # cap, tax, apron and roster rules by season
+.\.venv\Scripts\fol.exe ingest      # fetch league data from stats.nba.com into the raw store
+.\.venv\Scripts\fol.exe raw         # what the raw store holds
+.\.venv\Scripts\fol.exe check       # normalise the raw store and run the data-quality checks
 .\.venv\Scripts\fol.exe dictionary  # the data dictionary, generated from the table contracts
 ```
+
+The first `fol ingest` makes about 440 requests and takes roughly ten minutes: team
+data for every season since 1996-97, and player detail for the current league year and
+the three seasons before it. Later runs fetch only what is new. `fol ingest --season
+2025-26` fetches one season.
 
 ## Development
 

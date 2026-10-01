@@ -91,6 +91,28 @@ Every column is tagged `identifier`, `measured`, `derived`, `modeled`, `assumpti
 modeled estimates and user assumptions; carrying that tag on the column lets any screen
 label a number correctly without knowing how it was produced.
 
+## From source to table
+
+```
+fol ingest:  provider.fetch(dataset) -> Snapshot -> RawStore.save()
+fol check:   RawStore -> normalize() -> tables + issues -> quality checks
+```
+
+- A **dataset** (`domain/datasets.py`) is one kind of provider response. A **snapshot**
+  (`domain/snapshots.py`) is one response, unchanged, with its source, partition, fetch
+  time and the request that produced it.
+- The **raw store** files snapshots under
+  `data/raw/<source>/<dataset>/<partition>/<fetched_at>_<hash>.json.gz`. Files are
+  written once and never changed. Fetching what is already stored writes nothing.
+- **Normalisation** (`pipelines/normalize.py`) is a pure replay of the raw store: the
+  same snapshots always give the same tables, so anything built from them can be thrown
+  away and rebuilt.
+- A dataset that is missing, malformed or fails its contract becomes a **build issue**
+  for that table and season and the build carries on. A normaliser that adjusts source
+  data says so in a note. See `docs/decisions/0003-source-quirks.md`.
+- **Quality checks** (`quality/checks.py`) then test the tables against each other.
+  Contracts prove a table is well-formed; checks prove the tables agree.
+
 ## Season rules
 
 Cap thresholds, salary exceptions, maximum salaries and roster limits live in
@@ -129,3 +151,13 @@ field disagree.
 2. Write the normaliser in `processing/` and finish it with `conform_frame`.
 3. Run `fol dictionary --write`.
 4. Test the normaliser against a recorded fixture.
+
+## How to add a stats.nba.com dataset
+
+1. Add it to `NbaStatsDataset` and `_SPECS` in `domain/datasets.py`.
+2. Map it to its endpoint in `providers/nba_stats.py`. A test confirms the parameters
+   exist in the installed `nba_api`.
+3. Request it in `pipelines/ingest.py` (`league_requests` or `team_requests`).
+4. Normalise it in `processing/nba_stats/`, wire it into `pipelines/normalize.py`, and
+   add any cross-table check to `quality/checks.py`.
+5. Add it to `scripts/make_fixtures.py`, rebuild the fixtures, and test against them.

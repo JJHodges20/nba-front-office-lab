@@ -12,6 +12,20 @@ seasons:
   # First season for which stats.nba.com publishes team advanced statistics
   # (possessions, offensive/defensive rating). Historical team research starts here.
   history_start: "1996-97"
-  # Player-level detail (season stats, game logs, rosters) is ingested for this many
-  # of the most recent seasons. Team-level history always goes back to history_start.
+  # Player-level detail (season stats, game logs, rosters, on/off) is ingested for the
+  # current league year and this many seasons before it. Team-level history always goes
+  # back to history_start.
   player_detail_seasons: 3
+
+providers:
+  nba_stats:
+    # stats.nba.com is an undocumented public endpoint: be patient and polite.
+    timeout_seconds: 45
+    min_interval_seconds: 1.2
+    max_retries: 3
+    backoff_seconds: 4
+
+ingestion:
+  # A season still in progress is refetched once its newest snapshot is this old.
+  # A finished season is fetched once and then left alone.
+  refresh_after_hours: 12

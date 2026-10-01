@@ -32,7 +32,329 @@ measured statistics, modeled estimates and user assumptions visibly apart.
 
 | Table | Domain | Grain | Since |
 | --- | --- | --- | --- |
+| [`teams`](#teams) | teams | One row per active franchise. | V1 |
+| [`team_seasons`](#team_seasons) | teams | One row per team per season (regular season). | V1 |
+| [`team_games`](#team_games) | teams | One row per team per game (two rows per game). | V1 |
+| [`playoff_results`](#playoff_results) | historical_outcomes | One row per playoff series. | V1 |
+| [`players`](#players) | players | One row per player. | V1 |
+| [`player_seasons`](#player_seasons) | player_performance | One row per player per season per season type. | V1 |
+| [`player_game_logs`](#player_game_logs) | player_performance | One row per player per game. | V1 |
+| [`team_rosters`](#team_rosters) | players | One row per player per team per season. | V1 |
+| [`player_on_off`](#player_on_off) | player_performance | One row per player per team per season per season type. | V1 |
 | [`salary_cap_rules`](#salary_cap_rules) | cap_rules | One row per NBA season. | V0 |
+
+### teams
+
+The thirty current franchises. A franchise keeps its id when it relocates or is renamed.
+
+- **Grain:** One row per active franchise.
+- **Primary key:** `team_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `team_id` | integer | yes | identifier |  | Franchise id assigned by the league. |
+| `abbreviation` | string | yes | identifier |  | Current three-letter abbreviation. |
+| `city` | string | yes | identifier |  | Current city or region name. |
+| `nickname` | string | yes | identifier |  | Current nickname, e.g. Celtics. |
+| `full_name` | string | yes | identifier |  | City and nickname. |
+| `conference` | string | yes | identifier |  | Current conference. One of: `East`, `West`. |
+| `division` | string | yes | identifier |  | Current division. |
+| `first_season_year` | integer | no | measured |  | Calendar year the franchise's first season began. |
+
+### team_seasons
+
+Regular-season performance of each team with its postseason outcome: the team-season dataset that historical benchmark research is built on.
+
+- **Grain:** One row per team per season (regular season).
+- **Primary key:** `season`, `team_id`
+- **Indexes:** `team_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `season` | string | yes | identifier |  | Season label, e.g. 2025-26. |
+| `team_id` | integer | yes | identifier |  | Team id. References `teams.team_id`. |
+| `team_name` | string | yes | identifier |  | Team name as it was that season. |
+| `team_abbreviation` | string | no | identifier |  | Abbreviation as it was that season. |
+| `conference` | string | no | identifier |  | Conference that season. One of: `East`, `West`. |
+| `division` | string | no | identifier |  | Division that season. |
+| `conference_rank` | integer | no | measured |  | Final position in the conference standings. |
+| `games_played` | integer | yes | measured |  | Regular-season games played. |
+| `wins` | integer | yes | measured |  | Regular-season wins. |
+| `losses` | integer | yes | measured |  | Regular-season losses. |
+| `minutes` | float | yes | measured | minutes | Game minutes played, overtime included (48 per regulation game). |
+| `fgm` | integer | yes | measured |  | Field goals made. |
+| `fga` | integer | yes | measured |  | Field goals attempted. |
+| `fg3m` | integer | yes | measured |  | Three-point field goals made. |
+| `fg3a` | integer | yes | measured |  | Three-point field goals attempted. |
+| `ftm` | integer | yes | measured |  | Free throws made. |
+| `fta` | integer | yes | measured |  | Free throws attempted. |
+| `oreb` | integer | yes | measured |  | Offensive rebounds. |
+| `dreb` | integer | yes | measured |  | Defensive rebounds. |
+| `reb` | integer | yes | measured |  | Total rebounds. |
+| `ast` | integer | yes | measured |  | Assists. |
+| `tov` | integer | yes | measured |  | Turnovers. |
+| `stl` | integer | yes | measured |  | Steals. |
+| `blk` | integer | yes | measured |  | Blocks. |
+| `pf` | integer | yes | measured |  | Personal fouls. |
+| `pts` | integer | yes | measured |  | Points. |
+| `opp_fgm` | integer | yes | measured |  | Field goals made by opponents. |
+| `opp_fga` | integer | yes | measured |  | Field goals attempted by opponents. |
+| `opp_fg3m` | integer | yes | measured |  | Three-point field goals made by opponents. |
+| `opp_fg3a` | integer | yes | measured |  | Three-point field goals attempted by opponents. |
+| `opp_ftm` | integer | yes | measured |  | Free throws made by opponents. |
+| `opp_fta` | integer | yes | measured |  | Free throws attempted by opponents. |
+| `opp_oreb` | integer | yes | measured |  | Offensive rebounds by opponents. |
+| `opp_dreb` | integer | yes | measured |  | Defensive rebounds by opponents. |
+| `opp_reb` | integer | yes | measured |  | Total rebounds by opponents. |
+| `opp_ast` | integer | yes | measured |  | Assists by opponents. |
+| `opp_tov` | integer | yes | measured |  | Turnovers by opponents. |
+| `opp_stl` | integer | yes | measured |  | Steals by opponents. |
+| `opp_blk` | integer | yes | measured |  | Blocks by opponents. |
+| `opp_pf` | integer | yes | measured |  | Personal fouls by opponents. |
+| `opp_pts` | integer | yes | measured |  | Points by opponents. |
+| `possessions` | integer | yes | measured |  | Possessions, counted by the league from play-by-play. |
+| `pace` | float | yes | measured | possessions per 48 minutes | Possessions per 48 minutes, as published by the league. |
+| `off_rating` | float | yes | measured | per 100 possessions | Points scored per 100 possessions, as published by the league. |
+| `def_rating` | float | yes | measured | per 100 possessions | Points allowed per 100 possessions, as published by the league. |
+| `net_rating` | float | yes | measured | per 100 possessions | Offensive minus defensive rating, as published by the league. |
+| `made_play_in` | boolean | no | derived |  | Played in the play-in tournament. Null until the season's postseason is complete. |
+| `made_playoffs` | boolean | no | derived |  | Played at least one playoff game. Null until the season's postseason is complete. |
+| `playoff_round_reached` | integer | no | derived |  | Furthest playoff round played: 0 none, 1 first round, 2 conference semifinals, 3 conference finals, 4 NBA Finals. Null until the season's postseason is complete. |
+| `playoff_series_won` | integer | no | derived |  | Playoff series won. Null until the season's postseason is complete. |
+| `playoff_wins` | integer | no | derived |  | Playoff games won. Null until the season's postseason is complete. |
+| `playoff_losses` | integer | no | derived |  | Playoff games lost. Null until the season's postseason is complete. |
+| `made_conference_finals` | boolean | no | derived |  | Reached the conference finals. Null until the season's postseason is complete. |
+| `made_finals` | boolean | no | derived |  | Reached the NBA Finals. Null until the season's postseason is complete. |
+| `won_championship` | boolean | no | derived |  | Won the NBA championship. Null until the season's postseason is complete. |
+
+### team_games
+
+Each team's box score for each game: regular season, play-in and playoffs.
+
+- **Grain:** One row per team per game (two rows per game).
+- **Primary key:** `game_id`, `team_id`
+- **Indexes:** `season`, `season_type`; `team_id`, `game_date`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `game_id` | string | yes | identifier |  | Game id: ten digits, kept as text because it starts with zeros. |
+| `team_id` | integer | yes | identifier |  | Team id. References `teams.team_id`. |
+| `season` | string | yes | identifier |  | Season label, e.g. 2025-26. |
+| `season_type` | string | yes | identifier |  | Phase of the season. One of: `regular`, `playoffs`, `playin`. |
+| `game_date` | date | yes | measured |  | Date the game was played. |
+| `opponent_team_id` | integer | yes | identifier |  | The other team in the game. References `teams.team_id`. |
+| `is_home` | boolean | yes | measured |  | Whether the team played at home. False for both teams at a neutral site. |
+| `is_neutral_site` | boolean | yes | measured |  | Whether the game was played at a neutral site, with neither team at home. |
+| `won` | boolean | no | measured |  | Whether the team won. Null if the game is unfinished. |
+| `minutes` | integer | yes | measured | player-minutes | Player-minutes credited to the team (240 in regulation, 25 more per overtime). |
+| `fgm` | integer | yes | measured |  | Field goals made. |
+| `fga` | integer | yes | measured |  | Field goals attempted. |
+| `fg3m` | integer | yes | measured |  | Three-point field goals made. |
+| `fg3a` | integer | yes | measured |  | Three-point field goals attempted. |
+| `ftm` | integer | yes | measured |  | Free throws made. |
+| `fta` | integer | yes | measured |  | Free throws attempted. |
+| `oreb` | integer | yes | measured |  | Offensive rebounds. |
+| `dreb` | integer | yes | measured |  | Defensive rebounds. |
+| `reb` | integer | yes | measured |  | Total rebounds. |
+| `ast` | integer | yes | measured |  | Assists. |
+| `tov` | integer | yes | measured |  | Turnovers. |
+| `stl` | integer | yes | measured |  | Steals. |
+| `blk` | integer | yes | measured |  | Blocks. |
+| `pf` | integer | yes | measured |  | Personal fouls. |
+| `pts` | integer | yes | measured |  | Points. |
+| `opp_pts` | integer | yes | measured |  | Points scored by the opponent. |
+
+### playoff_results
+
+Every playoff series, derived from game results.
+
+- **Grain:** One row per playoff series.
+- **Primary key:** `season`, `series_id`
+- **Indexes:** `season`, `round`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `season` | string | yes | identifier |  | Season label, e.g. 2025-26. |
+| `series_id` | string | yes | identifier |  | Series key: season, round and the two team ids. |
+| `round` | integer | yes | derived |  | Playoff round, 1 (first round) to 4 (NBA Finals). |
+| `round_name` | string | yes | identifier |  | Name of the round. One of: `First Round`, `Conference Semifinals`, `Conference Finals`, `NBA Finals`. |
+| `team_a_id` | integer | yes | identifier |  | The team that hosted game 1. References `teams.team_id`. |
+| `team_b_id` | integer | yes | identifier |  | The team that visited in game 1. References `teams.team_id`. |
+| `team_a_wins` | integer | yes | measured |  | Games won by team A. |
+| `team_b_wins` | integer | yes | measured |  | Games won by team B. |
+| `games_played` | integer | yes | measured |  | Games played in the series. |
+| `best_of` | integer | yes | measured |  | Scheduled length of the series: 5 or 7 games. |
+| `is_complete` | boolean | yes | derived |  | Whether one team has won enough games to take the series. |
+| `winner_team_id` | integer | no | identifier |  | Series winner. Null while the series is undecided. References `teams.team_id`. |
+| `loser_team_id` | integer | no | identifier |  | Series loser. Null while the series is undecided. References `teams.team_id`. |
+| `start_date` | date | yes | measured |  | Date of the first game. |
+| `end_date` | date | yes | measured |  | Date of the most recent game. |
+
+### players
+
+Everyone who has played in the league: identity and profile fields.
+
+- **Grain:** One row per player.
+- **Primary key:** `player_id`
+- **Indexes:** `current_team_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `player_id` | integer | yes | identifier |  | Player id assigned by the league. |
+| `full_name` | string | yes | identifier |  | First and last name. |
+| `first_name` | string | no | identifier |  | First name. Null for players known by a single name. |
+| `last_name` | string | yes | identifier |  | Last name. |
+| `position` | string | no | identifier |  | Listed position: G, F, C or a combination such as G-F. |
+| `height_inches` | integer | no | measured | inches | Listed height. |
+| `weight_lbs` | integer | no | measured | pounds | Listed weight. |
+| `birth_date` | date | no | measured |  | Date of birth. Known only for players who appear on an ingested roster. |
+| `country` | string | no | identifier |  | Country. |
+| `college` | string | no | identifier |  | College or last team before the NBA. |
+| `draft_year` | integer | no | measured |  | Year drafted. Null if undrafted. |
+| `draft_round` | integer | no | measured |  | Draft round. Null if undrafted. |
+| `draft_number` | integer | no | measured |  | Overall pick number. Null if undrafted. |
+| `first_season_year` | integer | no | measured |  | Calendar year the player's first season began. |
+| `last_season_year` | integer | no | measured |  | Calendar year the player's most recent season began. |
+| `is_active` | boolean | yes | measured |  | Whether the player is on a roster now. |
+| `current_team_id` | integer | no | identifier |  | Team the player is on now. Null if not on a roster. References `teams.team_id`. |
+
+### player_seasons
+
+Each player's season totals with the league's on-court measurements. A player traded mid-season has one row covering every team he played for.
+
+- **Grain:** One row per player per season per season type.
+- **Primary key:** `player_id`, `season`, `season_type`
+- **Indexes:** `season`, `season_type`; `team_id`, `season`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `player_id` | integer | yes | identifier |  | Player id. References `players.player_id`. |
+| `season` | string | yes | identifier |  | Season label, e.g. 2025-26. |
+| `season_type` | string | yes | identifier |  | Phase of the season. One of: `regular`, `playoffs`, `playin`. |
+| `player_name` | string | yes | identifier |  | Player name as the source listed it. |
+| `team_id` | integer | yes | identifier |  | Team the player finished the season with. References `teams.team_id`. |
+| `team_count` | integer | yes | measured |  | Number of teams the player appeared for. |
+| `age` | integer | no | measured | years | Age during the season. |
+| `games_played` | integer | yes | measured |  | Games played. |
+| `games_started` | integer | no | measured |  | Games started. |
+| `wins` | integer | yes | measured |  | Team wins in games the player appeared in. |
+| `losses` | integer | yes | measured |  | Team losses in games the player appeared in. |
+| `minutes` | float | yes | measured | minutes | Minutes played. |
+| `fgm` | integer | yes | measured |  | Field goals made. |
+| `fga` | integer | yes | measured |  | Field goals attempted. |
+| `fg3m` | integer | yes | measured |  | Three-point field goals made. |
+| `fg3a` | integer | yes | measured |  | Three-point field goals attempted. |
+| `ftm` | integer | yes | measured |  | Free throws made. |
+| `fta` | integer | yes | measured |  | Free throws attempted. |
+| `oreb` | integer | yes | measured |  | Offensive rebounds. |
+| `dreb` | integer | yes | measured |  | Defensive rebounds. |
+| `reb` | integer | yes | measured |  | Total rebounds. |
+| `ast` | integer | yes | measured |  | Assists. |
+| `tov` | integer | yes | measured |  | Turnovers. |
+| `stl` | integer | yes | measured |  | Steals. |
+| `blk` | integer | yes | measured |  | Blocks. |
+| `pf` | integer | yes | measured |  | Personal fouls. |
+| `pts` | integer | yes | measured |  | Points. |
+| `blocked_attempts` | integer | yes | measured |  | Field goal attempts by the player that were blocked. |
+| `fouls_drawn` | integer | yes | measured |  | Personal fouls drawn. |
+| `plus_minus` | integer | no | measured |  | Team point margin while the player was on the court. |
+| `double_doubles` | integer | yes | measured |  | Double-doubles. |
+| `triple_doubles` | integer | yes | measured |  | Triple-doubles. |
+| `possessions` | integer | no | measured |  | Team possessions while the player was on the court. |
+| `off_rating` | float | no | measured | per 100 possessions | Team points per 100 possessions with the player on the court. |
+| `def_rating` | float | no | measured | per 100 possessions | Opponent points per 100 possessions with the player on the court. |
+| `net_rating` | float | no | measured | per 100 possessions | On-court offensive minus defensive rating. |
+| `usage_pct` | float | no | measured | fraction | Share of team plays used by the player while on the court. |
+| `assist_pct` | float | no | measured | fraction | Share of teammates' field goals the player assisted while on the court. |
+| `oreb_pct` | float | no | measured | fraction | Share of available offensive rebounds the player took while on the court. |
+| `dreb_pct` | float | no | measured | fraction | Share of available defensive rebounds the player took while on the court. |
+| `reb_pct` | float | no | measured | fraction | Share of available rebounds the player took while on the court. |
+| `pace` | float | no | measured | possessions per 48 minutes | Team possessions per 48 minutes with the player on the court. |
+| `player_impact_estimate` | float | no | measured | fraction | The league's PIE: the player's share of the game events in games he played. |
+
+### player_game_logs
+
+Each player's box score for each game he played.
+
+- **Grain:** One row per player per game.
+- **Primary key:** `player_id`, `game_id`
+- **Indexes:** `season`, `season_type`; `player_id`, `game_date`; `game_id`, `team_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `player_id` | integer | yes | identifier |  | Player id. References `players.player_id`. |
+| `game_id` | string | yes | identifier |  | Game id: ten digits, kept as text because it starts with zeros. |
+| `season` | string | yes | identifier |  | Season label, e.g. 2025-26. |
+| `season_type` | string | yes | identifier |  | Phase of the season. One of: `regular`, `playoffs`, `playin`. |
+| `game_date` | date | yes | measured |  | Date the game was played. |
+| `team_id` | integer | yes | identifier |  | Team the player appeared for. References `teams.team_id`. |
+| `opponent_team_id` | integer | yes | identifier |  | The other team in the game. References `teams.team_id`. |
+| `is_home` | boolean | yes | measured |  | Whether the player's team played at home. False at a neutral site. |
+| `is_neutral_site` | boolean | yes | measured |  | Whether the game was played at a neutral site, with neither team at home. |
+| `won` | boolean | no | measured |  | Whether the player's team won. Null if the game is unfinished. |
+| `minutes` | integer | yes | measured | minutes | Minutes played, rounded to the whole minute by the source. |
+| `fgm` | integer | yes | measured |  | Field goals made. |
+| `fga` | integer | yes | measured |  | Field goals attempted. |
+| `fg3m` | integer | yes | measured |  | Three-point field goals made. |
+| `fg3a` | integer | yes | measured |  | Three-point field goals attempted. |
+| `ftm` | integer | yes | measured |  | Free throws made. |
+| `fta` | integer | yes | measured |  | Free throws attempted. |
+| `oreb` | integer | yes | measured |  | Offensive rebounds. |
+| `dreb` | integer | yes | measured |  | Defensive rebounds. |
+| `reb` | integer | yes | measured |  | Total rebounds. |
+| `ast` | integer | yes | measured |  | Assists. |
+| `tov` | integer | yes | measured |  | Turnovers. |
+| `stl` | integer | yes | measured |  | Steals. |
+| `blk` | integer | yes | measured |  | Blocks. |
+| `pf` | integer | yes | measured |  | Personal fouls. |
+| `pts` | integer | yes | measured |  | Points. |
+| `plus_minus` | integer | no | measured |  | Team point margin while the player was on the court. |
+
+### team_rosters
+
+Roster membership as the league lists it for a season: the final roster of a finished season, or the roster as of the fetch for the current league year.
+
+- **Grain:** One row per player per team per season.
+- **Primary key:** `season`, `team_id`, `player_id`
+- **Indexes:** `player_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `season` | string | yes | identifier |  | Season label, e.g. 2025-26. |
+| `team_id` | integer | yes | identifier |  | Team id. References `teams.team_id`. |
+| `player_id` | integer | yes | identifier |  | Player id. References `players.player_id`. |
+| `player_name` | string | yes | identifier |  | Player name as the source listed it. |
+| `jersey_number` | string | no | identifier |  | Jersey number; text because 0 and 00 are different numbers. |
+| `position` | string | no | identifier |  | Listed position: G, F, C or a combination such as G-F. |
+| `height_inches` | integer | no | measured | inches | Listed height. |
+| `weight_lbs` | integer | no | measured | pounds | Listed weight. |
+| `birth_date` | date | no | measured |  | Date of birth. |
+| `experience_years` | integer | no | measured | years | Completed NBA seasons; 0 for a rookie. |
+| `school` | string | no | identifier |  | College or last team before the NBA. |
+| `how_acquired` | string | no | identifier |  | How the team acquired the player, as the league describes it. |
+
+### player_on_off
+
+A team's ratings with each player on the court and off it.
+
+- **Grain:** One row per player per team per season per season type.
+- **Primary key:** `player_id`, `season`, `season_type`, `team_id`
+- **Indexes:** `season`, `team_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `player_id` | integer | yes | identifier |  | Player id. References `players.player_id`. |
+| `season` | string | yes | identifier |  | Season label, e.g. 2025-26. |
+| `season_type` | string | yes | identifier |  | Phase of the season. One of: `regular`, `playoffs`, `playin`. |
+| `team_id` | integer | yes | identifier |  | Team id. References `teams.team_id`. |
+| `on_court_minutes` | float | no | measured | minutes | Minutes the player was on the court. |
+| `on_court_off_rating` | float | no | measured | per 100 possessions | Team offensive rating with the player on the court. |
+| `on_court_def_rating` | float | no | measured | per 100 possessions | Team defensive rating with the player on the court. |
+| `on_court_net_rating` | float | no | measured | per 100 possessions | Team net rating with the player on the court. |
+| `off_court_minutes` | float | no | measured | minutes | Minutes the team played without the player. |
+| `off_court_off_rating` | float | no | measured | per 100 possessions | Team offensive rating with the player off the court. |
+| `off_court_def_rating` | float | no | measured | per 100 possessions | Team defensive rating with the player off the court. |
+| `off_court_net_rating` | float | no | measured | per 100 possessions | Team net rating with the player off the court. |
 
 ### salary_cap_rules
 
@@ -70,14 +392,6 @@ Called for by the roadmap; each gets a contract in the milestone that builds it.
 
 | Table | Domain | Purpose | Milestone |
 | --- | --- | --- | --- |
-| `players` | players | Stable player identity and profile fields. | 2 |
-| `player_seasons` | player_performance | Season-level player statistics and advanced metrics. | 2 |
-| `player_game_logs` | player_performance | Game-level performance and availability. | 2 |
-| `teams` | teams | Stable team identity. | 2 |
-| `team_seasons` | teams | Season-level team performance and outcomes. | 2 |
-| `team_games` | teams | Game-level team results. | 2 |
-| `team_rosters` | players | Player membership by team and season. | 2 |
-| `playoff_results` | historical_outcomes | Series and postseason advancement. | 2 |
 | `contracts` | contracts | Contract-level metadata, guarantees, options, start/end. | 3 |
 | `contract_years` | contracts | Salary by season and cap percentage. | 3 |
 | `custom_rosters` | user_rosters | User-created roster scenarios. | 4 |

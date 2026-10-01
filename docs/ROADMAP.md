@@ -33,7 +33,7 @@ points-per-dollar.
 | # | Milestone | Deliverable | Status |
 | --- | --- | --- | --- |
 | 1 | Repository and architecture | Package structure, configuration, test foundation, documentation | Done |
-| 2 | NBA data ingestion | Players, teams, games, standings, advanced statistics | Not started |
+| 2 | NBA data ingestion | Players, teams, games, standings, advanced statistics | Done |
 | 3 | Contracts and salary-cap data | Contracts, season rules, cap-normalised salaries | Not started |
 | 4 | Database and repositories | Persistent storage and clean data-access boundaries | Not started |
 | 5 | Player analytics | Reusable player calculations and comparison tools | Not started |

@@ -13,6 +13,9 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\python.exe -m ruff format .
 .\.venv\Scripts\fol.exe --help
 .\.venv\Scripts\fol.exe dictionary --write        # regenerate docs/DATA_DICTIONARY.md
+.\.venv\Scripts\fol.exe ingest                    # fetch from stats.nba.com (skips what is stored)
+.\.venv\Scripts\fol.exe check                     # normalise the raw store + run quality checks
+.\.venv\Scripts\python.exe scripts\make_fixtures.py   # rebuild tests/fixtures/raw from data/raw
 ```
 
 ## Work in milestones
@@ -46,6 +49,8 @@ Build one roadmap milestone at a time. A milestone is finished only when:
 - **No predictive claims early.** Nothing may present a championship probability or
   "contender" verdict before the benchmark and modeling milestones are done and
   validated out of sample.
+- **Source quirks get a rule, a note and a test.** Never repair data silently inside a
+  normaliser (`docs/decisions/0003-source-quirks.md`).
 - **Warnings are errors** in the test suite.
 
 ## Conventions
@@ -55,3 +60,9 @@ Build one roadmap milestone at a time. A milestone is finished only when:
 - The league year rolls over on July 1; the season with playable stats is found from the
   data, not from the calendar.
 - Tests never touch the real `data/` directory: use the `project` / `settings` fixtures.
+- `tests/fixtures/raw` is a miniature raw store of real responses. The `raw`,
+  `normalized` and `tables` fixtures read it; `tables` is a private copy a test may break.
+- stats.nba.com adds and drops response columns between seasons: select by name, list
+  what you need in `required=`, never index by position.
+- When patching files from a shell heredoc, backslashes get mangled. Use the editor
+  tools for anything containing Windows paths.

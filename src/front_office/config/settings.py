@@ -11,7 +11,16 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, ConfigDict, PositiveInt, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    NonNegativeFloat,
+    NonNegativeInt,
+    PositiveFloat,
+    PositiveInt,
+    ValidationError,
+    field_validator,
+)
 
 from front_office.domain.seasons import Season
 
@@ -43,9 +52,29 @@ class SeasonSettings(_Section):
         return Season.parse(value).label
 
 
+class NbaStatsSettings(_Section):
+    """How patiently and politely to call stats.nba.com."""
+
+    timeout_seconds: PositiveFloat = 45.0
+    min_interval_seconds: NonNegativeFloat = 1.2
+    max_retries: NonNegativeInt = 3
+    backoff_seconds: NonNegativeFloat = 4.0
+
+
+class ProviderSettings(_Section):
+    nba_stats: NbaStatsSettings = NbaStatsSettings()
+
+
+class IngestionSettings(_Section):
+    refresh_after_hours: NonNegativeFloat = 12.0
+    """An in-progress season's data is refetched once its newest snapshot is this old."""
+
+
 class _BaseFile(_Section):
     paths: PathSettings = PathSettings()
     seasons: SeasonSettings = SeasonSettings()
+    providers: ProviderSettings = ProviderSettings()
+    ingestion: IngestionSettings = IngestionSettings()
 
 
 class Settings(_Section):
@@ -55,6 +84,8 @@ class Settings(_Section):
     config_dir: Path
     data_dir: Path
     seasons: SeasonSettings
+    providers: ProviderSettings = ProviderSettings()
+    ingestion: IngestionSettings = IngestionSettings()
 
     @property
     def season_rules_dir(self) -> Path:
@@ -130,6 +161,8 @@ def load_settings(project_root: Path | None = None) -> Settings:
         config_dir=config_dir,
         data_dir=data_dir.resolve(),
         seasons=base.seasons,
+        providers=base.providers,
+        ingestion=base.ingestion,
     )
 
 
