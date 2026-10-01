@@ -1,0 +1,47 @@
+# Salary-cap and roster rules for the 2026-27 NBA season.
+# All amounts are whole US dollars. Verify against the sources below before changing.
+season: "2026-27"
+status: final   # set by the league on June 30, 2026; in effect from July 1, 2026
+
+thresholds:
+  salary_cap: 164961000
+  minimum_team_salary: 148465000
+  luxury_tax: 200428000
+  first_apron: 209015000
+  second_apron: 221686000
+
+exceptions:
+  non_taxpayer_mid_level: 15044000
+  taxpayer_mid_level: 6064000
+  room_mid_level: 9366000
+  bi_annual: 5477000
+
+# Maximum first-year salary by years of service (25% / 30% / 35% of the cap).
+maximum_salaries:
+  service_0_to_6_years: 41240250
+  service_7_to_9_years: 49488300
+  service_10_plus_years: 57736350
+
+roster:
+  max_standard_contracts: 15
+  min_standard_contracts: 14
+  max_two_way_contracts: 3
+  offseason_max_players: 21
+
+sources:
+  - publisher: Hoops Rumors
+    title: "Salary Cap, Tax Line Set For 2026/27 NBA Season"
+    url: "https://www.hoopsrumors.com/2026/06/salary-cap-tax-line-set-for-2026-27-nba-season.html"
+    published: 2026-06-30
+    retrieved: 2026-10-01
+    covers: "Cap, floor, tax line, aprons, exceptions and maximum salaries, reported from the NBA press release."
+  - publisher: NBA
+    title: "CBA 101 - Highlights of the Collective Bargaining Agreement"
+    url: "https://cms.nba.com/wp-content/uploads/sites/4/2024/11/2024-25-CBA-101.pdf"
+    retrieved: 2026-10-01
+    covers: "Roster limits: 14-15 standard contracts in season, up to three two-way contracts, 21 players in the offseason."
+
+notes: >
+  A team may carry 12 or 13 standard contracts for at most two consecutive weeks at a
+  time and 28 days in total during a regular season; min_standard_contracts records the
+  general requirement of 14.

@@ -1,0 +1,17 @@
+# NBA Front Office Lab - base configuration.
+#
+# Season-specific financial rules are NOT here: they live in configs/seasons/<season>.yaml
+# so that cap figures are never embedded in Python code.
+
+paths:
+  # Relative paths resolve against the project root. Override with the FOL_DATA_DIR
+  # environment variable to keep data outside the repository.
+  data_dir: data
+
+seasons:
+  # First season for which stats.nba.com publishes team advanced statistics
+  # (possessions, offensive/defensive rating). Historical team research starts here.
+  history_start: "1996-97"
+  # Player-level detail (season stats, game logs, rosters) is ingested for this many
+  # of the most recent seasons. Team-level history always goes back to history_start.
+  player_detail_seasons: 3

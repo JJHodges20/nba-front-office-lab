@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nba-front-office-lab"
+version = "0.1.0"
+description = "Front-office research workbench: NBA analytics, contracts, cap rules, and roster construction."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Joshua Hodges" }]
+dependencies = [
+    "pandas>=3.0",
+    "numpy>=2.0",
+    "pydantic>=2.5",
+    "pyyaml>=6",
+    "typer>=0.12",
+    "rich>=13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.4"]
+
+[project.scripts]
+fol = "front_office.interfaces.cli.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+addopts = "-q -m 'not network'"
+markers = [
+    "network: calls a live external service; deselected by default (run with -m network)",
+]
+# A warning is a defect we have not looked at yet. Add a targeted ignore here, with a
+# reason, only for warnings raised inside third-party code.
+filterwarnings = ["error"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "apps"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]

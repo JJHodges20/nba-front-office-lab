@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Environments
+.venv/
+venv/
+.env
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local data: raw snapshots, the database, imports and exports are rebuilt or
+# supplied locally and are never committed. data/README.md documents the layout.
+data/*
+!data/README.md
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
