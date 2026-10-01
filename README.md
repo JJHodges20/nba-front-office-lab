@@ -11,9 +11,9 @@ before roster scoring, optimisation or any predictive claim. The plan is in
 
 ## Status
 
-Milestones 1-4 of 14 are complete: the architecture, ingestion of league data from
-stats.nba.com, import of contract data with cap-normalised salaries, and a database
-built from them. There is no user interface yet. See the milestone table in the roadmap
+Milestones 1-5 of 14 are complete: the architecture, ingestion of league data from
+stats.nba.com, import of contract data with cap-normalised salaries, a database built
+from them, and player analytics. There is no user interface yet. See the roadmap
 for what exists and what does not.
 
 **Contract data is not included.** No free source permits collecting NBA contracts

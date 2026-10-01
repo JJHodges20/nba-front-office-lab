@@ -103,6 +103,22 @@ class Warehouse:
             rows = connection.execute(statement).mappings().all()
         return frame_from_rows(rows, contract)
 
+    def distinct(
+        self, table: str, column: str, where: Mapping[str, Any] | None = None
+    ) -> list[Any]:
+        """The different non-null values of one column, ascending."""
+        sql_table = self._database.table(table)
+        if table in self._database.rebuilt and not self.is_built():
+            raise StorageError("the database has not been built; run: fol build")
+        if column not in sql_table.c:
+            raise StorageError(f"table {table!r} has no column {column!r}")
+        target = sql_table.c[column]
+        statement = select(target).where(target.is_not(None)).distinct().order_by(target)
+        for name, wanted in (where or {}).items():
+            statement = statement.where(_condition(sql_table, name, wanted))
+        with self._database.connect() as connection:
+            return list(connection.execute(statement).scalars())
+
 
 def _condition(sql_table: Table, column: str, wanted: Any) -> Any:
     if column not in sql_table.c:

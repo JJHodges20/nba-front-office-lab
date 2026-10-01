@@ -3,6 +3,61 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone 5 - Player analytics (2026-10-01)
+
+**Built**
+
+- `analytics/formulas.py`: every basketball formula, once. Shooting percentages,
+  effective field goal and true shooting percentage, turnover percentage, per-game,
+  per-36 and per-100 rates, ratings, pace, estimated possessions.
+- `analytics/players.py`: a catalogue of 45 player metrics in the roadmap's six groups
+  (availability, scoring, creation, rebounding, defense, impact); season metrics; metrics
+  over any span of games; rolling metrics; recent availability; on/off combined across
+  teams for traded players.
+- `analytics/comparison.py`: qualification thresholds, percentiles oriented so higher is
+  better, ranks, side-by-side comparison, pooled group averages, position groups.
+- `analytics/finance.py`: cap share and a payroll's position against each threshold.
+- `domain/metrics.py`: `MetricSpec`, which carries each metric's label, description,
+  format, provenance and better direction.
+- `services/`: `Lab` (opens the data, reports what it holds) and `PlayerService` (season
+  table, profile, game log, rolling metrics, availability, comparison).
+
+**Decisions** ([0006](decisions/0006-metrics.md))
+
+- Derived metrics are computed by the lab; league-measured ones are passed through and
+  labelled as such, never approximated.
+- A rate with no denominator is missing, not zero.
+- Percentiles are computed within a qualified group and always read "higher is better".
+
+**Verification**
+
+- The lab's effective field goal and true shooting percentages equal the league's
+  published values to three decimals, and its offensive rating to one decimal, for every
+  team in three seasons and every shooter in the fixture data. On the full store the
+  same holds for 477 players.
+- That comparison also showed where the league's definitions differ from the textbook
+  ones (team rebound percentage, player turnover rate); each is recorded in the
+  decision record and in the metric's description.
+- On the real database: the 2025-26 player table (582 players, 45 metrics, percentiles)
+  is produced in 0.3 s; a last-ten-games table in 0.7 s; a player profile in 0.2 s.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| Automated tests | 946 passed, 1 skipped (UI boundary test) |
+| Test sensitivity | 30 planted bugs in formulas, metrics, comparison, finance and the service: 27 caught at first; the three misses were real gaps in the service tests, now closed (30 of 30) |
+| Data-quality checks | Unchanged: 0 errors, 2 standing warnings |
+| UI review | Not applicable |
+| Architectural boundaries | `tests/architecture` passes; analytics imports only domain |
+| Lint | `ruff check` and `ruff format --check` clean |
+
+**Open items carried forward**
+
+- Defensive indicators are limited to steals, blocks, fouls and on-court defensive
+  rating. Tracking-based measures (contested shots, rim defence) need more datasets and
+  belong with the value engine.
+
 ## Milestone 4 - Database and repositories (2026-10-01)
 
 **Built**
