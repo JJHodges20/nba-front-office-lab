@@ -22,7 +22,9 @@ from front_office.domain.seasons import Season
 from front_office.storage import Database, OperationsLog, RosterRepository, StorageError, Warehouse
 
 if TYPE_CHECKING:
+    from front_office.services.league import LeagueService
     from front_office.services.players import PlayerService
+    from front_office.services.teams import TeamService
 
 
 class LabNotBuilt(RuntimeError):
@@ -149,3 +151,15 @@ class Lab:
         from front_office.services.players import PlayerService
 
         return PlayerService(self)
+
+    @property
+    def teams(self) -> TeamService:
+        from front_office.services.teams import TeamService
+
+        return TeamService(self)
+
+    @property
+    def league(self) -> LeagueService:
+        from front_office.services.league import LeagueService
+
+        return LeagueService(self)

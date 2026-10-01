@@ -33,8 +33,10 @@ from front_office.pipelines.ingest import (
     default_plan,
 )
 from front_office.pipelines.inventory import raw_inventory
+from front_office.services.glossary import METRIC_CATALOGS, metric_glossary
 
 DATA_DICTIONARY = "docs/DATA_DICTIONARY.md"
+METRIC_GLOSSARY = "docs/METRICS.md"
 
 app = typer.Typer(
     help="NBA Front Office Lab: ingest, inspect and analyse league data.",
@@ -146,6 +148,27 @@ def dictionary(
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(document, encoding="utf-8", newline="\n")
     _say(f"Wrote {target} ({len(ALL_TABLES)} tables)")
+
+
+@app.command()
+def metrics(
+    write: Annotated[
+        bool, typer.Option("--write", help=f"Write {METRIC_GLOSSARY} instead of printing.")
+    ] = False,
+) -> None:
+    """Render the metric glossary from the metric catalogs."""
+    document = metric_glossary()
+    if not write:
+        typer.echo(document, nl=False)
+        return
+    try:
+        target = load_settings().project_root / METRIC_GLOSSARY
+    except ConfigError as error:
+        raise _fail(error) from error
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(document, encoding="utf-8", newline="\n")
+    count = sum(len(catalog) for catalog in METRIC_CATALOGS.values())
+    _say(f"Wrote {target} ({count} metrics)")
 
 
 _STATUS_STYLE = {

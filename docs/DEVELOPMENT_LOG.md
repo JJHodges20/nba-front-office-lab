@@ -3,6 +3,70 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone 6 - Team analytics (2026-10-01)
+
+**Built**
+
+- `analytics/teams.py`: a catalogue of 25 team metrics (record, scoring, efficiency, the
+  four factors at both ends, style); season metrics with league-relative ratings;
+  league averages by season; standings with games behind; home, road and recent
+  records and streaks; how each season ended; metrics over any span of games and over
+  trailing spans, with possessions estimated from box scores and calibrated per season.
+- `services/teams.py`: `TeamService` - the season table with ranks and league reference
+  lines, the same for a span of games or the postseason, a franchise profile with every
+  season on record, game log, rolling metrics, and the rotation (what each player did
+  for this team).
+- `services/league.py`: `LeagueService` - standings, league averages by season, the
+  history of every team-season with rating ranks and outcome, champions, and the
+  playoff bracket of a season.
+- `domain/glossary.py` and `fol metrics --write`: `docs/METRICS.md`, generated from the
+  metric catalogs, with a test that fails when the committed file is stale.
+- `analytics/comparison.ranks` can rank within a group (a season).
+
+**Decisions** ([0007](decisions/0007-team-metrics.md))
+
+- A season's ratings and pace are the league's published figures. A span of games uses
+  estimated possessions - the mean of both teams' box-score estimates, scaled by a
+  per-season factor - and every view built that way names its estimated metrics.
+- Era comparisons use league-relative ratings against the pooled league average of the
+  same season.
+- The four factors use the standard definitions; the league's differently defined team
+  rebound percentage is not imitated.
+- Outcomes are stated per team-season; no threshold or "contender" judgement is drawn.
+
+**Verification**
+
+- Estimator choice was made on evidence from all 892 team-seasons: calibrated, the
+  estimate is unbiased, within 0.20% of counted possessions on average (worst 0.86%),
+  and reproduces published offensive ratings within 0.22 on average. The table of
+  alternatives is in the decision record.
+- Team turnover rate, assist percentage, effective field goal and true shooting
+  percentage equal the league's published figures to three decimals for every team in
+  the three fixture seasons, with one exception that is itself a known source
+  inconsistency (Sacramento, 1996-97) and is asserted as the only one.
+- On the real database the champions view (from the playoff series table) and the
+  outcome flags of the team-season table name the same champion and runner-up in all
+  thirty seasons, and the Finals results through 2024-25 match the historical record.
+- On the real database: team table 0.12 s; last-15-games table 0.21 s; franchise
+  profile 0.12 s; standings 0.15 s; history of 892 team-seasons 0.11 s.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| Automated tests | 1,101 passed, 1 skipped (UI boundary test) |
+| Test sensitivity | 58 planted bugs in team analytics, ranks, the two services and the glossary: 58 caught |
+| Data-quality checks | Unchanged: 44 checks, 0 errors, 2 standing warnings |
+| UI review | Not applicable |
+| Architectural boundaries | `tests/architecture` passes; services import only domain, config, storage, analytics |
+| Lint | `ruff check` and `ruff format --check` clean |
+
+**Open items carried forward**
+
+- In the first days of a season the team table holds only teams that have played, so
+  standings are incomplete until every team has a game.
+- Team payroll against the cap lines belongs with the contract views (milestone 7).
+
 ## Milestone 5 - Player analytics (2026-10-01)
 
 **Built**

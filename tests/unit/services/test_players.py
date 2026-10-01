@@ -2,13 +2,12 @@
 
 The fixture has player data for everyone who appeared for Boston or New York in
 2025-26, so those two rosters are complete and the rest of the league is absent.
+The ``lab`` and ``priced_lab`` fixtures are in this directory's conftest.
 """
 
 from __future__ import annotations
 
 import math
-import shutil
-from collections.abc import Iterator
 from datetime import date
 
 import pandas as pd
@@ -16,8 +15,6 @@ import pytest
 
 from front_office.analytics.players import BOX_METRIC_KEYS, PLAYER_METRICS
 from front_office.config import Settings
-from front_office.pipelines.build import build_database
-from front_office.pipelines.contracts import import_contract_file
 from front_office.services import (
     DEFAULT_QUALIFICATION,
     Lab,
@@ -33,38 +30,8 @@ TATUM, BROWN, VUCEVIC, ABDELNABY = 1628369, 1627759, 202696, 76001
 
 
 @pytest.fixture(scope="module")
-def lab(built_readonly: Settings) -> Iterator[Lab]:
-    with Lab(built_readonly) as opened:
-        yield opened
-
-
-@pytest.fixture(scope="module")
 def table(lab: Lab) -> PlayerTable:
     return lab.players.table("2025-26")
-
-
-@pytest.fixture(scope="module")
-def priced_lab(built_template, tmp_path_factory) -> Iterator[Lab]:
-    """A built project with an invented contract file imported and built in."""
-    root = tmp_path_factory.mktemp("priced") / "lab"
-    shutil.copytree(built_template[0], root)
-    from front_office.config import load_settings
-
-    settings = load_settings(root)
-    path = root / "contracts.csv"
-    path.write_text(
-        "player_id,team,status,2026-27,2027-28\n"
-        f"{TATUM},BOS,,40000000,44000000 PO\n"
-        f"{BROWN},BOS,,30000000,\n"
-        # Money a team still owes a player it waived is not that player's salary.
-        f"{BROWN},NYK,dead,2000000,\n"
-        f"{VUCEVIC},NYK,dead,5000000,\n",
-        encoding="utf-8",
-    )
-    import_contract_file(settings, path, source_label="invented for tests", as_of=date(2026, 10, 1))
-    assert build_database(settings).loaded
-    with Lab(settings) as opened:
-        yield opened
 
 
 class TestStatus:

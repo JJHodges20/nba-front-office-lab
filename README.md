@@ -11,10 +11,10 @@ before roster scoring, optimisation or any predictive claim. The plan is in
 
 ## Status
 
-Milestones 1-5 of 14 are complete: the architecture, ingestion of league data from
+Milestones 1-6 of 14 are complete: the architecture, ingestion of league data from
 stats.nba.com, import of contract data with cap-normalised salaries, a database built
-from them, and player analytics. There is no user interface yet. See the roadmap
-for what exists and what does not.
+from them, and player and team analytics. There is no user interface yet. See the
+roadmap for what exists and what does not.
 
 **Contract data is not included.** No free source permits collecting NBA contracts
 automatically for this kind of project, so salaries come from a file you supply. See
@@ -50,6 +50,7 @@ python -m venv .venv
 .\.venv\Scripts\fol.exe contracts template            # a contract file to fill in
 .\.venv\Scripts\fol.exe contracts import FILE --source "where the figures came from"
 .\.venv\Scripts\fol.exe dictionary  # the data dictionary, generated from the table contracts
+.\.venv\Scripts\fol.exe metrics     # the metric glossary, generated from the metric catalogs
 ```
 
 The first `fol refresh` makes about 440 requests and takes roughly ten minutes: team
@@ -82,6 +83,7 @@ tests/              unit, architecture and integration tests
 - [Roadmap and milestone status](docs/ROADMAP.md)
 - [Architecture](docs/ARCHITECTURE.md) - the layers and the rules between them
 - [Data dictionary](docs/DATA_DICTIONARY.md) - generated from the table contracts
+- [Metric glossary](docs/METRICS.md) - every player and team metric, generated from the catalogs
 - [Contract data](docs/CONTRACT_DATA.md) - how to supply salaries, and the file format
 - [Data source register](docs/DATA_SOURCE_REGISTER.md)
 - [Development log](docs/DEVELOPMENT_LOG.md)

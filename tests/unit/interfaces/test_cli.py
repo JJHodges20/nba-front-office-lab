@@ -82,6 +82,22 @@ def test_dictionary_write_creates_the_document(project: Path) -> None:
     assert written.startswith("# Data Dictionary")
 
 
+def test_metrics_prints_the_glossary() -> None:
+    result = runner.invoke(app, ["metrics"])
+    assert result.exit_code == 0
+    assert result.output.startswith("# Metric Glossary")
+    assert "## Player metrics" in result.output and "## Team metrics" in result.output
+
+
+def test_metrics_write_creates_the_document(project: Path) -> None:
+    result = runner.invoke(app, ["metrics", "--write"])
+    assert result.exit_code == 0, result.output
+    assert "70 metrics" in result.output
+    written = (project / "docs" / "METRICS.md").read_text(encoding="utf-8")
+    assert written.startswith("# Metric Glossary")
+    assert "\r" not in written
+
+
 class TestIngest:
     """The ingest command, with stats.nba.com replaced by a fake provider."""
 

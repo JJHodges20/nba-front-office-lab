@@ -91,6 +91,22 @@ Every column is tagged `identifier`, `measured`, `derived`, `modeled`, `assumpti
 modeled estimates and user assumptions; carrying that tag on the column lets any screen
 label a number correctly without knowing how it was produced.
 
+## Metrics
+
+What a data contract is to a table, a `MetricSpec` (`domain/metrics.py`) is to a number
+on screen: its key, label, description, display format, provenance and which direction
+is better. The specs are grouped in catalogs, `PLAYER_METRICS` and `TEAM_METRICS`, next
+to the code that computes them.
+
+- `analytics/formulas.py` defines each formula once; the catalog modules call it.
+- A service returns frames whose columns are catalog keys, together with the catalog,
+  so a screen labels and formats a number without knowing how it was produced.
+- `docs/METRICS.md` is generated from the catalogs (`fol metrics --write`), and a test
+  fails if the committed file is stale.
+- League-published figures are passed through and tagged `measured`. Where the lab
+  estimates instead - team ratings over a span of games - the service names the
+  estimated metrics. See `docs/decisions/0006-metrics.md` and `0007-team-metrics.md`.
+
 ## From source to table
 
 ```

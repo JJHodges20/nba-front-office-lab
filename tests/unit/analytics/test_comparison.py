@@ -167,6 +167,22 @@ class TestRanks:
         assert result.iloc[0] == 2 and result.iloc[2] == 1
         assert pd.isna(result.iloc[1])
 
+    def test_a_metric_with_no_better_direction_ranks_the_highest_first(self) -> None:
+        players = frame(age=[20.0, 40.0, 30.0])
+        assert ranks(players, CATALOG, "age").tolist() == [3, 1, 2]
+
+    def test_groups_are_ranked_separately(self) -> None:
+        teams = frame(score=[10.0, 30.0, 20.0, 5.0, 50.0], errors=[1.0, 2.0, 3.0, 9.0, 4.0])
+        season = pd.Series(["a", "a", "a", "b", "b"], index=teams.index)
+        assert ranks(teams, CATALOG, "score", group=season).tolist() == [3, 1, 2, 2, 1]
+        assert ranks(teams, CATALOG, "errors", group=season).tolist() == [1, 2, 3, 2, 1]
+
+    def test_missing_values_are_unranked(self) -> None:
+        players = frame(score=[10.0, None, 20.0])
+        result = ranks(players, CATALOG, "score")
+        assert result.tolist()[0] == 2 and result.tolist()[2] == 1
+        assert pd.isna(result.iloc[1])
+
 
 class TestComparison:
     def test_one_line_per_metric_per_player_in_the_order_given(self) -> None:

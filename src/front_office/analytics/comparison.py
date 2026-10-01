@@ -92,13 +92,23 @@ def percentiles(
 
 
 def ranks(
-    frame: pd.DataFrame, catalog: MetricCatalog, key: str, *, qualified: pd.Series | None = None
+    frame: pd.DataFrame,
+    catalog: MetricCatalog,
+    key: str,
+    *,
+    qualified: pd.Series | None = None,
+    group: pd.Series | None = None,
 ) -> pd.Series:
-    """Position of each qualified row on one metric, 1 being best; ties share a rank."""
+    """Position of each qualified row on one metric, 1 being best; ties share a rank.
+
+    For a metric with no better direction, 1 is the highest value. ``group`` (for
+    example season) ranks each row only among the rows sharing its group.
+    """
     eligible = pd.Series(True, index=frame.index) if qualified is None else qualified.astype(bool)
     values = frame[key].astype("float64").where(eligible)
     ascending = catalog[key].higher_is_better is False
-    return values.rank(method="min", ascending=ascending).astype("Int64")
+    grouped = values.groupby(group) if group is not None else values
+    return grouped.rank(method="min", ascending=ascending).astype("Int64")
 
 
 def comparison(

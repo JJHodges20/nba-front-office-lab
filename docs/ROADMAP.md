@@ -37,7 +37,7 @@ points-per-dollar.
 | 3 | Contracts and salary-cap data | Contracts, season rules, cap-normalised salaries | Done (import path; no contract file supplied yet) |
 | 4 | Database and repositories | Persistent storage and clean data-access boundaries | Done |
 | 5 | Player analytics | Reusable player calculations and comparison tools | Done |
-| 6 | Team analytics | Team efficiency, point differential, pace, historical outcomes | Not started |
+| 6 | Team analytics | Team efficiency, point differential, pace, historical outcomes | Done |
 | 7 | Front Office UI foundation | Navigation, filters, player/team explorers, Team Builder | Not started |
 | 8 | Historical contender analysis | Playoff/championship benchmark research | Not started |
 | 9 | Player value engine | Validated value features, surplus value, archetypes | Not started |

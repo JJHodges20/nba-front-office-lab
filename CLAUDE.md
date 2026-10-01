@@ -14,6 +14,7 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\python.exe -m ruff format .
 .\.venv\Scripts\fol.exe --help
 .\.venv\Scripts\fol.exe dictionary --write        # regenerate docs/DATA_DICTIONARY.md
+.\.venv\Scripts\fol.exe metrics --write           # regenerate docs/METRICS.md
 .\.venv\Scripts\fol.exe ingest                    # fetch from stats.nba.com (skips what is stored)
 .\.venv\Scripts\fol.exe check                     # normalise the raw store + run quality checks
 .\.venv\Scripts\fol.exe build                     # rebuild data\front_office.sqlite from the raw store
@@ -46,7 +47,11 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   Normalisers end with `conform_frame`. After changing a contract run
   `fol dictionary --write`.
 - **Analytics own formulas.** A metric is computed in exactly one place, in `analytics`.
-  The UI and later stages call it; they never re-derive it.
+  The UI and later stages call it; they never re-derive it. Every metric has a
+  `MetricSpec` in a catalog; after changing one run `fol metrics --write`.
+- **Published versus estimated.** A season's team ratings and pace are the league's.
+  Over a span of games they are estimates from box scores, and the service says which
+  (`TeamTable.estimated`). Show them as estimates (`docs/decisions/0007-team-metrics.md`).
 - **Measured vs modeled vs assumed.** Tag every column's provenance, and keep the three
   visibly apart on screen.
 - **No predictive claims early.** Nothing may present a championship probability or
