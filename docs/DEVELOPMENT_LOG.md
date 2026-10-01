@@ -3,6 +3,66 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone 4 - Database and repositories (2026-10-01)
+
+**Built**
+
+- `storage/schema.py`: SQL tables generated from the data contracts, with a fingerprint
+  of their shape.
+- `storage/database.py`: the SQLite database, with transactional DDL, write-ahead
+  logging and foreign keys on.
+- `storage/warehouse.py`: `Warehouse.replace` rewrites every rebuilt table inside one
+  transaction; `Warehouse.read` returns contract-conforming frames with simple filters.
+- `storage/rosters.py`: `RosterRepository` for the user's rosters.
+- `storage/operations.py`: `OperationsLog` for the history of fetches and builds.
+- Contracts for seven new tables: `custom_rosters`, `roster_players`, `fetch_log`,
+  `builds`, `build_issues`, `check_results`, `raw_snapshots`.
+- `pipelines/build.py`: normalise, check and load in one step; record the build.
+- Commands: `fol build`, `fol refresh` (ingest then build), `fol db`. `fol ingest` now
+  records every fetch that reached the source.
+
+**Decisions** ([0005](decisions/0005-database.md))
+
+- One SQLite file through SQLAlchemy Core; tables generated from contracts.
+- League tables and the last build's report are rebuilt together in one transaction;
+  the user's rosters and the fetch and build history are kept across builds.
+- A build with problems still loads and records them; a build that would empty a
+  populated table is refused unless forced.
+- Foreign keys are enforced only between kept tables.
+
+**Something learned the useful way.** A probe before writing any storage code showed
+that, with SQLAlchemy's defaults, a `DROP TABLE` inside a rolled-back transaction stays
+dropped on SQLite. Had the rebuild been written on the assumption that transactions
+cover DDL, a failed build would have destroyed the previous one. The database layer now
+controls transactions explicitly and a test proves a failed rebuild restores the old
+tables.
+
+**Verification**
+
+- `fol build` on the real store: 174,492 rows in about twenty seconds, 32 MB.
+- Read back from the database, every league table equals what was written, column for
+  column, with the same types.
+- Reads: one season of team rows in 0.05 s; one season of player game logs (26,651
+  rows) in 0.4 s; every team game since 1996 (76,046 rows) in 1.1 s.
+- A reader with an open transaction sees the previous build until the new one commits.
+- Rosters survive rebuilds.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| Automated tests | 745 passed, 1 skipped (UI boundary test) |
+| Test sensitivity | 20 planted bugs in storage and the build: 18 caught; both survivors were equivalent (a redundant branch, since removed; one half of a two-part recipe, now asserted directly) |
+| Data-quality checks | `fol build` on the real store: 0 errors, 2 standing warnings |
+| UI review | Not applicable |
+| Architectural boundaries | `tests/architecture` passes; `sqlalchemy` appears only in `storage` |
+| Lint | `ruff check` and `ruff format --check` clean |
+
+**Open items carried forward**
+
+- Kept tables have no migration mechanism yet; one is needed before their shape changes.
+- Every build reloads everything. Fine at twenty seconds; revisit if it grows.
+
 ## Milestone 3 - Contracts and salary-cap data (2026-10-01)
 
 **Built**

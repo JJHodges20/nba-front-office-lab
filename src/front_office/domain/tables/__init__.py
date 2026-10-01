@@ -10,10 +10,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from front_office.domain.schema import TableContract
-from front_office.domain.tables import finance, players, teams
+from front_office.domain.tables import finance, operations, players, rosters, teams
 
-# Listed so that a table always comes after the tables it references.
-ALL_TABLES: tuple[TableContract, ...] = (*teams.TABLES, *players.TABLES, *finance.TABLES)
+# Built from the raw store; listed so that a table always follows the tables it references.
+LEAGUE_TABLES: tuple[TableContract, ...] = (*teams.TABLES, *players.TABLES, *finance.TABLES)
+
+# Dropped and rewritten by every build: the league data and the build's own report.
+REBUILT_TABLES: tuple[TableContract, ...] = (*LEAGUE_TABLES, *operations.BUILD_STATE_TABLES)
+
+# Never dropped: the user's rosters and the history of fetches and builds.
+KEPT_TABLES: tuple[TableContract, ...] = (*rosters.TABLES, *operations.HISTORY_TABLES)
+
+ALL_TABLES: tuple[TableContract, ...] = (*LEAGUE_TABLES, *rosters.TABLES, *operations.TABLES)
 
 _BY_NAME = {contract.name: contract for contract in ALL_TABLES}
 if len(_BY_NAME) != len(ALL_TABLES):
@@ -33,8 +41,6 @@ class PlannedTable:
 # The roadmap's core database design (section 12). An entry is deleted from this list in
 # the same commit that adds the table's contract.
 PLANNED_TABLES: tuple[PlannedTable, ...] = (
-    PlannedTable("custom_rosters", "user_rosters", "User-created roster scenarios.", 4),
-    PlannedTable("roster_players", "user_rosters", "Members of each custom roster.", 4),
     PlannedTable("player_archetypes", "player_value", "Role classification outputs.", 9),
     PlannedTable("player_value_scores", "player_value", "Versioned player value calculations.", 9),
     PlannedTable("lineups", "lineups", "Five-player lineup identities.", 10),

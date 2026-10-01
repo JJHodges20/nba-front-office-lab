@@ -16,12 +16,13 @@ dependencies = [
     "pyyaml>=6",
     "nba_api>=1.9",
     "requests>=2.31",
+    "sqlalchemy>=2.0",
     "typer>=0.12",
     "rich>=13",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.4"]
+dev = ["pytest>=8", "pytest-cov>=5", "pytest-xdist>=3", "ruff>=0.4"]
 
 [project.scripts]
 fol = "front_office.interfaces.cli.app:main"

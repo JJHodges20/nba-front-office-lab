@@ -14,11 +14,12 @@ from rich.table import Table
 from rich.text import Text
 
 from front_office import __version__
-from front_office.config import ConfigError, load_all_season_rules, load_settings
+from front_office.config import ConfigError, Settings, load_all_season_rules, load_settings
 from front_office.domain import PayrollLine, Season
 from front_office.domain.dictionary import render_data_dictionary
 from front_office.domain.tables import ALL_TABLES, PLANNED_TABLES
-from front_office.pipelines.check import CheckSeverity, check_raw_data
+from front_office.pipelines.build import build_database, database_status, log_fetches
+from front_office.pipelines.check import CheckSeverity, DataReport, check_raw_data
 from front_office.pipelines.contracts import (
     TEMPLATE_SEASONS,
     ContractImportError,
@@ -180,9 +181,19 @@ def ingest(
     """
     try:
         settings = load_settings()
+    except ConfigError as error:
+        raise _fail(error) from error
+    if _ingest(settings, season, teams_only=teams_only, force=force):
+        _say("Some requests failed; run the command again to retry them.", style="bold red")
+        raise typer.Exit(code=1)
+
+
+def _ingest(settings: Settings, season: list[str] | None, *, teams_only: bool, force: bool) -> int:
+    """Run an ingest, print its progress, log it, and return how many requests failed."""
+    try:
         plan = default_plan(settings, date.today())
         chosen = [Season.parse(label) for label in season] if season else list(plan.seasons)
-    except (ConfigError, ValueError) as error:
+    except ValueError as error:
         raise _fail(error) from error
 
     def report(outcome: FetchOutcome) -> None:
@@ -211,9 +222,8 @@ def ingest(
         counts[outcome.status] += 1
     summary = ", ".join(f"{count} {status.value}" for status, count in counts.items() if count)
     _say(f"\n{len(outcomes)} requests: {summary}")
-    if counts[FetchStatus.FAILED]:
-        _say("Some requests failed; run the command again to retry them.", style="bold red")
-        raise typer.Exit(code=1)
+    log_fetches(settings, outcomes)
+    return counts[FetchStatus.FAILED]
 
 
 @app.command()
@@ -256,7 +266,12 @@ def check() -> None:
     except ConfigError as error:
         raise _fail(error) from error
     report = check_raw_data(settings)
+    _print_data_report(report)
+    if not report.ok:
+        raise typer.Exit(code=1)
 
+
+def _print_data_report(report: DataReport) -> None:
     tables = Table(title="Normalised tables")
     tables.add_column("Table", style="bold")
     tables.add_column("Rows", justify="right")
@@ -286,8 +301,100 @@ def check() -> None:
         f"{len(report.check_warnings)} with warnings, {len(report.check_errors)} with errors; "
         f"{len(report.tables.errors)} table parts not built."
     )
+
+
+@app.command()
+def build(
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Load even if that empties a table that now holds data."),
+    ] = False,
+) -> None:
+    """Rebuild the database from the raw store, replacing the league tables in one step."""
+    try:
+        settings = load_settings()
+    except ConfigError as error:
+        raise _fail(error) from error
+    _build(settings, force=force)
+
+
+def _build(settings: Settings, *, force: bool) -> None:
+    report = build_database(settings, force=force)
+    _print_data_report(report.data)
+    if not report.loaded:
+        raise _fail(RuntimeError(report.refused_because))
+    _say(
+        f"Loaded {report.rows_loaded:,} rows into {settings.database_path} "
+        f"(build {report.build_id})."
+    )
     if not report.ok:
+        _say("The build loaded with problems; see above.", style="bold red")
         raise typer.Exit(code=1)
+
+
+@app.command()
+def refresh(
+    teams_only: Annotated[
+        bool, typer.Option("--teams-only", help="Skip player-level datasets.")
+    ] = False,
+) -> None:
+    """Fetch whatever is new from stats.nba.com, then rebuild the database."""
+    try:
+        settings = load_settings()
+    except ConfigError as error:
+        raise _fail(error) from error
+    failed = _ingest(settings, None, teams_only=teams_only, force=False)
+    if failed:
+        _say(
+            f"{failed} request(s) failed; building from what is stored. Run the command "
+            "again to retry them.",
+            style="yellow",
+        )
+    _build(settings, force=False)
+    if failed:
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def db() -> None:
+    """Show what the database holds and how the last build went."""
+    try:
+        settings = load_settings()
+    except ConfigError as error:
+        raise _fail(error) from error
+    status = database_status(settings)
+    if not status.exists:
+        _say(f"There is no database at {settings.database_path} yet. Run: fol build")
+        return
+
+    # The path goes on its own line: as a title it would be squeezed to the table's width.
+    _say(f"Database: {settings.database_path}")
+    if not status.row_counts:
+        _say("No build has completed yet. Run: fol build")
+        return
+    table = Table()
+    table.add_column("Table", style="bold")
+    table.add_column("Rows", justify="right")
+    for name, rows in status.row_counts.items():
+        table.add_row(name, f"{rows:,}")
+    console.print(table)
+
+    if status.latest_build is None:
+        _say("No build has completed yet. Run: fol build")
+        return
+    latest = status.latest_build
+    _say(
+        f"Build {latest['build_id']} finished {latest['finished_at']:%Y-%m-%d %H:%M} UTC "
+        f"({latest['status']}): {latest['rows_loaded']:,} rows, "
+        f"{latest['build_errors']} table parts not built, {latest['build_notes']} notes, "
+        f"{latest['check_errors']} check errors, {latest['check_warnings']} check warnings."
+    )
+    if not status.is_current:
+        _tagged(
+            "warning",
+            "yellow",
+            "the tables were built by a different version of the lab; run: fol build",
+        )
 
 
 @contracts_app.command("template")

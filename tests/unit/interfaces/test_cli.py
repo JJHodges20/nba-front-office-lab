@@ -299,3 +299,133 @@ class TestContracts:
         result = runner.invoke(app, ["check"])
         assert "no contract file has been imported" not in result.output
         assert "contract_years.teams_have_plausible_rosters" in result.output
+
+
+class TestDatabaseCommands:
+    """build, refresh and db, against a private copy of the fixture store."""
+
+    @pytest.fixture(autouse=True)
+    def _lab(self, project: Path) -> None:
+        shutil.copytree(FIXTURE_RAW, project / "data" / "raw")
+
+    def test_db_before_anything_is_built(self, project: Path) -> None:
+        result = runner.invoke(app, ["db"])
+        assert result.exit_code == 0
+        assert "There is no database" in result.output
+        assert not (project / "data" / "front_office.sqlite").exists()
+
+    def test_build_loads_the_database_and_reports_it(self, project: Path) -> None:
+        result = runner.invoke(app, ["build"])
+        # The fixture store fails two checks by construction, so the build loads but
+        # the command reports problems.
+        assert result.exit_code == 1
+        assert "Loaded 10," in result.output and "(build 1)" in result.output
+        assert "The build loaded with problems" in result.output
+        assert "note  team_games [2012-13]" in result.output
+        assert (project / "data" / "front_office.sqlite").is_file()
+
+    @pytest.fixture
+    def prebuilt(self, project: Path, built_template) -> None:
+        """Put the shared pre-built database in place, as if `fol build` had been run."""
+        for path in (built_template[0] / "data").glob("front_office.sqlite*"):
+            shutil.copy(path, project / "data" / path.name)
+
+    def test_db_after_a_build(self, prebuilt: None) -> None:
+        result = runner.invoke(app, ["db"])
+        assert result.exit_code == 0, result.output
+        assert "Database: " in result.output
+        assert "team_games" in result.output and "7,792" in result.output
+        assert "Build 1 finished" in result.output
+        assert "(problems)" in result.output
+        assert "2 check errors, 2 check warnings" in result.output
+        assert "different version" not in result.output
+
+    def test_a_build_that_would_empty_a_table_is_refused(
+        self, project: Path, prebuilt: None
+    ) -> None:
+        shutil.rmtree(project / "data" / "raw" / "nba_stats" / "player_index")
+        result = runner.invoke(app, ["build"])
+        assert result.exit_code == 1
+        assert "would empty players" in result.output
+        assert "Loaded" not in result.output
+        forced = runner.invoke(app, ["build", "--force"])
+        assert "Loaded" in forced.output and "(build 2)" in forced.output
+
+    def test_db_warns_when_built_by_another_version(
+        self, monkeypatch: pytest.MonkeyPatch, prebuilt: None
+    ) -> None:
+        from front_office.storage import database
+
+        monkeypatch.setattr(database, "schema_fingerprint", lambda contracts: "another")
+        result = runner.invoke(app, ["db"])
+        assert "built by a different version of the lab; run: fol build" in result.output
+
+    def test_ingest_records_its_fetches_in_the_database(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from front_office.storage import Database, OperationsLog
+
+        clock = Clock(datetime.now(UTC))
+        fake = FakeProvider(clock=clock)
+        fake.fail = {D.TEAM_SEASON_ADVANCED}
+
+        def build(settings, *, force=False, on_outcome=None) -> Ingestor:
+            policy = RefreshPolicy(timedelta(hours=12), force=force)
+            return Ingestor(
+                fake, RawStore(settings.raw_dir), policy, now=clock.now, on_outcome=on_outcome
+            )
+
+        monkeypatch.setattr(cli, "build_ingestor", build)
+        result = runner.invoke(app, ["ingest", "-s", "2024-25", "--teams-only"])
+        assert result.exit_code == 1  # one dataset is down
+        with Database(project / "data" / "front_office.sqlite") as opened:
+            log = OperationsLog(opened)
+            failed = log.fetches(status="failed")
+            everything = log.fetches()
+        assert failed["dataset"].tolist() == ["team_season_advanced"]
+        assert "is down" in failed.iloc[0]["error"]
+        # Seven season datasets were requested; the two global ones were already in the
+        # copied store and inside their refresh window, so they were skipped, not logged.
+        assert len(everything) == 7
+        assert set(everything["status"]) == {"stored", "failed"}
+
+    def test_refresh_fetches_then_builds(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        clock = Clock(datetime.now(UTC))
+        fake = FakeProvider(clock=clock)
+        calls: list[str] = []
+
+        def build(settings, *, force=False, on_outcome=None) -> Ingestor:
+            calls.append("ingest")
+            policy = RefreshPolicy(timedelta(hours=12), force=force)
+            return Ingestor(
+                fake, RawStore(settings.raw_dir), policy, now=clock.now, on_outcome=on_outcome
+            )
+
+        def fake_build(settings, *, force):
+            calls.append("build")
+
+        monkeypatch.setattr(cli, "build_ingestor", build)
+        monkeypatch.setattr(cli, "_build", fake_build)
+        result = runner.invoke(app, ["refresh", "--teams-only"])
+        assert result.exit_code == 0, result.output
+        assert calls == ["ingest", "build"]
+        assert "requests:" in result.output
+
+    def test_refresh_still_builds_when_a_fetch_fails(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        clock = Clock(datetime.now(UTC))
+        fake = FakeProvider(clock=clock)
+        fake.fail = {D.TEAM_SEASON_OPPONENT}
+        built: list[bool] = []
+
+        def build(settings, *, force=False, on_outcome=None) -> Ingestor:
+            policy = RefreshPolicy(timedelta(hours=12), force=force)
+            return Ingestor(
+                fake, RawStore(settings.raw_dir), policy, now=clock.now, on_outcome=on_outcome
+            )
+
+        monkeypatch.setattr(cli, "build_ingestor", build)
+        monkeypatch.setattr(cli, "_build", lambda settings, *, force: built.append(True))
+        result = runner.invoke(app, ["refresh", "--teams-only"])
+        assert built == [True]
+        assert result.exit_code == 1
+        assert "building from what is stored" in result.output

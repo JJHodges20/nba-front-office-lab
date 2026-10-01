@@ -7,7 +7,8 @@ rules before changing anything. The source plan is
 ## Commands (Windows)
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest              # all tests except live-network ones
+.\.venv\Scripts\python.exe -m pytest -n auto      # all tests except live-network ones, in parallel (~30 s)
+.\.venv\Scripts\python.exe -m pytest tests\unit\domain   # one area, serially
 .\.venv\Scripts\python.exe -m pytest -m network   # live-network tests only
 .\.venv\Scripts\python.exe -m ruff check .
 .\.venv\Scripts\python.exe -m ruff format .
@@ -15,6 +16,8 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe dictionary --write        # regenerate docs/DATA_DICTIONARY.md
 .\.venv\Scripts\fol.exe ingest                    # fetch from stats.nba.com (skips what is stored)
 .\.venv\Scripts\fol.exe check                     # normalise the raw store + run quality checks
+.\.venv\Scripts\fol.exe build                     # rebuild data\front_office.sqlite from the raw store
+.\.venv\Scripts\fol.exe db                        # row counts and the last build's result
 .\.venv\Scripts\python.exe scripts\make_fixtures.py   # rebuild tests/fixtures/raw from data/raw
 ```
 
@@ -51,6 +54,14 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   validated out of sample.
 - **Source quirks get a rule, a note and a test.** Never repair data silently inside a
   normaliser (`docs/decisions/0003-source-quirks.md`).
+- **Rebuilt versus kept tables.** Every build drops and rewrites the league tables. The
+  user's rosters and the fetch/build history are kept and must never be put in the
+  rebuilt group (`domain/tables/__init__.py`, `docs/decisions/0005-database.md`).
+- **Only `storage` touches SQL.** Other layers call `Warehouse`, `RosterRepository` or
+  `OperationsLog`. Always open a `Database` in a `with` block: on Windows an open
+  connection keeps the file locked.
+- **Never print data through rich markup.** Use `_say` / `_tagged` in the CLI; text in
+  square brackets is otherwise swallowed as a style tag.
 - **Warnings are errors** in the test suite.
 
 ## Conventions

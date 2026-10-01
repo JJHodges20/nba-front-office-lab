@@ -95,7 +95,7 @@ label a number correctly without knowing how it was produced.
 
 ```
 fol ingest:  provider.fetch(dataset) -> Snapshot -> RawStore.save()
-fol check:   RawStore -> normalize() -> tables + issues -> quality checks
+fol check:   RawStore -> normalize() -> tables + issues -> quality checks   (writes nothing)
 ```
 
 - A **dataset** (`domain/datasets.py`) is one kind of provider response. A **snapshot**
@@ -112,6 +112,27 @@ fol check:   RawStore -> normalize() -> tables + issues -> quality checks
   data says so in a note. See `docs/decisions/0003-source-quirks.md`.
 - **Quality checks** (`quality/checks.py`) then test the tables against each other.
   Contracts prove a table is well-formed; checks prove the tables agree.
+
+## The database
+
+```
+fol build:  RawStore -> normalize() -> quality checks -> Warehouse.replace() [one transaction]
+```
+
+One SQLite file, `data/front_office.sqlite`, whose tables are generated from the data
+contracts. Tables come in two groups:
+
+- **Rebuilt** - the league tables and the last build's own report (`build_issues`,
+  `check_results`, `raw_snapshots`). Every build drops and rewrites all of them inside
+  a single transaction, so a reader sees one complete build or the other, never a mix,
+  and a failed build leaves the previous one in place.
+- **Kept** - the user's rosters (`custom_rosters`, `roster_players`) and the history
+  (`fetch_log`, `builds`). Created once and never dropped.
+
+Three repositories are the only way in or out: `Warehouse` (read league tables, replace
+them), `RosterRepository` (the user's rosters) and `OperationsLog` (fetch and build
+history). They return frames that satisfy the table's contract. See
+`docs/decisions/0005-database.md`.
 
 ## Season rules
 

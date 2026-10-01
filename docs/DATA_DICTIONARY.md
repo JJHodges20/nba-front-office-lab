@@ -44,6 +44,13 @@ measured statistics, modeled estimates and user assumptions visibly apart.
 | [`salary_cap_rules`](#salary_cap_rules) | cap_rules | One row per NBA season. | V0 |
 | [`contracts`](#contracts) | contracts | One row per player per team per run of consecutive seasons. | V1 |
 | [`contract_years`](#contract_years) | contracts | One row per contract per season. | V1 |
+| [`custom_rosters`](#custom_rosters) | user_rosters | One row per roster. | V1 |
+| [`roster_players`](#roster_players) | user_rosters | One row per player per roster. | V1 |
+| [`fetch_log`](#fetch_log) | operations | One row per fetch attempt. | V1 |
+| [`builds`](#builds) | operations | One row per build. | V1 |
+| [`build_issues`](#build_issues) | operations | One row per issue from the most recent build. | V1 |
+| [`check_results`](#check_results) | operations | One row per check. | V1 |
+| [`raw_snapshots`](#raw_snapshots) | operations | One row per dataset slice. | V1 |
 
 ### teams
 
@@ -432,14 +439,137 @@ Salary for each season of each contract, with its share of that season's cap.
 | `guarantee` | string | no | identifier |  | How much of the season's salary is guaranteed. Null if the file does not say. One of: `full`, `partial`, `none`. |
 | `years_remaining` | integer | yes | derived | seasons | Seasons left on the contract after this one. |
 
+### custom_rosters
+
+Rosters assembled by the user in the Team Builder.
+
+- **Grain:** One row per roster.
+- **Primary key:** `roster_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `roster_id` | integer | yes | identifier |  | Roster id, assigned when the roster is created. |
+| `name` | string | yes | assumption |  | Name the user gave the roster. |
+| `stats_season` | string | yes | assumption |  | Season whose statistics describe the players. |
+| `payroll_season` | string | yes | assumption |  | Season whose salaries and cap the roster is priced against. |
+| `notes` | string | no | assumption |  | The user's notes. |
+| `created_at` | datetime | yes | operational |  | When the roster was created. |
+| `updated_at` | datetime | yes | operational |  | When the roster or its players last changed. |
+
+### roster_players
+
+The players on each user-built roster.
+
+- **Grain:** One row per player per roster.
+- **Primary key:** `roster_id`, `player_id`
+- **Indexes:** `player_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `roster_id` | integer | yes | identifier |  | The roster. References `custom_rosters.roster_id`. |
+| `player_id` | integer | yes | identifier |  | Player id. References `players.player_id`. |
+| `slot` | string | yes | assumption |  | Where the user placed the player: a starting position or the bench. One of: `PG`, `SG`, `SF`, `PF`, `C`, `BENCH`. |
+| `assumed_salary` | integer | no | assumption | USD | A salary the user entered for this player, used in place of contract data. Null means use the contract data. |
+| `added_at` | datetime | yes | operational |  | When the player was added. |
+
+### fetch_log
+
+Every attempt to fetch a dataset from a source, successful or not.
+
+- **Grain:** One row per fetch attempt.
+- **Primary key:** `fetch_id`
+- **Indexes:** `source`, `dataset`; `finished_at`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `fetch_id` | integer | yes | operational |  | Attempt id, assigned when recorded. |
+| `source` | string | yes | operational |  | Source the dataset comes from. |
+| `dataset` | string | yes | operational |  | Dataset requested. |
+| `partition_key` | string | yes | operational |  | Which slice of the dataset: season, season type, team. |
+| `season` | string | no | operational |  | Season requested, if the dataset is seasonal. |
+| `status` | string | yes | operational |  | What happened. One of: `stored`, `unchanged`, `failed`. |
+| `rows` | integer | no | operational |  | Rows returned. |
+| `error` | string | no | operational |  | Why the attempt failed. |
+| `started_at` | datetime | yes | operational |  | When the attempt began. |
+| `finished_at` | datetime | yes | operational |  | When the attempt ended. |
+
+### builds
+
+Every rebuild of the database from the raw store.
+
+- **Grain:** One row per build.
+- **Primary key:** `build_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `build_id` | integer | yes | operational |  | Build id, assigned when recorded. |
+| `started_at` | datetime | yes | operational |  | When the build began. |
+| `finished_at` | datetime | yes | operational |  | When the build ended. |
+| `lab_version` | string | yes | operational |  | Version of the lab that ran the build. |
+| `schema_fingerprint` | string | yes | operational |  | Fingerprint of the table contracts the build used. |
+| `status` | string | yes | operational |  | Whether the build was clean. One of: `ok`, `problems`. |
+| `rows_loaded` | integer | yes | operational |  | Rows written across all tables. |
+| `build_errors` | integer | yes | operational |  | Table parts that could not be built. |
+| `build_notes` | integer | yes | operational |  | Adjustments made to source data. |
+| `check_errors` | integer | yes | operational |  | Quality checks that found a contradiction. |
+| `check_warnings` | integer | yes | operational |  | Quality checks that raised a warning. |
+
+### build_issues
+
+What the most recent build could not build, or had to adjust.
+
+- **Grain:** One row per issue from the most recent build.
+- **Primary key:** `issue_number`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `issue_number` | integer | yes | operational |  | Position of the issue in the build's report. |
+| `table_name` | string | yes | operational |  | Table the issue concerns. |
+| `scope` | string | yes | operational |  | Season the issue belongs to, or 'all seasons'. |
+| `severity` | string | yes | operational |  | Error: data is missing. Note: source data was adjusted. One of: `error`, `note`. |
+| `message` | string | yes | operational |  | What happened. |
+
+### check_results
+
+The outcome of every data-quality check in the most recent build.
+
+- **Grain:** One row per check.
+- **Primary key:** `check_name`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `check_name` | string | yes | operational |  | Check name: table and rule. |
+| `table_name` | string | yes | operational |  | Table the check concerns. |
+| `description` | string | yes | operational |  | What the check requires. |
+| `severity` | string | yes | operational |  | What a failure means. One of: `error`, `warning`. |
+| `examined` | integer | yes | operational |  | Items examined. |
+| `failures` | integer | yes | operational |  | Items that failed. |
+| `passed` | boolean | yes | operational |  | Whether nothing failed. |
+| `examples` | string | no | operational |  | A few failing items, one per line. |
+
+### raw_snapshots
+
+The newest raw snapshot of every dataset slice, as of the most recent build.
+
+- **Grain:** One row per dataset slice.
+- **Primary key:** `source`, `dataset`, `partition_key`
+- **Indexes:** `source`, `dataset`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `source` | string | yes | operational |  | Source the dataset comes from. |
+| `dataset` | string | yes | operational |  | Dataset. |
+| `partition_key` | string | yes | operational |  | Which slice of the dataset: season, season type, team. |
+| `season` | string | no | operational |  | Season, if the dataset is seasonal. |
+| `fetched_at` | datetime | yes | operational |  | When the newest snapshot was fetched. |
+| `versions` | integer | yes | operational |  | How many distinct snapshots of this slice are stored. |
+
 ## Planned tables
 
 Called for by the roadmap; each gets a contract in the milestone that builds it.
 
 | Table | Domain | Purpose | Milestone |
 | --- | --- | --- | --- |
-| `custom_rosters` | user_rosters | User-created roster scenarios. | 4 |
-| `roster_players` | user_rosters | Members of each custom roster. | 4 |
 | `player_archetypes` | player_value | Role classification outputs. | 9 |
 | `player_value_scores` | player_value | Versioned player value calculations. | 9 |
 | `lineups` | lineups | Five-player lineup identities. | 10 |

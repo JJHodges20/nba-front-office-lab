@@ -11,10 +11,10 @@ before roster scoring, optimisation or any predictive claim. The plan is in
 
 ## Status
 
-Milestones 1-3 of 14 are complete: the architecture, ingestion of league data from
-stats.nba.com into a validated set of tables, and import of contract data with
-cap-normalised salaries. There is no database or user interface yet. See the milestone
-table in the roadmap for what exists and what does not.
+Milestones 1-4 of 14 are complete: the architecture, ingestion of league data from
+stats.nba.com, import of contract data with cap-normalised salaries, and a database
+built from them. There is no user interface yet. See the milestone table in the roadmap
+for what exists and what does not.
 
 **Contract data is not included.** No free source permits collecting NBA contracts
 automatically for this kind of project, so salaries come from a file you supply. See
@@ -38,25 +38,30 @@ python -m venv .venv
 ## Using it
 
 ```powershell
+.\.venv\Scripts\fol.exe refresh     # fetch what is new from stats.nba.com, then rebuild the database
+.\.venv\Scripts\fol.exe db          # what the database holds and how the last build went
+
 .\.venv\Scripts\fol.exe info        # version, data locations, configured seasons
 .\.venv\Scripts\fol.exe seasons     # cap, tax, apron and roster rules by season
-.\.venv\Scripts\fol.exe ingest      # fetch league data from stats.nba.com into the raw store
+.\.venv\Scripts\fol.exe ingest      # only fetch: league data into the raw store
+.\.venv\Scripts\fol.exe build       # only rebuild: the database from the raw store
 .\.venv\Scripts\fol.exe raw         # what the raw store holds
-.\.venv\Scripts\fol.exe check       # normalise the raw store and run the data-quality checks
+.\.venv\Scripts\fol.exe check       # validate the raw store without writing anything
 .\.venv\Scripts\fol.exe contracts template            # a contract file to fill in
 .\.venv\Scripts\fol.exe contracts import FILE --source "where the figures came from"
 .\.venv\Scripts\fol.exe dictionary  # the data dictionary, generated from the table contracts
 ```
 
-The first `fol ingest` makes about 440 requests and takes roughly ten minutes: team
+The first `fol refresh` makes about 440 requests and takes roughly ten minutes: team
 data for every season since 1996-97, and player detail for the current league year and
 the three seasons before it. Later runs fetch only what is new. `fol ingest --season
-2025-26` fetches one season.
+2025-26` fetches one season. Rebuilding the database takes about twenty seconds and
+never touches rosters you have built.
 
 ## Development
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest          # tests (live-network tests are deselected)
+.\.venv\Scripts\python.exe -m pytest -n auto  # tests, in parallel (live-network tests are deselected)
 .\.venv\Scripts\python.exe -m ruff check .    # lint
 .\.venv\Scripts\python.exe -m ruff format .   # format
 ```

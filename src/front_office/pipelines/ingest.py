@@ -53,8 +53,12 @@ class FetchRequest:
             self.dataset, season=self.season, season_type=self.season_type, team_id=self.team_id
         )
 
+    @property
+    def partition_key(self) -> str:
+        return partition_key(self.partition)
+
     def describe(self) -> str:
-        return f"{self.dataset.value}/{partition_key(self.partition)}"
+        return f"{self.dataset.value}/{self.partition_key}"
 
 
 class FetchStatus(StrEnum):

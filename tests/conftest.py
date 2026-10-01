@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 from collections.abc import Callable
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -14,6 +15,7 @@ from front_office.config.settings import ENV_DATA_DIR, ENV_HOME
 from front_office.domain.cap_rules import SeasonRules
 from front_office.domain.datasets import NBA_STATS, partition_for
 from front_office.domain.snapshots import Snapshot
+from front_office.pipelines.build import BuildReport, build_database
 from front_office.pipelines.normalize import NormalizedTables, normalize
 from front_office.rawstore import RawStore
 
@@ -83,3 +85,43 @@ def normalized(fixture_store: RawStore, season_rules: list[SeasonRules]) -> Norm
 def tables(normalized: NormalizedTables) -> dict[str, pd.DataFrame]:
     """A private copy of the normalised fixture tables that a test may freely break."""
     return {name: frame.copy() for name, frame in normalized.frames.items()}
+
+
+BUILT_AT = datetime(2026, 10, 1, 12, 0, 0)
+BUILD_TOOK = timedelta(seconds=9)
+
+
+@pytest.fixture(scope="session")
+def built_template(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, BuildReport]:
+    """A project built once from the fixture store, with the report of that build.
+
+    Building takes a couple of seconds, so it is done once per test run. Tests that only
+    read use ``built_readonly``; tests that change anything take a copy with
+    ``built_lab``.
+    """
+    root = tmp_path_factory.mktemp("built-lab")
+    shutil.copytree(REPO_ROOT / "configs", root / "configs")
+    shutil.copytree(FIXTURE_RAW, root / "data" / "raw")
+    moments = iter([BUILT_AT, BUILT_AT + BUILD_TOOK])
+    report = build_database(load_settings(root), now=lambda: next(moments))
+    assert report.loaded
+    return root, report
+
+
+@pytest.fixture(scope="session")
+def built_readonly(built_template: tuple[Path, BuildReport]) -> Settings:
+    """The shared built project. Read from it; never write to it."""
+    return load_settings(built_template[0])
+
+
+@pytest.fixture(scope="session")
+def first_build_report(built_template: tuple[Path, BuildReport]) -> BuildReport:
+    return built_template[1]
+
+
+@pytest.fixture
+def built_lab(built_template: tuple[Path, BuildReport], tmp_path: Path) -> Settings:
+    """A private copy of the built project that a test may change freely."""
+    target = tmp_path / "built"
+    shutil.copytree(built_template[0], target)
+    return load_settings(target)
