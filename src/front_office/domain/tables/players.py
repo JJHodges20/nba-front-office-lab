@@ -69,7 +69,7 @@ PLAYER_SEASONS = TableContract(
     domain="player_performance",
     description=(
         "Each player's season totals with the league's on-court measurements. A player "
-        "traded mid-season has one row covering every team he played for."
+        "traded mid-season has one row covering every team played for."
     ),
     grain="One row per player per season per season type.",
     fields=(
@@ -118,7 +118,7 @@ PLAYER_SEASONS = TableContract(
         Field(
             "player_impact_estimate",
             DType.FLOAT,
-            "The league's PIE: the player's share of the game events in games he played.",
+            "The league's PIE: the player's share of the game events in games played.",
             unit="fraction",
         ),
     ),
@@ -129,7 +129,7 @@ PLAYER_SEASONS = TableContract(
 PLAYER_GAME_LOGS = TableContract(
     name="player_game_logs",
     domain="player_performance",
-    description="Each player's box score for each game he played.",
+    description="Each player's box score for each game played.",
     grain="One row per player per game.",
     fields=(
         f.player_id(),

@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+import webbrowser
 from datetime import date
 from pathlib import Path
 from typing import Annotated
@@ -15,6 +22,7 @@ from rich.text import Text
 
 from front_office import __version__
 from front_office.config import ConfigError, Settings, load_all_season_rules, load_settings
+from front_office.config.settings import ENV_HOME
 from front_office.domain import PayrollLine, Season
 from front_office.domain.dictionary import render_data_dictionary
 from front_office.domain.tables import ALL_TABLES, PLANNED_TABLES
@@ -37,6 +45,9 @@ from front_office.services.glossary import METRIC_CATALOGS, metric_glossary
 
 DATA_DICTIONARY = "docs/DATA_DICTIONARY.md"
 METRIC_GLOSSARY = "docs/METRICS.md"
+WORKBENCH = "apps/workbench/app.py"
+DEFAULT_PORT = 8501
+STARTUP_SECONDS = 30
 
 app = typer.Typer(
     help="NBA Front Office Lab: ingest, inspect and analyse league data.",
@@ -495,6 +506,52 @@ def contracts_import(
     if not report.stored:
         _say("This file is identical to the last import; nothing new was stored.")
     _say("Run 'fol check' to validate the contract data against the rest.")
+
+
+@app.command()
+def ui(
+    port: Annotated[
+        int, typer.Option("--port", min=1024, max=65535, help="Port to serve the workbench on.")
+    ] = DEFAULT_PORT,
+    no_browser: Annotated[
+        bool, typer.Option("--no-browser", help="Start the workbench without opening a browser.")
+    ] = False,
+) -> None:
+    """Open the workbench: the lab's pages in your browser. Stop it with Ctrl+C."""
+    try:
+        settings = load_settings()
+    except ConfigError as error:
+        raise _fail(error) from error
+    script = settings.project_root / WORKBENCH
+    if not script.is_file():
+        raise _fail(FileNotFoundError(f"the workbench is missing: {script}"))
+
+    url = f"http://localhost:{port}"
+    _say(f"Starting the workbench at {url} (Ctrl+C to stop).")
+    command = [sys.executable, "-m", "streamlit", "run", str(script), "--server.port", str(port)]
+    # The workbench finds its data the way every command does; pin it to this project.
+    environment = {**os.environ, ENV_HOME: str(settings.project_root)}
+    if not no_browser:
+        threading.Thread(target=_open_when_ready, args=(url,), daemon=True).start()
+    try:
+        finished = subprocess.run(command, cwd=settings.project_root, env=environment, check=False)
+    except KeyboardInterrupt:
+        return
+    if finished.returncode:
+        raise typer.Exit(code=finished.returncode)
+
+
+def _open_when_ready(url: str, *, patience: float = STARTUP_SECONDS) -> bool:
+    """Open the browser once the workbench answers; give up quietly if it never does."""
+    deadline = time.monotonic() + patience
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(f"{url}/_stcore/health", timeout=2):
+                webbrowser.open(url)
+                return True
+        except (urllib.error.URLError, OSError):
+            time.sleep(0.5)
+    return False
 
 
 def main() -> None:

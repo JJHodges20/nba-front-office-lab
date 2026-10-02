@@ -81,3 +81,28 @@ class Clock:
 
     def advance(self, **kwargs: float) -> None:
         self.moment += timedelta(**kwargs)
+
+
+# --- people, teams and an invented contract file for tests that need salaries ---------
+
+BOS, NYK = 1610612738, 1610612752
+TATUM, BROWN, VUCEVIC, WHITE, PRITCHARD = 1628369, 1627759, 202696, 1628401, 1630202
+BRUNSON, TOWNS, BRIDGES, ANUNOBY, HART = 1628973, 1626157, 1628969, 1628384, 1628404
+ABDELNABY = 76001  # retired long before the fixture seasons: a player with no statistics
+
+# Invented figures. New York: 205M active and 7M dead, between the two aprons of
+# 2026-27. Boston: 77M on standard contracts and one two-way. Hart has no team.
+CONTRACT_FILE = (
+    "player_id,team,status,type,2026-27,2027-28,2028-29\n"
+    f"{TATUM},BOS,,,40000000,44000000 PO,\n"
+    f"{BROWN},BOS,,,30000000,,\n"
+    f"{PRITCHARD},BOS,,,7000000,7500000 TO,8000000\n"
+    f"{WHITE},BOS,,two-way,600000,,\n"
+    f"{BROWN},NYK,dead,,2000000,,\n"
+    f"{VUCEVIC},NYK,dead,,5000000,3000000,\n"
+    f"{BRUNSON},NYK,,,60000000,,\n"
+    f"{TOWNS},NYK,,,55000000,,\n"
+    f"{BRIDGES},NYK,,,50000000,,\n"
+    f"{ANUNOBY},NYK,,,40000000,,\n"
+    f"{HART},,,,12000000,,\n"
+)

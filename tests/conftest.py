@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import shutil
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -16,10 +17,25 @@ from front_office.domain.cap_rules import SeasonRules
 from front_office.domain.datasets import NBA_STATS, partition_for
 from front_office.domain.snapshots import Snapshot
 from front_office.pipelines.build import BuildReport, build_database
+from front_office.pipelines.contracts import import_contract_file
 from front_office.pipelines.normalize import NormalizedTables, normalize
 from front_office.rawstore import RawStore
+from tests.helpers import CONTRACT_FILE
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+# Outside a running server Streamlit logs these two warnings again and again: when a
+# cached function is defined or its cache cleared, and when one is called. They say
+# nothing about the workbench and bury the test output. Installed here, before anything
+# imports the workbench, because the first of them fires at import.
+BARE_MODE_NOISE = {
+    "streamlit.runtime.caching.cache_data_api": "No runtime found",
+    "streamlit.runtime.scriptrunner_utils.script_run_context": "missing ScriptRunContext",
+}
+for _logger, _phrase in BARE_MODE_NOISE.items():
+    logging.getLogger(_logger).addFilter(
+        lambda record, phrase=_phrase: phrase not in record.getMessage()
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -125,3 +141,24 @@ def built_lab(built_template: tuple[Path, BuildReport], tmp_path: Path) -> Setti
     target = tmp_path / "built"
     shutil.copytree(built_template[0], target)
     return load_settings(target)
+
+
+def with_contracts(template: Path, target: Path, contract_file: str) -> Settings:
+    """Copy a built project, import a contract file into the copy, and rebuild it."""
+    shutil.copytree(template, target)
+    settings = load_settings(target)
+    path = target / "contracts.csv"
+    path.write_text(contract_file, encoding="utf-8")
+    import_contract_file(settings, path, source_label="invented for tests", as_of=date(2026, 10, 1))
+    assert build_database(settings).loaded
+    return settings
+
+
+@pytest.fixture(scope="session")
+def contract_template(
+    built_template: tuple[Path, BuildReport], tmp_path_factory: pytest.TempPathFactory
+) -> Path:
+    """A built project holding the invented contract file. Never written to: copy it."""
+    root = tmp_path_factory.mktemp("contracts") / "lab"
+    with_contracts(built_template[0], root, CONTRACT_FILE)
+    return root

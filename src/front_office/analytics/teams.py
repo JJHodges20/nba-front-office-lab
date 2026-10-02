@@ -372,6 +372,16 @@ def league_averages(team_seasons: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def season_over_season(averages: pd.DataFrame) -> pd.DataFrame:
+    """How each league average moved from the season before it.
+
+    ``averages`` is :func:`league_averages`. Same index and metric columns; the first
+    season has nothing before it and is missing throughout. A season is compared with
+    the previous row, so ``averages`` should hold consecutive seasons.
+    """
+    return averages[list(TEAM_METRICS.keys)].sort_index().diff()
+
+
 def team_season_metrics(team_seasons: pd.DataFrame) -> pd.DataFrame:
     """One row per team-season: identity, every metric in :data:`TEAM_METRICS`, outcomes.
 
@@ -595,15 +605,20 @@ def team_window_metrics(
 
 
 def rolling_team_metrics(
-    team_games: pd.DataFrame, calibration: pd.Series | None = None, *, games: int = 10
+    team_games: pd.DataFrame,
+    calibration: pd.Series | None = None,
+    *,
+    games: int = 10,
+    full_spans: bool = False,
 ) -> pd.DataFrame:
     """Team metrics over each team's trailing ``games`` games, one row per game played.
 
     The inputs are those of :func:`team_window_metrics`. Each row describes the span
     ending with that game; early in a season the span is however many games the team
-    has played so far, and ``games_played`` says how many that is. With ``games=1`` each
-    row is a single game. Returns ``team_id``, ``game_id`` and ``game_date`` followed by
-    the metrics in :data:`WINDOW_METRIC_KEYS`.
+    has played so far, and ``games_played`` says how many that is. With ``full_spans``
+    those early rows are left out, so that every row covers exactly ``games`` games.
+    With ``games=1`` each row is a single game. Returns ``team_id``, ``game_id`` and
+    ``game_date`` followed by the metrics in :data:`WINDOW_METRIC_KEYS`.
     """
     if games < 1:
         raise ValueError("games must be at least 1")
@@ -618,4 +633,7 @@ def rolling_team_metrics(
     metrics = _window_rates(trailing)
     counts = ["games_played", "wins", "losses"]
     metrics[counts] = metrics[counts].astype("int64")
-    return pd.concat([played[["team_id", "game_id", "game_date"]], metrics], axis=1)
+    rolling = pd.concat([played[["team_id", "game_id", "game_date"]], metrics], axis=1)
+    if full_spans:
+        rolling = rolling[rolling["games_played"] == games].reset_index(drop=True)
+    return rolling

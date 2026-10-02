@@ -7,7 +7,8 @@ rules before changing anything. The source plan is
 ## Commands (Windows)
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -n auto      # all tests except live-network ones, in parallel (~30 s)
+.\.venv\Scripts\python.exe -m pytest -n auto      # all tests except live-network ones, in parallel (~2 min)
+.\.venv\Scripts\python.exe -m pytest tests\unit -n auto  # everything but the workbench pages (~40 s)
 .\.venv\Scripts\python.exe -m pytest tests\unit\domain   # one area, serially
 .\.venv\Scripts\python.exe -m pytest -m network   # live-network tests only
 .\.venv\Scripts\python.exe -m ruff check .
@@ -19,6 +20,7 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe check                     # normalise the raw store + run quality checks
 .\.venv\Scripts\fol.exe build                     # rebuild data\front_office.sqlite from the raw store
 .\.venv\Scripts\fol.exe db                        # row counts and the last build's result
+.\.venv\Scripts\fol.exe ui --no-browser           # the workbench at http://localhost:8501 (Ctrl+C stops it)
 .\.venv\Scripts\python.exe scripts\make_fixtures.py   # rebuild tests/fixtures/raw from data/raw
 ```
 
@@ -69,6 +71,39 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   square brackets is otherwise swallowed as a style tag.
 - **Warnings are errors** in the test suite.
 
+## The workbench (`apps/workbench`)
+
+Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's guide.
+
+- **The UI computes nothing.** A page sorts, filters, formats and draws. If it needs a
+  number - a rank, a total, a change, a correlation - give a service a method that
+  returns it. Deciding which rows are worth drawing is a service's job too.
+- **Charts go through `wb/charts.py`**, and onto a page through `components.chart`, which
+  adds the table view and the exports. The house rules (one scale, thin marks, ink text,
+  series caps) are tested in `tests/ui/test_charts.py`; do not work around them in a page.
+- **Colours live in `wb/theme.py`.** `.streamlit/config.toml` repeats them and a test
+  keeps the two in step. A new colour has to pass `tests/ui/test_theme.py`.
+- **Every figure says what it is**: measured, derived, estimate or the user's assumption.
+  Estimates over a span carry "≈". Missing is a dash and an explanation, never a zero.
+- **Cache on the build id.** Accessors in `wb/data.py` take `build` first. Rosters are
+  never cached.
+- **Text is gender-neutral**: "they", "the player", never "he".
+- **A clickable table takes its key from `state.table_key`** and calls `state.choose`
+  for whatever row is picked, with no further condition. A fixed key leaves the row
+  selected, and it then overrules every later choice in the sidebar.
+- **Never assign to a widget's session key after the widget is drawn.** Park the value
+  and apply it at the top of the next run (`state.choose`, `builder.CREATED`).
+- **Headline tiles cut off long text.** Keep a figure's context to about twenty
+  characters, or give the row fewer tiles (`components.figures(..., per_row=3)`).
+- **Page tests** (`tests/ui/test_pages.py`) draw a page with `AppTest` and compare what
+  it shows with what the service returns. `tests/ui/test_sweep.py` tries every control
+  on every page; a new page must be added to its `STARTS`. `AppTest` cannot click a
+  table row or edit a table cell: see `tests/ui/test_clicks.py` and `TestRosterEdits`.
+- **Look at it, and click through it.** A running server keeps old modules loaded:
+  restart `fol ui` after a code change, then check the page in the light and the dark
+  theme and use every control you touched. Passing tests say nothing about clipped
+  labels, collisions, or a click that does the wrong thing.
+
 ## Conventions
 
 - Seasons: `2025-26` (`Season.parse`). Money: whole USD integers. Shares: fractions 0-1.
@@ -82,3 +117,5 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   what you need in `required=`, never index by position.
 - When patching files from a shell heredoc, backslashes get mangled. Use the editor
   tools for anything containing Windows paths.
+- pytest fixtures are module-level functions. A fixture written as a method of a test
+  class with a scope wider than `function` is an error in this pytest version.

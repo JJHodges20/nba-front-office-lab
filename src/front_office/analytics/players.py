@@ -282,8 +282,8 @@ PLAYER_METRICS = MetricCatalog(
             "DRtg",
             "On-court defensive rating",
             "Points the opponent scored per 100 possessions while the player was on the "
-            "court. Measured by the league. It describes the lineups he played in as much "
-            "as the player.",
+            "court. Measured by the league. It describes the lineups around the player as "
+            "much as the player.",
             DEFENSE,
             provenance=_MEASURED,
             higher_is_better=False,
@@ -312,9 +312,9 @@ PLAYER_METRICS = MetricCatalog(
             "on_off_net",
             "On/Off",
             "On/off net rating difference",
-            "Team net rating with the player on the court minus its net rating with him "
-            "off it. For a player traded mid-season, each team's ratings are weighted by "
-            "the minutes behind them.",
+            "Team net rating with the player on the court minus its net rating with the "
+            "player off it. For a player traded mid-season, each team's ratings are "
+            "weighted by the minutes behind them.",
             IMPACT,
             _SIGNED,
         ),
@@ -330,7 +330,7 @@ PLAYER_METRICS = MetricCatalog(
             "player_impact_estimate",
             "PIE",
             "Player impact estimate",
-            "The league's PIE: the player's share of the box-score events in the games he played.",
+            "The league's PIE: the player's share of the box-score events in the games played.",
             IMPACT,
             _PCT,
             _MEASURED,
@@ -438,7 +438,7 @@ def box_metrics(totals: pd.DataFrame) -> pd.DataFrame:
 
 
 def combined_on_off(on_off: pd.DataFrame) -> pd.DataFrame:
-    """Each player's on/off net rating difference for a season, across his teams.
+    """Each player's on/off net rating difference for a season, across every team played for.
 
     Input is ``player_on_off``. For a player who appeared for several teams, the on-court
     ratings are averaged weighted by on-court minutes and the off-court ratings by
@@ -560,10 +560,10 @@ def window_metrics(
 def recent_availability(
     player_logs: pd.DataFrame, team_games: pd.DataFrame, *, team_games_back: int = 20
 ) -> pd.DataFrame:
-    """How many of his team's most recent games each player appeared in.
+    """How many of the team's most recent games each player appeared in.
 
     Both frames are narrowed to one season and season type. A player's team is the one
-    he most recently appeared for. Returns ``team_id``, ``team_games``, ``games_played``
+    most recently appeared for. Returns ``team_id``, ``team_games``, ``games_played``
     and ``availability`` (their ratio), indexed by ``player_id``.
     """
     if team_games_back < 1:
@@ -592,12 +592,16 @@ def recent_availability(
     return result[columns]
 
 
-def rolling_metrics(game_logs: pd.DataFrame, *, games: int = 10) -> pd.DataFrame:
+def rolling_metrics(
+    game_logs: pd.DataFrame, *, games: int = 10, full_spans: bool = False
+) -> pd.DataFrame:
     """Box metrics over each player's trailing ``games`` games, one row per game played.
 
     ``game_logs`` is ``player_game_logs`` narrowed to one season and season type. Each
     row describes the span ending with that game; early in a season the span is however
     many games the player has played so far, and ``games_played`` says how many that is.
+    With ``full_spans`` those early rows are left out, so that every row covers exactly
+    ``games`` games and the rows can be compared with one another.
     Returns ``player_id``, ``game_id`` and ``game_date`` followed by the box metrics.
     """
     if games < 1:
@@ -615,4 +619,7 @@ def rolling_metrics(game_logs: pd.DataFrame, *, games: int = 10) -> pd.DataFrame
         logs.groupby("player_id").cumcount().add(1).clip(upper=games).to_numpy()
     )
     metrics = box_metrics(trailing)
-    return pd.concat([logs[["player_id", "game_id", "game_date"]], metrics], axis=1)
+    rolling = pd.concat([logs[["player_id", "game_id", "game_date"]], metrics], axis=1)
+    if full_spans:
+        rolling = rolling[rolling["games_played"] == games].reset_index(drop=True)
+    return rolling

@@ -16,12 +16,12 @@ from front_office.analytics import players as analytics
 from front_office.analytics.comparison import Qualification
 from front_office.domain.metrics import MetricCatalog, MetricSpec
 from front_office.domain.seasons import SeasonType
+from front_office.services.contracts import SALARY_COLUMNS as _CONTRACT_COLUMNS
 from front_office.services.lab import Lab
 from front_office.services.window import Window
 
 DEFAULT_QUALIFICATION = Qualification(min_games=20, min_minutes=300)
 
-_CONTRACT_COLUMNS = ("salary", "salary_cap_pct", "years_remaining", "option", "guarantee")
 _BIO_COLUMNS = ("position", "height_inches", "weight_lbs", "birth_date", "country", "college")
 
 GAME_LOG_COLUMNS = (
@@ -104,7 +104,7 @@ class PlayerService:
 
         ``window`` narrows the games considered; the qualification thresholds then apply
         to the games and minutes inside the window. ``by_position`` ranks each player
-        against his own position group instead of the whole league.
+        against the same position group instead of the whole league.
         """
         window = window or Window()
         where = {"season": season, "season_type": season_type}
@@ -170,7 +170,7 @@ class PlayerService:
         return tidy
 
     def profile(self, player_id: int, *, payroll_season: str | None = None) -> PlayerProfile:
-        """Everything about one player: who he is, every season, on/off, contract."""
+        """Everything about one player: identity, every season, on/off, contract."""
         found = self._lab.read("players", {"player_id": int(player_id)})
         if found.empty:
             raise KeyError(f"no player with id {player_id}")
@@ -236,17 +236,27 @@ class PlayerService:
         return frame[list(GAME_LOG_COLUMNS)].reset_index(drop=True)
 
     def rolling(
-        self, player_id: int, season: str, season_type: str = "regular", *, games: int = 10
+        self,
+        player_id: int,
+        season: str,
+        season_type: str = "regular",
+        *,
+        games: int = 10,
+        full_spans: bool = False,
     ) -> pd.DataFrame:
-        """Box metrics over the player's trailing ``games`` games, oldest first."""
+        """Box metrics over the player's trailing ``games`` games, oldest first.
+
+        Early in a season a span holds fewer games; ``full_spans`` leaves those rows out.
+        """
         logs = self._lab.read(
             "player_game_logs",
             {"player_id": int(player_id), "season": season, "season_type": season_type},
         )
-        return analytics.rolling_metrics(logs, games=games).drop(columns="player_id")
+        rolling = analytics.rolling_metrics(logs, games=games, full_spans=full_spans)
+        return rolling.drop(columns="player_id")
 
     def availability(self, season: str, *, team_games_back: int = 20) -> pd.DataFrame:
-        """Each player's appearances in his team's most recent regular-season games."""
+        """Each player's appearances in the team's most recent regular-season games."""
         where = {"season": season, "season_type": SeasonType.REGULAR.value}
         logs = self._lab.read("player_game_logs", where)
         games = self._lab.read("team_games", where)
@@ -284,13 +294,9 @@ class PlayerService:
             for column in _CONTRACT_COLUMNS:
                 frame[column] = None
             return frame
-        years = self._lab.read("contract_years", {"season": payroll_season})
-        contracts = self._lab.read("contracts")[["contract_id", "status"]]
-        active = years.merge(contracts, on="contract_id")
-        active = active[active["status"] == "active"].drop_duplicates("player_id")
-        active = active.set_index("player_id")
+        salaries = self._lab.contracts.salaries(payroll_season)
         for column in _CONTRACT_COLUMNS:
-            frame[column] = active[column].reindex(frame.index)
+            frame[column] = salaries[column].reindex(frame.index)
         return frame
 
 

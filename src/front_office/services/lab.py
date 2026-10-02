@@ -22,6 +22,9 @@ from front_office.domain.seasons import Season
 from front_office.storage import Database, OperationsLog, RosterRepository, StorageError, Warehouse
 
 if TYPE_CHECKING:
+    from front_office.services.builder import BuilderService
+    from front_office.services.contracts import ContractService
+    from front_office.services.health import HealthService
     from front_office.services.league import LeagueService
     from front_office.services.players import PlayerService
     from front_office.services.teams import TeamService
@@ -163,3 +166,21 @@ class Lab:
         from front_office.services.league import LeagueService
 
         return LeagueService(self)
+
+    @property
+    def contracts(self) -> ContractService:
+        from front_office.services.contracts import ContractService
+
+        return ContractService(self)
+
+    @property
+    def builder(self) -> BuilderService:
+        from front_office.services.builder import BuilderService
+
+        return BuilderService(self)
+
+    @property
+    def health(self) -> HealthService:
+        from front_office.services.health import HealthService
+
+        return HealthService(self)

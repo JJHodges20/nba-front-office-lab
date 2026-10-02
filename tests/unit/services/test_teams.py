@@ -70,6 +70,16 @@ class TestTable:
         assert ranks.loc[table.teams["def_rating"].idxmin(), "def_rating"] == 1
         assert set(ranks["net_rating"]) <= set(range(1, 31))
 
+    def test_percentiles_read_higher_is_better(self, table: TeamTable) -> None:
+        percentiles = table.percentiles
+        assert percentiles.index.equals(table.teams.index)
+        assert list(percentiles.columns) == list(TEAM_METRICS.keys)
+        stingiest = table.teams["def_rating"].idxmin()
+        assert percentiles.loc[stingiest, "def_rating"] == percentiles["def_rating"].max()
+        best = table.teams["net_rating"].idxmax()
+        assert percentiles.loc[best, "net_rating"] == pytest.approx(100 * 29.5 / 30)
+        assert percentiles["net_rating"].mean() == pytest.approx(50.0)
+
     def test_where_no_direction_is_better_the_highest_ranks_first(self, table: TeamTable) -> None:
         assert table.ranks.loc[table.teams["pace"].idxmax(), "pace"] == 1
         assert table.ranks.loc[BOS, "pace"] == 30  # the slowest team in the league
@@ -122,6 +132,7 @@ class TestWindow:
         assert last.metrics.keys == WINDOW_METRIC_KEYS
         assert "rel_off_rating" not in last.teams.columns
         assert list(last.ranks.columns) == list(WINDOW_METRIC_KEYS)
+        assert list(last.percentiles.columns) == list(WINDOW_METRIC_KEYS)
         assert list(last.league.index) == list(WINDOW_METRIC_KEYS)
 
     def test_identity_and_outcomes_come_from_the_season(self, last: TeamTable) -> None:
@@ -271,6 +282,15 @@ class TestRolling:
         last = rolling.iloc[-1]
         assert (last["games_played"], last["wins"]) == (10, 8)
         assert last["net_rating"] == pytest.approx(11.6102, abs=1e-4)
+
+    def test_full_spans_start_at_the_tenth_game(self, lab: Lab) -> None:
+        every = lab.teams.rolling(BOS, "2025-26", games=10)
+        rolling = lab.teams.rolling(BOS, "2025-26", games=10, full_spans=True)
+        assert len(rolling) == 73 and (rolling["games_played"] == 10).all()
+        pd.testing.assert_frame_equal(rolling, every.iloc[9:].reset_index(drop=True))
+        # Seven playoff games: there is no span of ten, and there are three of five.
+        assert len(lab.teams.rolling(BOS, "2025-26", "playoffs", games=10, full_spans=True)) == 0
+        assert len(lab.teams.rolling(BOS, "2025-26", "playoffs", games=5, full_spans=True)) == 3
 
     def test_the_last_row_matches_the_last_games_table(self, lab: Lab) -> None:
         rolling = lab.teams.rolling(BOS, "2025-26", games=15)

@@ -150,6 +150,33 @@ them), `RosterRepository` (the user's rosters) and `OperationsLog` (fetch and bu
 history). They return frames that satisfy the table's contract. See
 `docs/decisions/0005-database.md`.
 
+## Services and the workbench
+
+```
+fol ui:  apps/workbench/app.py -> wb.views.<page> -> front_office.services.Lab -> storage + analytics
+```
+
+`services.Lab` opens the database and the season rules; the services hang off it:
+`players`, `teams`, `league`, `contracts`, `builder` (the user's rosters) and `health`.
+A service reads tables, calls analytics, and joins the result with names. It contains
+no formulas.
+
+The workbench (`apps/workbench`) is a Streamlit app:
+
+| Part | Role |
+| --- | --- |
+| `app.py` | The frame: navigation, global filters, data status. |
+| `wb/views/` | One module per page, each with a `render()`. |
+| `wb/state.py` | The global filters: season, phase, team, player, comparison window. |
+| `wb/data.py` | Access to the lab. Results are cached per build id. |
+| `wb/charts.py` | Chart builders: a frame and a palette in, a figure out. |
+| `wb/theme.py` | The palette, for a light and for a dark surface. |
+| `wb/components.py`, `wb/formats.py` | Shared pieces and text formatting. |
+
+It displays what services return and computes nothing itself; see
+`docs/decisions/0008-workbench.md`. `.streamlit/config.toml` holds the page theme, which
+a test keeps in step with `wb/theme.py`.
+
 ## Season rules
 
 Cap thresholds, salary exceptions, maximum salaries and roster limits live in
@@ -177,6 +204,9 @@ field disagree.
 - `tests/unit/` - one directory per layer; pure, fast, no network.
 - `tests/architecture/` - the boundary rules above.
 - `tests/integration/` - several layers together against recorded fixtures.
+- `tests/ui/` - the workbench: the palette by arithmetic, the chart builders, every
+  page drawn without a browser against a database built from the fixtures, and a sweep
+  that puts every control on every page through every value it offers.
 - Tests marked `network` call live services and are deselected by default
   (`pytest -m network`).
 - Warnings are errors (`filterwarnings = ["error"]`).
@@ -188,6 +218,29 @@ field disagree.
 2. Write the normaliser in `processing/` and finish it with `conform_frame`.
 3. Run `fol dictionary --write`.
 4. Test the normaliser against a recorded fixture.
+
+## How to add a metric
+
+1. Add its formula to `analytics/formulas.py` if it is new, and compute it where the
+   catalog's other metrics are computed.
+2. Add a `MetricSpec` to the catalog: label, description, format, provenance, which
+   direction is better.
+3. Run `fol metrics --write`.
+4. Test it by hand on a small example and, where the league publishes the same
+   quantity, against the league's figure.
+
+## How to add a page to the workbench
+
+1. Give a service a method that returns everything the page shows. If the page needs a
+   number, the service computes it.
+2. Add an accessor to `wb/data.py`, cached on the build id.
+3. Write `wb/views/<page>.py` with a `render()` and add it to `PAGES` in `app.py`.
+4. Draw charts with the builders in `wb/charts.py`, each through `components.chart` so
+   it gets its table view and exports.
+5. Add the page to `PAGES` in `tests/ui/test_pages.py` and to `STARTS` in
+   `tests/ui/test_sweep.py` (a test fails until both are done), and test what it shows
+   against what the service returns.
+6. Look at it in both themes, and click through anything that can be clicked.
 
 ## How to add a stats.nba.com dataset
 

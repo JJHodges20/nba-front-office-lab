@@ -92,7 +92,7 @@ def build_players(player_index: Snapshot, rosters: Sequence[Snapshot] = ()) -> p
             "last_season_year": convert.integers(source["TO_YEAR"]),
             "is_active": is_active,
             # The index lists a retired player's last team; only an active player's
-            # team is his current one.
+            # team is the current one.
             "current_team_id": team_id.where(is_active & (team_id > 0)),
         }
     )
@@ -329,8 +329,8 @@ def build_player_on_off(on_off: Sequence[Snapshot]) -> pd.DataFrame:
         off = _on_off_side(snapshot, _OFF_COURT, "off_court", team_id)
         if on.empty:
             continue
-        # A rostered player who never took the court appears in the "off" set only. He
-        # has no on/off split, so he is left out.
+        # A rostered player who never took the court appears in the "off" set only,
+        # has no on/off split, and is left out.
         both = on.merge(off, on="player_id", how="left", validate="one_to_one")
         both.insert(1, "season", season.label)
         both.insert(2, "season_type", season_type.value)

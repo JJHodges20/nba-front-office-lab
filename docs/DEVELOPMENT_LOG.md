@@ -3,6 +3,129 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone 7 - Front Office UI foundation (2026-10-01)
+
+**Built**
+
+- `apps/workbench`: the workbench, a Streamlit app of seven pages - League Overview,
+  Player Explorer, Team Explorer, Contract Explorer, Analytics Lab, Team Builder, Data
+  Health - inside one frame: navigation, global filters (season, phase, team, player,
+  comparison window) that hold from page to page, and the data status on every page.
+- `wb/charts.py`: ten chart builders (scatter, diverging bars and columns, percentile
+  bars, line, lines, stacked bars, histogram, comparison dots, meter) that carry the
+  house rules; `wb/theme.py`: one palette stepped for a light and a dark surface;
+  `components.chart`: every chart with its table view, CSV and interactive HTML export.
+- `fol ui`: starts the workbench for this project and opens the browser once it answers.
+- Services the pages needed: `ContractService` (salaries, team payrolls against every
+  line, commitments, outlook, cap rules, what the file adds up to), `BuilderService`
+  (the user's rosters: slots, assumed salaries, payroll, roster-rule checks, pooled
+  indicators beside the league), `HealthService` (source states, freshness, failing
+  fetches, gaps, checks, build history), `explore.relationship`, league
+  season-over-season changes, team percentiles.
+- Analytics behind them: `finance` (team payrolls, position against each payroll line,
+  a season's salary totals), `rosters` (20 roster indicators, pooled from player totals
+  and weighted by minutes), `relationships` (linear and rank correlation with the sample
+  they rest on), trailing-span metrics restricted to full spans on request.
+- `docs/WORKBENCH.md`, the user's guide; screenshots in the README.
+
+**Decisions** ([0008](decisions/0008-workbench.md))
+
+- The interface displays and never computes. Where a page needed a number the services
+  did not give, the service gained it.
+- Charts come from one module that knows nothing about Streamlit or basketball, and the
+  house rules are its tests: one scale, thin marks, ink text, at most three series in a
+  scatter and four in a line chart, enforced with an error rather than another colour.
+- The palette is checked by arithmetic, in both themes, and the page theme is kept in
+  step with it by a test.
+- Nothing is reachable only by hovering; missing is said, not hidden; where a number
+  comes from is on the page; no judgement is offered.
+- Form charts draw full spans only, and percentiles are written from 1st to 99th.
+- A click on a table row acts once: the table then returns under a new key with nothing
+  selected. A widget is never written to after it is drawn; the value is parked and
+  applied on the next run.
+- The workbench listens on this machine only and sends no usage statistics.
+
+**Verification**
+
+- Every page is drawn without a browser for nine kinds of filter state on a database
+  with contracts, and again without contracts: none raises, each shows one title and no
+  error. What a page shows is compared with what the service returns - headline figures,
+  ranks, estimates marked as such, payroll against the lines, roster checks, salary
+  sources, correlations, gaps.
+- A sweep puts every control on every page through every value it offers - 847 page
+  runs from twelve starting states - and presses every button: no exception and no
+  error box. Planted crashes behind a single option of a select, a segmented control
+  and a text box were each found by it.
+- On the real database (build 3, 174,492 rows) all seven pages draw without an
+  exception, each in 1.5 to 3.2 seconds from a cold start.
+- The journeys the tests cannot make were clicked through in a real browser: choosing a
+  team and a player by table row and then changing and clearing the choice in the
+  sidebar; and, on a scratch database, creating a roster, adding players, typing a
+  salary into the table, changing a slot so that its holder moves to the bench, ticking
+  a player off, and deleting the roster. This found two defects no test had shown, both
+  fixed and now covered: a selected row went on overruling the sidebar, so a team or
+  player chosen by row could not be changed or cleared there; and creating a second
+  roster from the "New roster" form raised an error, because the page wrote to the
+  roster select after drawing it.
+- Palette, measured (OKLab distance x 100; the floors are 15 for full colour vision and
+  8 under simulated protanopia and deuteranopia): neighbouring series differ by 19.6 and
+  9.1 on the light surface and 19.3 and 8.4 on the dark; the three series a scatter may
+  use by 24.0 and 9.2, and 20.9 and 9.4, in every pairing. A fourth scatter series fails
+  (13.7 light; 10.6 and 4.8 dark), which is why the cap is three. The figures were
+  reproduced by an independent implementation in the tests.
+- `fol ui` was started for real: the server answered its health check and served the
+  pages.
+- Screenshot review of all seven pages in the light and the dark theme, on the real
+  data and, for the contract views, on a scratch database with invented salaries kept
+  outside the repository. Looking found what the tests could not, and each was fixed:
+  colliding labels in the team scatter (labels now choose a free side); truncated
+  headline labels; a reference label the line could cross (moved to the margin);
+  threshold names overprinting each other (two rows, short names); a stacked chart
+  without its legend; "None" and "nan" in empty cells (a dash); cramped roster-table
+  columns; a study control hidden in the sidebar (moved onto the page); values clipped
+  at the tip of a full percentile bar; a best-in-group player shown at the "100th
+  percentile"; form charts that opened with a one-game spike which set the scale for
+  the rest of the season (full spans only); date labels written at a slant on narrow
+  charts; a player chosen by row whose profile stayed behind another tab (the profile
+  now opens); and headline tiles that cut off their text in a row of six (two rows of
+  three). Checked again at a laptop width of 1366 pixels.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| Automated tests | 1,687 passed, none skipped (420 of them for the workbench); about two minutes with `pytest -n auto` |
+| Test sensitivity | Services and analytics for the pages: 56 planted bugs, 52 caught at once, 4 gaps closed, then 56 of 56. Workbench and launcher: 85 planted bugs, 77 caught at once; 6 exposed gaps that were closed and then caught; 2 were not bugs (Streamlit itself drops a remembered choice that is no longer offered, so removing the lab's own guard changes nothing) |
+| Data-quality checks | Unchanged: 44 checks, 0 errors, 2 standing warnings |
+| UI review | All seven pages, light and dark, real data and invented contract data, plus a click-through of the interactive journeys in a browser; issues above fixed and re-shot |
+| Architectural boundaries | `tests/architecture` passes, the interface rule no longer skipped: `apps/` imports only `services` and `domain`; `streamlit` and `plotly` appear nowhere else. A search of the pages for arithmetic on data found only rounding, unit conversion and counts of what is drawn |
+| Lint | `ruff check` and `ruff format --check` clean |
+
+**Version 1.0**
+
+Milestones 1-7 are the roadmap's version 1.0. Nine of its ten acceptance criteria are
+met; the checklist with evidence is in [ROADMAP.md](ROADMAP.md). The tenth - player
+contracts available in the workspace - is open: the import path and every view exist
+and are tested, but the workspace holds no contracts until a file is supplied.
+
+**Open items carried forward**
+
+- Contract data needs a decision from the user: fill in the template by hand, or
+  license a feed. Nothing is collected automatically (decision 0004).
+- Cap rules are configured for 2024-25 to 2026-27 only; salaries in other seasons have
+  no cap share.
+- Kept tables (rosters, history) have no migration mechanism yet; one is needed before
+  their contracts change.
+- `AppTest` cannot click a table row or edit a table cell. The tests imitate the first
+  and test the second at the function that saves the edits; the real thing has to be
+  clicked through in a browser whenever those paths change. There is no browser test in
+  the suite.
+- Static images are saved from the chart toolbar in the browser; there is no
+  server-side image export.
+- The pages were reviewed at desktop widths. Nothing was designed for a phone.
+- Defensive indicators are thin (steals, blocks, defensive rating); lineup data is
+  deferred to the roster-fit milestone.
+
 ## Milestone 6 - Team analytics (2026-10-01)
 
 **Built**
@@ -323,7 +446,7 @@ handled explicitly and covered by a test ([0003](decisions/0003-source-quirks.md
   them.
 - Consistency: every team's wins, losses and games equal its game results; league-wide
   wins equal losses and points scored equal points allowed in every season; every
-  player's games and points equal his game log; in all 7,882 team-games with player
+  player's games and points equal the player's game log; in all 7,882 team-games with player
   logs, the players' points sum to the team's score.
 
 **Gate**

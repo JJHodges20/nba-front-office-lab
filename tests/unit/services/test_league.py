@@ -82,6 +82,15 @@ class TestAverages:
         assert averages["teams"].tolist() == [29, 30, 30]
         assert set(TEAM_METRICS.keys) <= set(averages.columns)
 
+    def test_changes_from_the_season_before(self, lab: Lab) -> None:
+        averages, changes = lab.league.averages(), lab.league.changes()
+        assert changes.index.tolist() == averages.index.tolist()
+        assert "teams" not in changes.columns
+        assert changes.loc["1996-97"].isna().all()
+        assert changes.loc["2025-26", "off_rating"] == pytest.approx(
+            averages.loc["2025-26", "off_rating"] - averages.loc["2012-13", "off_rating"]
+        )
+
     def test_metrics_are_the_team_catalog(self, lab: Lab) -> None:
         assert lab.league.metrics is TEAM_METRICS
 
@@ -196,7 +205,7 @@ class TestPlayoffs:
 
 class TestGlossary:
     def test_covers_players_and_teams(self) -> None:
-        assert list(METRIC_CATALOGS) == ["Player metrics", "Team metrics"]
+        assert list(METRIC_CATALOGS) == ["Player metrics", "Team metrics", "Roster indicators"]
         document = metric_glossary()
         for catalog in METRIC_CATALOGS.values():
             for spec in catalog:

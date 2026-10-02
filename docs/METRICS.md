@@ -80,7 +80,7 @@ describes what is on screen rather than what was once intended.
 | BLK/36 | Blocks per 36 minutes | `blk_per_36` | derived | number | higher | Blocks scaled to 36 minutes, so players with different minutes can be compared. |
 | STK/36 | Steals plus blocks per 36 minutes | `stocks_per_36` | derived | number | higher | Steals and blocks together, scaled to 36 minutes. A rough count of defensive events, not a measure of defensive quality. |
 | PF/36 | Personal fouls per 36 minutes | `pf_per_36` | derived | number | lower | Personal fouls scaled to 36 minutes, so players with different minutes can be compared. |
-| DRtg | On-court defensive rating | `def_rating` | measured | number | lower | Points the opponent scored per 100 possessions while the player was on the court. Measured by the league. It describes the lineups he played in as much as the player. |
+| DRtg | On-court defensive rating | `def_rating` | measured | number | lower | Points the opponent scored per 100 possessions while the player was on the court. Measured by the league. It describes the lineups around the player as much as the player. |
 
 ### Impact
 
@@ -88,9 +88,9 @@ describes what is on screen rather than what was once intended.
 | --- | --- | --- | --- | --- | --- | --- |
 | ORtg | On-court offensive rating | `off_rating` | measured | number | higher | Points the team scored per 100 possessions while the player was on the court. Measured by the league. |
 | NetRtg | On-court net rating | `net_rating` | measured | signed number | higher | Team points scored minus allowed per 100 possessions while the player was on the court. Measured by the league. |
-| On/Off | On/off net rating difference | `on_off_net` | derived | signed number | higher | Team net rating with the player on the court minus its net rating with him off it. For a player traded mid-season, each team's ratings are weighted by the minutes behind them. |
+| On/Off | On/off net rating difference | `on_off_net` | derived | signed number | higher | Team net rating with the player on the court minus its net rating with the player off it. For a player traded mid-season, each team's ratings are weighted by the minutes behind them. |
 | +/- | Plus-minus per game | `plus_minus_per_game` | derived | signed number | higher | Team point margin while the player was on the court, per game played. |
-| PIE | Player impact estimate | `player_impact_estimate` | measured | percentage | higher | The league's PIE: the player's share of the box-score events in the games he played. |
+| PIE | Player impact estimate | `player_impact_estimate` | measured | percentage | higher | The league's PIE: the player's share of the box-score events in the games played. |
 
 ## Team metrics
 
@@ -148,3 +148,40 @@ describes what is on screen rather than what was once intended.
 | 3PAr | Three-point attempt rate | `fg3a_rate` | derived | percentage | neither | Share of field goal attempts taken from three: 3PA / FGA. |
 | 3P% | Three-point percentage | `fg3_pct` | derived | percentage | higher | Three-pointers made divided by attempted. |
 | AST% | Assist percentage | `ast_pct` | derived | percentage | neither | Share of made field goals that were assisted: AST / FGM. |
+
+## Roster indicators
+
+### Composition
+
+| Metric | Name | Key | Origin | Shown as | Better | Definition |
+| --- | --- | --- | --- | --- | --- | --- |
+| Players | Players | `players` | derived | whole number | neither | Players on the roster. |
+| With stats | Players with statistics | `players_with_stats` | derived | whole number | neither | Players on the roster who played in the statistics season. The rest add nothing to the pooled figures. |
+| Guards | Guards | `guards` | derived | whole number | neither | Players whose first listed position is guard. |
+| Forwards | Forwards | `forwards` | derived | whole number | neither | Players whose first listed position is forward. |
+| Centers | Centers | `centers` | derived | whole number | neither | Players whose first listed position is center. |
+| Age | Average age, weighted by minutes | `age` | derived | number | neither | Average age during the statistics season, each player weighted by minutes played: the age of the minutes, not of the bench. |
+| MIN% | Share of a team season's minutes | `minutes_share` | derived | percentage | neither | Minutes the group played in the statistics season, as a share of the minutes a team has to fill. Above 100% the group has played more minutes than one team has; below it, someone has to play more than before. |
+
+### Shooting, pooled
+
+| Metric | Name | Key | Origin | Shown as | Better | Definition |
+| --- | --- | --- | --- | --- | --- | --- |
+| TS% | True shooting percentage | `ts_pct` | derived | percentage | higher | PTS / (2 x (FGA + 0.44 x FTA)). Scoring efficiency counting twos, threes and free throws together. Computed from the group's pooled totals. |
+| eFG% | Effective field goal percentage | `efg_pct` | derived | percentage | higher | (FGM + 0.5 x 3PM) / FGA. Field goal percentage that credits a three as one and a half makes. Computed from the group's pooled totals. |
+| 3P% | Three-point percentage | `fg3_pct` | derived | percentage | higher | Three-pointers made divided by attempted. Computed from the group's pooled totals. |
+| FT% | Free throw percentage | `ft_pct` | derived | percentage | higher | Free throws made divided by attempted. Computed from the group's pooled totals. |
+| 3PAr | Three-point attempt rate | `fg3a_rate` | derived | percentage | neither | Share of field goal attempts taken from three: 3PA / FGA. Computed from the group's pooled totals. |
+| FTr | Free throw rate | `ft_rate` | derived | number | higher | Free throw attempts per field goal attempt: FTA / FGA. How often a player gets to the line. Computed from the group's pooled totals. |
+
+### Production, pooled
+
+| Metric | Name | Key | Origin | Shown as | Better | Definition |
+| --- | --- | --- | --- | --- | --- | --- |
+| PTS/36 | Points per 36 minutes | `pts_per_36` | derived | number | higher | Points scaled to 36 minutes, so players with different minutes can be compared. Computed from the group's pooled totals. |
+| REB/36 | Rebounds per 36 minutes | `reb_per_36` | derived | number | higher | Rebounds scaled to 36 minutes, so players with different minutes can be compared. Computed from the group's pooled totals. |
+| AST/36 | Assists per 36 minutes | `ast_per_36` | derived | number | higher | Assists scaled to 36 minutes, so players with different minutes can be compared. Computed from the group's pooled totals. |
+| STL/36 | Steals per 36 minutes | `stl_per_36` | derived | number | higher | Steals scaled to 36 minutes, so players with different minutes can be compared. Computed from the group's pooled totals. |
+| BLK/36 | Blocks per 36 minutes | `blk_per_36` | derived | number | higher | Blocks scaled to 36 minutes, so players with different minutes can be compared. Computed from the group's pooled totals. |
+| TOV% | Turnover percentage | `tov_pct` | derived | percentage | lower | TOV / (FGA + 0.44 x FTA + TOV). Share of the player's own plays that end in a turnover. Computed from the group's pooled totals. |
+| AST/TO | Assist-to-turnover ratio | `ast_to_tov` | derived | number | higher | Assists divided by turnovers. Computed from the group's pooled totals. |

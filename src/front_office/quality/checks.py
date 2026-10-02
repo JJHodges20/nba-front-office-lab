@@ -632,7 +632,7 @@ _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
     Check(
         "games_and_points_match_logs",
         "player_seasons",
-        "Each player's games played and points equal his game log.",
+        "Each player's games played and points equal the player's game log.",
         E,
         _player_games_match_logs,
     ),
@@ -646,7 +646,7 @@ _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
     Check(
         "starts_within_games",
         "player_seasons",
-        "No player started more games than he played.",
+        "No player started more games than were played.",
         E,
         _starts_within_games,
     ),

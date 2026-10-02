@@ -360,6 +360,16 @@ class TestRollingAndAvailability:
         first = lab.players.game_log(TATUM, "2025-26").iloc[-1]
         assert rolling.iloc[0]["pts_per_game"] == first["pts"]
 
+    def test_full_spans_start_at_the_first_complete_one(self, lab: Lab) -> None:
+        every = lab.players.rolling(TATUM, "2025-26", games=5)
+        rolling = lab.players.rolling(TATUM, "2025-26", games=5, full_spans=True)
+        assert len(rolling) == 12 and (rolling["games_played"] == 5).all()
+        pd.testing.assert_frame_equal(rolling, every.iloc[4:].reset_index(drop=True))
+        first_five = lab.players.game_log(TATUM, "2025-26").tail(5)  # the log is newest first
+        assert rolling.iloc[0]["pts_per_game"] == pytest.approx(first_five["pts"].mean())
+        # Sixteen games played: there is no span of twenty.
+        assert len(lab.players.rolling(TATUM, "2025-26", games=20, full_spans=True)) == 0
+
     def test_availability(self, lab: Lab) -> None:
         availability = lab.players.availability("2025-26", team_games_back=20)
         row = availability.loc[TATUM]

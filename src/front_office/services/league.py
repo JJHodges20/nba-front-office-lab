@@ -51,6 +51,14 @@ class LeagueService:
         """The league's average of every team metric in each season, oldest first."""
         return analytics.league_averages(self._lab.read("team_seasons"))
 
+    def changes(self) -> pd.DataFrame:
+        """How each league average moved from the season before it on record.
+
+        Same shape as :meth:`averages`. The first season has nothing to compare with
+        and is missing throughout.
+        """
+        return analytics.season_over_season(self.averages())
+
     def history(self) -> pd.DataFrame:
         """Every team-season on record, newest first.
 

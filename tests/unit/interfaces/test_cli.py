@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import shutil
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -92,7 +94,7 @@ def test_metrics_prints_the_glossary() -> None:
 def test_metrics_write_creates_the_document(project: Path) -> None:
     result = runner.invoke(app, ["metrics", "--write"])
     assert result.exit_code == 0, result.output
-    assert "70 metrics" in result.output
+    assert "90 metrics" in result.output
     written = (project / "docs" / "METRICS.md").read_text(encoding="utf-8")
     assert written.startswith("# Metric Glossary")
     assert "\r" not in written
@@ -445,3 +447,115 @@ class TestDatabaseCommands:
         assert built == [True]
         assert result.exit_code == 1
         assert "building from what is stored" in result.output
+
+
+class TestUi:
+    """The command that starts the workbench, with the server itself replaced."""
+
+    @pytest.fixture
+    def launched(self, project: Path, monkeypatch: pytest.MonkeyPatch) -> list[dict]:
+        """A project that has a workbench script, and a record of what would be run."""
+        script = project / "apps" / "workbench" / "app.py"
+        script.parent.mkdir(parents=True)
+        script.write_text("", encoding="utf-8")
+        calls: list[dict] = []
+
+        def run(command, *, cwd, env, check):
+            calls.append({"command": command, "cwd": cwd, "env": env})
+            return SimpleNamespace(returncode=0)
+
+        monkeypatch.setattr(cli.subprocess, "run", run)
+        return calls
+
+    def test_starts_streamlit_on_the_workbench_of_this_project(
+        self, project: Path, launched: list[dict]
+    ) -> None:
+        result = runner.invoke(app, ["ui", "--no-browser"])
+        assert result.exit_code == 0, result.output
+        assert "http://localhost:8501" in result.output
+        call = launched[0]
+        assert call["command"][1:4] == ["-m", "streamlit", "run"]
+        assert Path(call["command"][4]) == project / "apps" / "workbench" / "app.py"
+        assert call["command"][5:] == ["--server.port", "8501"]
+        assert call["cwd"] == project
+        assert call["env"][ENV_HOME] == str(project)
+
+    def test_a_project_found_from_the_working_directory_is_pinned_for_the_workbench(
+        self, project: Path, launched: list[dict], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Streamlit runs the workbench as another process; it must not look again and
+        # settle on a different project than the command did.
+        monkeypatch.delenv(ENV_HOME)
+        monkeypatch.chdir(project)
+        result = runner.invoke(app, ["ui", "--no-browser"])
+        assert result.exit_code == 0, result.output
+        assert Path(launched[0]["env"][ENV_HOME]) == project.resolve()
+
+    def test_the_port_can_be_chosen(self, launched: list[dict]) -> None:
+        result = runner.invoke(app, ["ui", "--no-browser", "--port", "8600"])
+        assert result.exit_code == 0, result.output
+        assert launched[0]["command"][-1] == "8600"
+        assert "http://localhost:8600" in result.output
+
+    def test_the_browser_opens_unless_told_not_to(
+        self, launched: list[dict], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        opened: list[str] = []
+        monkeypatch.setattr(cli, "_open_when_ready", opened.append)
+        assert runner.invoke(app, ["ui", "--no-browser"]).exit_code == 0
+        assert opened == []
+        assert runner.invoke(app, ["ui"]).exit_code == 0
+        for _ in range(100):  # the opener runs on its own thread
+            if opened:
+                break
+            time.sleep(0.01)
+        assert opened == ["http://localhost:8501"]
+
+    def test_a_failed_start_is_reported_through_the_exit_code(
+        self, launched: list[dict], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            cli.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(returncode=3)
+        )
+        assert runner.invoke(app, ["ui", "--no-browser"]).exit_code == 3
+
+    def test_a_project_without_the_workbench_says_so(self, project: Path) -> None:
+        result = runner.invoke(app, ["ui", "--no-browser"])
+        assert result.exit_code == 1
+        assert "the workbench is missing" in result.output
+
+    def test_the_browser_waits_for_the_server_and_gives_up_quietly(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        opened: list[str] = []
+        monkeypatch.setattr(cli.webbrowser, "open", opened.append)
+
+        def refused(url, timeout):
+            raise OSError("connection refused")
+
+        monkeypatch.setattr(cli.urllib.request, "urlopen", refused)
+        assert cli._open_when_ready("http://localhost:1", patience=0.2) is False
+        assert opened == []
+
+    def test_the_browser_opens_once_the_server_answers(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        opened: list[str] = []
+        asked: list[str] = []
+        monkeypatch.setattr(cli.webbrowser, "open", opened.append)
+
+        class Answer:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        def answering(url, timeout):
+            asked.append(url)
+            return Answer()
+
+        monkeypatch.setattr(cli.urllib.request, "urlopen", answering)
+        assert cli._open_when_ready("http://localhost:8501", patience=1) is True
+        assert asked == ["http://localhost:8501/_stcore/health"]
+        assert opened == ["http://localhost:8501"]

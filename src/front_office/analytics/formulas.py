@@ -3,7 +3,7 @@
 Every function here is pure arithmetic on totals: it accepts numbers or pandas series
 and returns the same kind. A rate whose denominator is zero or missing is *missing*
 (NaN), never zero and never infinite: a player who has taken no shots does not have a
-0% shooting percentage, he has no shooting percentage.
+0% shooting percentage but no shooting percentage at all.
 
 Nothing else in the lab may re-derive these. A screen, a value model or an optimiser
 that needs true shooting calls :func:`true_shooting_pct`.

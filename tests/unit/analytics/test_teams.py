@@ -25,6 +25,7 @@ from front_office.analytics.teams import (
     postseason_result,
     record_splits,
     rolling_team_metrics,
+    season_over_season,
     standings,
     team_season_metrics,
     team_window_metrics,
@@ -725,6 +726,28 @@ class TestRolling:
         assert first["pts_per_game"] == opener["pts"]
         assert first["wins"] == int(opener["won"])
 
+    def test_full_spans_leave_out_the_early_games(self, games, calibration) -> None:
+        every = rolling_team_metrics(games, calibration, games=10)
+        full = rolling_team_metrics(games, calibration, games=10, full_spans=True)
+        assert (full["games_played"] == 10).all()
+        # What is kept is unchanged: the same rows, without each team's first nine.
+        kept = every[every["games_played"] == 10].reset_index(drop=True)
+        pd.testing.assert_frame_equal(full, kept)
+        boston = full[full["team_id"] == BOS]
+        assert len(boston) == 82 - 9
+        opening = games[games["team_id"] == BOS].sort_values(["game_date", "game_id"]).head(10)
+        assert boston.iloc[0]["game_id"] == opening.iloc[-1]["game_id"]
+        assert boston.iloc[0]["pts_per_game"] == pytest.approx(opening["pts"].mean())
+        assert boston.iloc[0]["wins"] == opening["won"].sum()
+
+    def test_a_team_with_too_few_games_has_no_full_span(self, games, calibration) -> None:
+        opening = games[games["team_id"] == BOS].sort_values(["game_date", "game_id"]).head(4)
+        few = games[games["game_id"].isin(opening["game_id"])]
+        every = rolling_team_metrics(few, calibration, games=5)
+        full = rolling_team_metrics(few, calibration, games=5, full_spans=True)
+        assert len(every) == len(few) and len(full) == 0
+        assert list(full.columns) == list(every.columns)
+
     def test_a_span_of_one_is_each_game_on_its_own(self, games, calibration) -> None:
         single = rolling_team_metrics(games, calibration, games=1)
         row = single[(single["team_id"] == BOS) & (single["game_id"] == LAST_BOSTON_GAME)].iloc[0]
@@ -746,3 +769,22 @@ class TestRolling:
     def test_the_span_must_be_at_least_one_game(self, games) -> None:
         with pytest.raises(ValueError, match="at least 1"):
             rolling_team_metrics(games, games=0)
+
+
+class TestSeasonOverSeason:
+    def test_each_season_against_the_one_before(self, team_seasons) -> None:
+        league = league_averages(team_seasons)
+        changes = season_over_season(league)
+        assert changes.index.tolist() == ["1996-97", "2012-13", "2025-26"]
+        assert list(changes.columns) == list(TEAM_METRICS.keys)
+        assert changes.loc["1996-97"].isna().all()
+        expected = league.loc["2025-26", "pace"] - league.loc["2012-13", "pace"]
+        assert changes.loc["2025-26", "pace"] == pytest.approx(expected)
+        assert changes.loc["2012-13", "fg3a_rate"] == pytest.approx(
+            league.loc["2012-13", "fg3a_rate"] - league.loc["1996-97", "fg3a_rate"]
+        )
+
+    def test_order_of_the_input_does_not_matter(self, team_seasons) -> None:
+        league = league_averages(team_seasons)
+        shuffled = season_over_season(league.iloc[::-1])
+        pd.testing.assert_frame_equal(shuffled, season_over_season(league))

@@ -229,7 +229,7 @@ Everyone who has played in the league: identity and profile fields.
 
 ### player_seasons
 
-Each player's season totals with the league's on-court measurements. A player traded mid-season has one row covering every team he played for.
+Each player's season totals with the league's on-court measurements. A player traded mid-season has one row covering every team played for.
 
 - **Grain:** One row per player per season per season type.
 - **Primary key:** `player_id`, `season`, `season_type`
@@ -279,11 +279,11 @@ Each player's season totals with the league's on-court measurements. A player tr
 | `dreb_pct` | float | no | measured | fraction | Share of available defensive rebounds the player took while on the court. |
 | `reb_pct` | float | no | measured | fraction | Share of available rebounds the player took while on the court. |
 | `pace` | float | no | measured | possessions per 48 minutes | Team possessions per 48 minutes with the player on the court. |
-| `player_impact_estimate` | float | no | measured | fraction | The league's PIE: the player's share of the game events in games he played. |
+| `player_impact_estimate` | float | no | measured | fraction | The league's PIE: the player's share of the game events in games played. |
 
 ### player_game_logs
 
-Each player's box score for each game he played.
+Each player's box score for each game played.
 
 - **Grain:** One row per player per game.
 - **Primary key:** `player_id`, `game_id`

@@ -43,6 +43,8 @@ class TeamTable:
     """Indexed by ``team_id``: identity, one column per metric, then how the season ended."""
     ranks: pd.DataFrame
     """Same index; position on each metric, 1 being best, or highest where neither is better."""
+    percentiles: pd.DataFrame
+    """Same index; one column per metric, 0-100 with higher always better."""
     league: pd.Series
     """The league's regular-season average of each metric that season: the reference line."""
     metrics: MetricCatalog
@@ -115,7 +117,17 @@ class TeamService:
             {key: compare.ranks(teams, catalog, key) for key in catalog.keys}, index=teams.index
         )
         league = analytics.league_averages(seasons).loc[season, list(catalog.keys)]
-        return TeamTable(season, season_type, window, teams, ranks, league, catalog, estimated)
+        return TeamTable(
+            season=season,
+            season_type=season_type,
+            window=window,
+            teams=teams,
+            ranks=ranks,
+            percentiles=compare.percentiles(teams, catalog),
+            league=league,
+            metrics=catalog,
+            estimated=estimated,
+        )
 
     def profile(self, team_id: int) -> TeamProfile:
         """One franchise: who it is now, and every season on record."""
@@ -163,10 +175,16 @@ class TeamService:
         season_type: str = SeasonType.REGULAR.value,
         *,
         games: int = 10,
+        full_spans: bool = False,
     ) -> pd.DataFrame:
-        """Team metrics over the trailing ``games`` games, oldest first. Ratings are estimates."""
+        """Team metrics over the trailing ``games`` games, oldest first. Ratings are estimates.
+
+        Early in a season a span holds fewer games; ``full_spans`` leaves those rows out.
+        """
         played = self._lab.read("team_games", {"season": season, "season_type": season_type})
-        metrics = analytics.rolling_team_metrics(played, self._calibration(season), games=games)
+        metrics = analytics.rolling_team_metrics(
+            played, self._calibration(season), games=games, full_spans=full_spans
+        )
         mine = metrics[metrics["team_id"] == int(team_id)]
         return mine.drop(columns="team_id").reset_index(drop=True)
 
@@ -180,9 +198,9 @@ class TeamService:
     ) -> pd.DataFrame:
         """What each player did in this team's games, most minutes first.
 
-        Unlike a player's season line, this counts only the games he played for this
-        team, so a player traded in mid-season shows what he did here. Indexed by
-        ``player_id``: who he is, his contract in ``payroll_season`` if one is given,
+        Unlike a player's season line, this counts only the games played for this
+        team, so a player traded in mid-season shows what was done here. Indexed by
+        ``player_id``: identity, the contract in ``payroll_season`` if one is given,
         then the box-score metrics. Empty for seasons without player detail.
         """
         logs = self._lab.read(

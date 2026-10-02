@@ -19,6 +19,8 @@ dependencies = [
     "sqlalchemy>=2.0",
     "typer>=0.12",
     "rich>=13",
+    "streamlit>=1.64",
+    "plotly>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -32,8 +34,10 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src", "."]
-addopts = "-q -m 'not network'"
+pythonpath = ["src", ".", "apps/workbench"]
+# worksteal: with -n, an idle worker takes queued tests from a busy one. The page sweeps
+# run for half a minute each, and the default hands them out in batches that pile up.
+addopts = "-q -m 'not network' --dist worksteal"
 markers = [
     "network: calls a live external service; deselected by default (run with -m network)",
 ]
@@ -44,7 +48,7 @@ filterwarnings = ["error"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-src = ["src", "tests", "apps"]
+src = ["src", "tests", "apps/workbench"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

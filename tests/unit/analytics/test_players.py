@@ -16,6 +16,7 @@ from front_office.analytics.players import (
     combined_on_off,
     player_season_metrics,
     recent_availability,
+    rolling_metrics,
     window_metrics,
     window_totals,
 )
@@ -317,6 +318,64 @@ class TestWindows:
     def test_a_window_must_be_at_least_one_game(self, logs) -> None:
         with pytest.raises(ValueError, match="at least 1"):
             window_totals(logs, last_games=0)
+
+
+class TestRolling:
+    def test_one_row_per_game_in_playing_order(self, logs) -> None:
+        rolling = rolling_metrics(logs, games=5)
+        assert len(rolling) == len(logs)
+        assert list(rolling.columns[:3]) == ["player_id", "game_id", "game_date"]
+        assert tuple(rolling.columns[3:]) == BOX_METRIC_KEYS
+        tatum = rolling[rolling["player_id"] == TATUM]
+        assert tatum["game_date"].is_monotonic_increasing
+        assert tatum["games_played"].tolist()[:6] == [1, 2, 3, 4, 5, 5]
+        assert rolling["games_played"].max() == 5
+
+    def test_the_last_row_is_the_last_window(self, logs) -> None:
+        rolling = rolling_metrics(logs, games=5)
+        window = window_metrics(logs, last_games=5)
+        last = rolling.groupby("player_id").tail(1).set_index("player_id")
+        for key in ("games_played", "pts_per_game", "ast_per_game", "ts_pct", "fg3_pct"):
+            pd.testing.assert_series_equal(
+                last[key],
+                window[key].reindex(last.index),
+                check_names=False,
+                check_dtype=False,
+                obj=key,
+            )
+
+    def test_the_first_row_is_the_first_game_alone(self, logs) -> None:
+        rolling = rolling_metrics(logs, games=5)
+        first = rolling[rolling["player_id"] == TATUM].iloc[0]
+        opener = logs[logs["player_id"] == TATUM].sort_values(["game_date", "game_id"]).iloc[0]
+        assert first["game_id"] == opener["game_id"]
+        assert first["pts_per_game"] == opener["pts"]
+
+    def test_full_spans_leave_out_the_early_games(self, logs) -> None:
+        every = rolling_metrics(logs, games=5)
+        full = rolling_metrics(logs, games=5, full_spans=True)
+        assert (full["games_played"] == 5).all()
+        # What is kept is unchanged: the same rows, without each player's first four.
+        kept = every[every["games_played"] == 5].reset_index(drop=True)
+        pd.testing.assert_frame_equal(full, kept)
+        tatum = full[full["player_id"] == TATUM]
+        assert len(tatum) == 16 - 4
+        opening = logs[logs["player_id"] == TATUM].sort_values(["game_date", "game_id"]).head(5)
+        assert tatum.iloc[0]["game_id"] == opening.iloc[-1]["game_id"]
+        assert tatum.iloc[0]["pts_per_game"] == pytest.approx(opening["pts"].mean())
+
+    def test_a_player_with_too_few_games_has_no_full_span(self, logs) -> None:
+        every = rolling_metrics(logs, games=20)
+        full = rolling_metrics(logs, games=20, full_spans=True)
+        assert TATUM in set(every["player_id"])
+        assert TATUM not in set(full["player_id"])  # he played 16 games
+        assert list(full.columns) == list(every.columns)
+        counts = logs.groupby("player_id").size()
+        assert set(full["player_id"]) == set(counts[counts >= 20].index)
+
+    def test_the_span_must_be_at_least_one_game(self, logs) -> None:
+        with pytest.raises(ValueError, match="at least 1"):
+            rolling_metrics(logs, games=0)
 
 
 class TestRecentAvailability:
