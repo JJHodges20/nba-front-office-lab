@@ -27,6 +27,7 @@ from wb.theme import FONT, MAX_LINE_SERIES, MAX_SCATTER_SERIES, Palette
 
 BAR_THICKNESS = 18
 """Pixels a bar may take; the rest of its band is air."""
+MAX_BAR_THICKNESS = 24
 ROW_HEIGHT = 30
 MARKER_SIZE = 10
 LINE_WIDTH = 2
@@ -34,14 +35,19 @@ RING_WIDTH = 2
 CORNER_RADIUS = 4
 HAIRLINE = 1
 LABEL_ROOM = 0.14
-REFERENCE_MARGIN = 92
-LABEL_GAP = "  "
-THRESHOLD_ROW = 14
-TIME_TICKS = 4
-"""Pixels between the two rows that threshold names alternate on."""
-"""Space between a category label and the start of its bar."""
-"""Pixels kept at the right of a line chart for the name of its reference line."""
 """Share of a bar chart's value range left free past the longest bar, for its label."""
+REFERENCE_MARGIN = 92
+"""Pixels kept at the right of a line chart for the name of its reference line."""
+LABEL_GAP = "  "
+"""Space between a category label and the start of its bar."""
+THRESHOLD_ROW = 14
+"""Pixels between the two rows that threshold names alternate on."""
+TIME_TICKS = 4
+"""The most date labels a time axis writes."""
+COLUMN_PLOT_WIDTH = 900
+"""The plot width a column chart is laid out for, in pixels: layout, not measurement."""
+BAND_THICKNESS = 0.14
+"""Half the height of the inner band of an interval row, as a share of the row."""
 
 MODEBAR = {
     "displaylogo": False,
@@ -749,6 +755,160 @@ def comparison_dots(
         autorange="reversed",
         showgrid=False,
         tickfont={"color": palette.ink, "size": 12},
+    )
+    return figure
+
+
+def interval_columns(
+    frame: pd.DataFrame,
+    *,
+    label: str,
+    value: str,
+    low: str,
+    high: str,
+    text: str,
+    palette: Palette,
+    value_title: str = "",
+    tickformat: str = ".0%",
+    height: int = 340,
+) -> go.Figure:
+    """A share for each band of something, with the interval the true share may lie in.
+
+    One column per row of ``frame``, in order. ``label`` is the band in words; it may
+    carry a second line, such as the number of cases behind the share. ``low`` and
+    ``high`` are the ends of the interval, drawn as a thin line through the top of the
+    column: a tall line on a short column is a share that rests on very little.
+    ``text`` is the ready-made tooltip.
+    """
+    figure = _base(palette, height=height)
+    figure.add_trace(
+        go.Bar(
+            x=frame[label],
+            y=frame[value],
+            marker={"color": palette.accent, "line": {"width": 0}},
+            customdata=frame[[text]].to_numpy(),
+            hovertemplate="%{customdata[0]}<extra></extra>",
+        )
+    )
+    across: list[object] = []
+    up: list[object] = []
+    for name, bottom, top in zip(frame[label], frame[low], frame[high], strict=True):
+        across += [name, name, None]
+        up += [bottom, top, None]
+    figure.add_trace(
+        go.Scatter(
+            x=across,
+            y=up,
+            mode="lines",
+            line={"color": palette.ink_secondary, "width": LINE_WIDTH},
+            hoverinfo="skip",
+        )
+    )
+    # Columns no thicker than the house allows, on a plot of typical width.
+    crowded = MAX_BAR_THICKNESS * max(len(frame), 1) / COLUMN_PLOT_WIDTH
+    figure.update_layout(bargap=min(max(1 - crowded, 0.3), 0.9))
+    figure.update_xaxes(type="category", showgrid=False, tickangle=0)
+    figure.update_yaxes(title_text=value_title, tickformat=tickformat, rangemode="tozero")
+    return figure
+
+
+def interval_rows(
+    frame: pd.DataFrame,
+    *,
+    label: str,
+    value: str,
+    low: str,
+    high: str,
+    text: str,
+    palette: Palette,
+    inner_low: str | None = None,
+    inner_high: str | None = None,
+    value_title: str = "",
+    tickformat: str = "",
+    reference: float | None = None,
+    reference_label: str = "",
+    axis_range: Sequence[float] | None = None,
+    tickvals: Sequence[float] | None = None,
+) -> go.Figure:
+    """One row per item: a dot at its value on a thin line spanning an interval.
+
+    The line runs from ``low`` to ``high``. With ``inner_low`` and ``inner_high`` a
+    thicker band is drawn inside it - the middle half of a group inside its middle 80%,
+    say. ``reference`` draws a hairline at a value, named by ``reference_label`` above
+    the plot; the value axis then fits the intervals and the reference together.
+    ``axis_range`` fixes the value axis instead; give it high-to-low to put the better
+    end on the right when lower is better, as with a rank.
+    """
+    labels = list(frame[label])
+    figure = _base(palette, height=ROW_HEIGHT * len(frame) + 76)
+    if reference is not None:
+        _reference_line(figure, palette, x=reference)
+        if reference_label:
+            # Room above the plot for the name of the line.
+            figure.update_layout(margin={"t": 30})
+            _note(
+                figure, palette, reference_label, x=reference, y=1, yref="paper",
+                yanchor="bottom", xanchor="center", yshift=4,
+            )  # fmt: skip
+        if axis_range is None and len(frame):
+            # Dots mark positions, so the axis need not start at zero - but it must
+            # show the line the dots are read against.
+            left = min(frame[low].min(), reference)
+            right = max(frame[high].max(), reference)
+            room = (right - left) * LABEL_ROOM / 2 or 1.0
+            axis_range = (left - room, right + room)
+    across: list[object] = []
+    down: list[object] = []
+    for name, left, right in zip(labels, frame[low], frame[high], strict=True):
+        across += [left, right, None]
+        down += [name, name, None]
+    figure.add_trace(
+        go.Scatter(
+            x=across,
+            y=down,
+            mode="lines",
+            line={"color": palette.deemphasis, "width": LINE_WIDTH},
+            hoverinfo="skip",
+        )
+    )
+    if inner_low is not None and inner_high is not None:
+        bands = zip(frame[inner_low], frame[inner_high], strict=True)
+        for position, (left, right) in enumerate(bands):
+            if pd.isna(left) or pd.isna(right):
+                continue
+            figure.add_shape(
+                type="rect", x0=left, x1=right,
+                y0=position - BAND_THICKNESS, y1=position + BAND_THICKNESS,
+                fillcolor=palette.deemphasis, line={"width": 0}, layer="below",
+            )  # fmt: skip
+    figure.add_trace(
+        go.Scatter(
+            x=frame[value],
+            y=labels,
+            mode="markers",
+            marker={
+                "size": MARKER_SIZE,
+                "color": palette.accent,
+                "line": {"color": palette.surface, "width": RING_WIDTH},
+            },
+            customdata=frame[[text]].to_numpy(),
+            hovertemplate="%{customdata[0]}<extra></extra>",
+            cliponaxis=False,
+        )
+    )
+    figure.update_xaxes(title_text=value_title, tickformat=tickformat)
+    if axis_range is not None:
+        figure.update_xaxes(range=list(axis_range))
+    if tickvals is not None:
+        figure.update_xaxes(tickvals=list(tickvals))
+    figure.update_yaxes(
+        type="category",
+        categoryorder="array",
+        categoryarray=labels,
+        autorange="reversed",
+        showgrid=False,
+        tickfont={"color": palette.ink, "size": 12},
+        ticksuffix=LABEL_GAP,
     )
     return figure
 

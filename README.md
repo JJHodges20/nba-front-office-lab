@@ -13,10 +13,14 @@ before roster scoring, optimisation or any predictive claim. The plan is in
 
 ## Status
 
-Milestones 1-7 of 14 are complete. Together they are the roadmap's version 1.0, *League
-and Roster Analytics*: league data from stats.nba.com, a database built from it, tested
-player and team analytics, import of contract data with cap-normalised salaries, and a
-seven-page workbench to explore all of it and to build rosters by hand.
+Milestones 1-8 of 14 are complete. The first seven are the roadmap's version 1.0,
+*League and Roster Analytics*: league data from stats.nba.com, a database built from it,
+tested player and team analytics, import of contract data with cap-normalised salaries,
+and a workbench to explore all of it and to build rosters by hand. The eighth adds the
+benchmark research of version 2: what the teams that reached each stage of the
+postseason have looked like over thirty seasons, as historical frequencies with their
+uncertainty rather than thresholds - on a page of the workbench and as a generated
+document, [docs/research/BENCHMARKS.md](docs/research/BENCHMARKS.md).
 
 Nothing yet scores players, judges fit, optimises a roster or predicts an outcome.
 Those are the later stages, and the workbench describes; it does not recommend.
@@ -61,10 +65,11 @@ Stop it with Ctrl+C. [docs/WORKBENCH.md](docs/WORKBENCH.md) is the guide.
 | Page | What it is for |
 | --- | --- |
 | League Overview | League averages and how they changed, standings, team efficiency, thirty seasons of trends, the playoff bracket and every champion. |
+| Winning Benchmarks | How often past teams of each record, rating or seed reached each stage of the postseason, what the teams that got there looked like, and what separated them - for any era. |
 | Player Explorer | Every player of a season; one player's profile, form, seasons, games and contract; up to three players side by side. |
 | Team Explorer | One team: record, ratings and ranks, the four factors, form, games, rotation, history, payroll. |
 | Contract Explorer | Salaries, team payrolls against the cap, tax and aprons, and the cap rules with their sources. |
-| Analytics Lab | Any two metrics against each other, how one is spread, champions against the field, and the metric glossary. |
+| Analytics Lab | Any two metrics against each other, how one is spread, and the metric glossary. |
 | Team Builder | Rosters you assemble by hand: payroll, cap share, room under each line, roster rules, pooled indicators. |
 | Data Health | Freshness, failed fetches, missing data, quality checks and source status. |
 
@@ -76,7 +81,7 @@ lab derived or estimated, and which you assumed.
 
 ![Team Explorer: ratings with league ranks, the four factors and form](docs/images/team-explorer.png)
 
-![Analytics Lab: every team-season since 1996-97 with champions picked out](docs/images/analytics-lab.png)
+![Winning Benchmarks: how often teams of each record won the championship, with intervals](docs/images/winning-benchmarks.png)
 
 ### Other commands
 
@@ -92,6 +97,7 @@ lab derived or estimated, and which you assumed.
 .\.venv\Scripts\fol.exe contracts import FILE --source "where the figures came from"
 .\.venv\Scripts\fol.exe dictionary  # the data dictionary, generated from the table contracts
 .\.venv\Scripts\fol.exe metrics     # the metric glossary, generated from the metric catalogs
+.\.venv\Scripts\fol.exe benchmarks  # the benchmark research, generated from the database
 .\.venv\Scripts\fol.exe ui --port 8600 --no-browser   # the workbench on another port
 ```
 
@@ -121,6 +127,7 @@ tests/              unit, architecture, integration and interface tests
 
 - [Roadmap and milestone status](docs/ROADMAP.md)
 - [The workbench](docs/WORKBENCH.md) - how to read and use the pages
+- [Benchmark research](docs/research/BENCHMARKS.md) - what contenders have looked like, generated from the database
 - [Architecture](docs/ARCHITECTURE.md) - the layers and the rules between them
 - [Data dictionary](docs/DATA_DICTIONARY.md) - generated from the table contracts
 - [Metric glossary](docs/METRICS.md) - every player, team and roster metric, generated from the catalogs

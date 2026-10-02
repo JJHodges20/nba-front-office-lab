@@ -29,7 +29,7 @@ it, and nothing else in the project.
 | Layer | Responsibility | May import |
 | --- | --- | --- |
 | `domain` | Shared vocabulary: seasons, cap-rule models, data contracts. Pure, no I/O. | nothing |
-| `config` | Settings and season rules read from `configs/`. The only place YAML is parsed. | `domain` |
+| `config` | Settings, season rules and eras read from `configs/`. The only place YAML is parsed. | `domain` |
 | `providers` | Adapters that retrieve data from external sources and return it unchanged. The only layer that touches the network. | `domain` |
 | `rawstore` | Immutable, timestamped snapshots of what providers returned. | `domain` |
 | `processing` | Pure functions that turn raw payloads into frames satisfying a data contract. | `domain` |
@@ -157,7 +157,8 @@ fol ui:  apps/workbench/app.py -> wb.views.<page> -> front_office.services.Lab -
 ```
 
 `services.Lab` opens the database and the season rules; the services hang off it:
-`players`, `teams`, `league`, `contracts`, `builder` (the user's rosters) and `health`.
+`players`, `teams`, `league`, `benchmarks`, `contracts`, `builder` (the user's rosters)
+and `health`.
 A service reads tables, calls analytics, and joins the result with names. It contains
 no formulas.
 
@@ -188,6 +189,23 @@ fingerprint that is stored with anything computed from the rules.
 To add a season: copy the latest file, rename it, update the `season` field and every
 figure, and cite the announcement. The loader refuses a file whose name and `season`
 field disagree.
+
+## Eras and benchmark research
+
+Historical research is asked of an *era*, a named span of seasons defined in
+`configs/eras.yaml` (`domain/eras.py`), or of any span chosen on the spot. An era never
+reaches outside the seasons whose postseason is complete.
+
+```
+fol benchmarks:  team_seasons -> analytics.benchmarks -> services.benchmarks
+                 -> docs/research/BENCHMARKS.md, and the Winning Benchmarks page
+```
+
+`analytics/benchmarks.py` holds the research: stage frequencies by band with Wilson
+intervals, profiles of the teams at each stage by league rank within their season, and
+within-season concordance with intervals from resampling seasons. Nothing is fitted;
+see `docs/decisions/0009-benchmarks.md`. The document is generated from the database
+and is never edited by hand.
 
 ## Conventions
 

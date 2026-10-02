@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from front_office.analytics.benchmarks import RESEARCH_METRICS
 from front_office.analytics.players import PLAYER_METRICS
 from front_office.analytics.rosters import ROSTER_METRICS
 from front_office.analytics.teams import TEAM_METRICS
@@ -12,6 +13,7 @@ METRIC_CATALOGS: dict[str, MetricCatalog] = {
     "Player metrics": PLAYER_METRICS,
     "Team metrics": TEAM_METRICS,
     "Roster indicators": ROSTER_METRICS,
+    "Benchmark measures": RESEARCH_METRICS,
 }
 
 

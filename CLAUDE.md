@@ -7,7 +7,7 @@ rules before changing anything. The source plan is
 ## Commands (Windows)
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -n auto      # all tests except live-network ones, in parallel (~2 min)
+.\.venv\Scripts\python.exe -m pytest -n auto      # all tests except live-network ones, in parallel (~3 min)
 .\.venv\Scripts\python.exe -m pytest tests\unit -n auto  # everything but the workbench pages (~40 s)
 .\.venv\Scripts\python.exe -m pytest tests\unit\domain   # one area, serially
 .\.venv\Scripts\python.exe -m pytest -m network   # live-network tests only
@@ -16,6 +16,7 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe --help
 .\.venv\Scripts\fol.exe dictionary --write        # regenerate docs/DATA_DICTIONARY.md
 .\.venv\Scripts\fol.exe metrics --write           # regenerate docs/METRICS.md
+.\.venv\Scripts\fol.exe benchmarks --write        # regenerate docs/research/BENCHMARKS.md from the database
 .\.venv\Scripts\fol.exe ingest                    # fetch from stats.nba.com (skips what is stored)
 .\.venv\Scripts\fol.exe check                     # normalise the raw store + run quality checks
 .\.venv\Scripts\fol.exe build                     # rebuild data\front_office.sqlite from the raw store
@@ -57,8 +58,15 @@ Build one roadmap milestone at a time. A milestone is finished only when:
 - **Measured vs modeled vs assumed.** Tag every column's provenance, and keep the three
   visibly apart on screen.
 - **No predictive claims early.** Nothing may present a championship probability or
-  "contender" verdict before the benchmark and modeling milestones are done and
-  validated out of sample.
+  "contender" verdict before the modeling milestone is done and validated out of
+  sample. Benchmarks are history: a frequency among past teams, with its count and its
+  interval, never a current team's chance (`docs/decisions/0009-benchmarks.md`).
+- **No thresholds.** Report how often, for how many, with what uncertainty. A band is a
+  way of grouping; nothing "needs" a figure. Compare teams within their own season.
+- **Generated documents are not edited.** `docs/DATA_DICTIONARY.md`, `docs/METRICS.md`
+  and `docs/research/BENCHMARKS.md` come from `fol dictionary|metrics|benchmarks --write`.
+  The first two are checked by tests; the third depends on the database, so regenerate
+  it at a milestone gate after the data or the research code changes.
 - **Source quirks get a rule, a note and a test.** Never repair data silently inside a
   normaliser (`docs/decisions/0003-source-quirks.md`).
 - **Rebuilt versus kept tables.** Every build drops and rewrites the league tables. The

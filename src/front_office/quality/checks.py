@@ -348,6 +348,29 @@ def _outcomes_form_a_postseason(tables: Tables) -> tuple[int, pd.DataFrame]:
     return len(summary), summary[wrong].astype(int).reset_index()
 
 
+def _conference_ranks_are_distinct(tables: Tables) -> tuple[int, pd.DataFrame]:
+    seasons = tables["team_seasons"]
+    placed = seasons[seasons["conference"].notna() & seasons["conference_rank"].notna()]
+    examined = 0
+    rows = []
+    for (season, conference), teams in placed.groupby(["season", "conference"], sort=True):
+        examined += 1
+        ranks = sorted(teams["conference_rank"].astype(int))
+        if ranks != list(range(1, len(ranks) + 1)):
+            shared = sorted({rank for rank in ranks if ranks.count(rank) > 1})
+            rows.append(
+                {
+                    "season": season,
+                    "conference": conference,
+                    "teams": len(ranks),
+                    "shared_places": " and ".join(str(rank) for rank in shared) or "none",
+                    "last_place": ranks[-1],
+                }
+            )
+    columns = ["season", "conference", "teams", "shared_places", "last_place"]
+    return examined, pd.DataFrame(rows, columns=columns)
+
+
 # --- playoffs -----------------------------------------------------------------------
 
 
@@ -614,6 +637,15 @@ _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
         "and sixteen playoff teams.",
         E,
         _outcomes_form_a_postseason,
+    ),
+    Check(
+        "conference_ranks_are_distinct",
+        "team_seasons",
+        "In each conference and season the standings give every team a place of its own, "
+        "from first to last. Through 2000-01 the league's standings leave teams with the "
+        "same record on the same place, so a place there is not always a playoff seed.",
+        W,
+        _conference_ranks_are_distinct,
     ),
     Check(
         "brackets_are_complete",

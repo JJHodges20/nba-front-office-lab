@@ -39,7 +39,7 @@ points-per-dollar.
 | 5 | Player analytics | Reusable player calculations and comparison tools | Done |
 | 6 | Team analytics | Team efficiency, point differential, pace, historical outcomes | Done |
 | 7 | Front Office UI foundation | Navigation, filters, player/team explorers, Team Builder | Done |
-| 8 | Historical contender analysis | Playoff/championship benchmark research | Not started |
+| 8 | Historical contender analysis | Playoff/championship benchmark research | Done (team level; roster make-up and payroll await player and contract history) |
 | 9 | Player value engine | Validated value features, surplus value, archetypes | Not started |
 | 10 | Roster fit engine | Fit, redundancy, role coverage, weaknesses | Not started |
 | 11 | Roster optimizer | Budget and roster constraints, multiple candidate rosters | Not started |

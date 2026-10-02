@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from front_office.domain.metrics import MetricCatalog
-from front_office.services import DEFAULT_QUALIFICATION, METRIC_CATALOGS, POSTSEASON_RESULTS
+from front_office.services import DEFAULT_QUALIFICATION, METRIC_CATALOGS
 from wb import charts, components, data, formats, state
 from wb.components import DERIVED, EMPTY_CELL, ESTIMATE, MEASURED
 from wb.state import Filters
@@ -15,9 +15,7 @@ from wb.views.players import SPAN_QUALIFICATION
 PLAYERS, TEAMS = "Players", "Teams"
 PLAYER_AXES = ("usage_pct", "ts_pct")
 TEAM_AXES = ("efg_pct", "off_rating")
-HISTORY_AXES = ("rel_off_rating", "rel_def_rating")
 BETTER = {True: "Higher", False: "Lower", None: "Neither"}
-CHAMPION = POSTSEASON_RESULTS[0]
 
 
 def render() -> None:
@@ -26,15 +24,13 @@ def render() -> None:
     subject, frame, catalog, estimated = _population(filters)
     components.provenance([MEASURED, DERIVED, *([ESTIMATE] if estimated else [])])
 
-    relationships, distribution, history, glossary = st.tabs(
-        ["Relationships", "Distributions", "Champions and the field", "Metric glossary"]
+    relationships, distribution, glossary = st.tabs(
+        ["Relationships", "Distributions", "Metric glossary"]
     )
     with relationships:
         _relationships(filters, subject, frame, catalog, estimated)
     with distribution:
         _distribution(filters, subject, frame, catalog)
-    with history:
-        _history(filters)
     with glossary:
         _glossary()
 
@@ -205,59 +201,6 @@ def _distribution(filters, subject, frame, catalog) -> None:  # type: ignore[no-
         frame[["name", key]].sort_values(key, ascending=False),
         key="lab_histogram",
         filename=f"{subject.lower()}_{key}_{filters.season}",
-        catalog=catalog,
-    )
-
-
-def _history(filters: Filters) -> None:
-    history = data.history(filters.build)
-    catalog = data.lab().league.metrics
-    st.caption(
-        "Every team-season on record, with champions picked out. This is description only: "
-        "what contenders have looked like. Thresholds and probabilities come with the "
-        "benchmark research, and nothing here predicts a title."
-    )
-    first, second, _ = st.columns(3)
-    with first:
-        x = _metric_picker("Across", catalog, HISTORY_AXES[0], "lab_history_x")
-    with second:
-        y = _metric_picker("Up", catalog, HISTORY_AXES[1], "lab_history_y")
-    x_spec, y_spec = catalog[x], catalog[y]
-    plotted = history.assign(
-        name=history["season"] + " " + history["team_name"],
-        record=history["wins"].astype(str) + "-" + history["losses"].astype(str),
-        x_text=x_spec.label + " " + formats.shown(catalog, history, x),
-        y_text=y_spec.label + " " + formats.shown(catalog, history, y),
-        ended=history["postseason_result"].fillna("Season in progress"),
-    )
-    champions = plotted.index[plotted["postseason_result"] == CHAMPION].tolist()
-    figure = charts.scatter(
-        plotted,
-        x=x,
-        y=y,
-        name="name",
-        hover=["record", "x_text", "y_text", "ended"],
-        highlight=champions,
-        palette=components.colors(),
-        x_title=x_spec.name,
-        y_title=y_spec.name,
-        x_tickformat=formats.tickformat(x_spec),
-        y_tickformat=formats.tickformat(y_spec),
-        x_reference=0.0 if x in HISTORY_AXES else None,
-        y_reference=0.0 if y in HISTORY_AXES else None,
-        reference_label="Lines: league average" if {x, y} & set(HISTORY_AXES) else "",
-        height=540,
-    )
-    st.markdown(
-        f"**{len(champions)} champions** in colour against "
-        f"**{len(plotted) - len(champions)} other team-seasons** in gray."
-    )
-    columns = ["season", "team_name", "record", x, y, "ended"]
-    components.chart(
-        figure,
-        plotted[list(dict.fromkeys(columns))].rename(columns={"ended": "season ended"}),
-        key="lab_history",
-        filename=f"team_seasons_{x}_vs_{y}",
         catalog=catalog,
     )
 

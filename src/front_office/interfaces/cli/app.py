@@ -41,10 +41,13 @@ from front_office.pipelines.ingest import (
     default_plan,
 )
 from front_office.pipelines.inventory import raw_inventory
+from front_office.services import Lab, LabNotBuilt
+from front_office.services.benchmark_report import benchmark_report
 from front_office.services.glossary import METRIC_CATALOGS, metric_glossary
 
 DATA_DICTIONARY = "docs/DATA_DICTIONARY.md"
 METRIC_GLOSSARY = "docs/METRICS.md"
+BENCHMARK_REPORT = "docs/research/BENCHMARKS.md"
 WORKBENCH = "apps/workbench/app.py"
 DEFAULT_PORT = 8501
 STARTUP_SECONDS = 30
@@ -180,6 +183,33 @@ def metrics(
     target.write_text(document, encoding="utf-8", newline="\n")
     count = sum(len(catalog) for catalog in METRIC_CATALOGS.values())
     _say(f"Wrote {target} ({count} metrics)")
+
+
+@app.command()
+def benchmarks(
+    write: Annotated[
+        bool, typer.Option("--write", help=f"Write {BENCHMARK_REPORT} instead of printing.")
+    ] = False,
+) -> None:
+    """Write up the benchmark research: what past contenders looked like, from the database."""
+    try:
+        settings = load_settings()
+        # Opening the lab creates the database; asking a question should not.
+        if not database_status(settings).exists:
+            raise LabNotBuilt
+        with Lab(settings) as lab:
+            lab.require_built()
+            document = benchmark_report(lab)
+            seasons = len(lab.benchmarks.seasons())
+    except (ConfigError, LabNotBuilt) as error:
+        raise _fail(error) from error
+    if not write:
+        typer.echo(document, nl=False)
+        return
+    target = settings.project_root / BENCHMARK_REPORT
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(document, encoding="utf-8", newline="\n")
+    _say(f"Wrote {target} ({seasons} completed seasons)")
 
 
 _STATUS_STYLE = {

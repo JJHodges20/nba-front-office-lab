@@ -39,6 +39,7 @@ The rules in force:
 | Playoff series identifiers | Ignored; series and rounds are derived from the games |
 | Postseason outcomes before the Finals are decided | Null |
 | A column the source added | Ignored |
+| Equal records left on the same place in the standings (through 2000-01) | Kept as published; a check warns, and benchmarks by seed say so |
 | A column the source removed or renamed | Rejected, naming the column |
 
 ## Consequences

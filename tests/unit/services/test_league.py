@@ -205,7 +205,12 @@ class TestPlayoffs:
 
 class TestGlossary:
     def test_covers_players_and_teams(self) -> None:
-        assert list(METRIC_CATALOGS) == ["Player metrics", "Team metrics", "Roster indicators"]
+        assert list(METRIC_CATALOGS) == [
+            "Player metrics",
+            "Team metrics",
+            "Roster indicators",
+            "Benchmark measures",
+        ]
         document = metric_glossary()
         for catalog in METRIC_CATALOGS.values():
             for spec in catalog:

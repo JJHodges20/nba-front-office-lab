@@ -28,6 +28,8 @@ NEEDS_FULL_PLAYER_LOGS = {
 KNOWN_WARNINGS = {
     "team_games.points_add_up": 2,
     "team_seasons.ratings_are_consistent": 1,
+    # Both conferences of 1996-97: the standings leave equal records on the same place.
+    "team_seasons.conference_ranks_are_distinct": 2,
 }
 
 
@@ -241,6 +243,35 @@ class TestTeamSeasons:
         seasons.loc[first_index(seasons, season="2025-26", team_id=BOS), "off_rating"] += 3
         expected = KNOWN_WARNINGS["team_seasons.ratings_are_consistent"] + 1
         assert failures(tables, "team_seasons.ratings_are_consistent") == expected
+
+    def test_the_old_standings_leave_equal_records_on_the_same_place(self, tables) -> None:
+        result = results(tables)["team_seasons.conference_ranks_are_distinct"]
+        assert (result.examined, result.failures) == (6, 2)  # two conferences, three seasons
+        assert result.severity is Severity.WARNING
+        assert result.examples[0].startswith("season=1996-97, conference=East, teams=15")
+        assert "shared_places=5" in result.examples[0]
+        assert "shared_places=2 and 6" in result.examples[1]
+
+    def test_a_new_tie_in_the_standings_is_reported(self, tables) -> None:
+        seasons = tables["team_seasons"]
+        seasons.loc[first_index(seasons, season="2025-26", team_id=BOS), "conference_rank"] = 1
+        result = results(tables)["team_seasons.conference_ranks_are_distinct"]
+        assert result.failures == 3
+        assert "season=2025-26, conference=East, teams=15, shared_places=1" in result.examples[2]
+
+    def test_a_place_nobody_holds_is_reported(self, tables) -> None:
+        seasons = tables["team_seasons"]
+        seasons.loc[first_index(seasons, season="2012-13", team_id=NYK), "conference_rank"] = 16
+        result = results(tables)["team_seasons.conference_ranks_are_distinct"]
+        assert result.failures == 3
+        assert "season=2012-13" in result.examples[2] and "last_place=16" in result.examples[2]
+        assert "shared_places=none" in result.examples[2]
+
+    def test_a_team_without_a_place_is_not_judged(self, tables) -> None:
+        seasons = tables["team_seasons"]
+        seasons.loc[seasons["season"] == "1996-97", "conference_rank"] = pd.NA
+        result = results(tables)["team_seasons.conference_ranks_are_distinct"]
+        assert result.passed and result.examined == 4
 
     def test_two_champions_is_a_contradiction(self, tables) -> None:
         seasons = tables["team_seasons"]

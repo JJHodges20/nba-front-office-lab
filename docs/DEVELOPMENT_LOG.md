@@ -3,6 +3,109 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone 8 - Historical contender analysis (2026-10-01)
+
+**Built**
+
+- `analytics/benchmarks.py`: the research. A team-season frame for completed seasons
+  (wins per 82 games, six nested stages from "reached the postseason" to "won the
+  championship", league rank within the season on every metric); how often the teams
+  in each band of a measure reached each stage, with Wilson intervals; the spread of
+  each stage's teams by value and by league rank; how many ranked near the top of the
+  league, at one end or both; and how well each metric alone orders the teams that
+  reached a stage, measured within seasons with intervals from resampling seasons.
+- `domain/eras.py`, `config/eras.py`, `configs/eras.yaml`: named spans of seasons - all,
+  the last five and ten, the modern era, the Play-In era - each with its reason, and
+  any span chosen on the spot.
+- `services/benchmarks.py`: `BenchmarkService` - an era as it falls on the data, the
+  research dataset, stage rates by record, net rating, point differential, relative
+  ratings or seed (for every team or among those that reached an earlier stage),
+  profiles with the teams at the extremes named, rank counts, separation against the
+  league or against a narrower field, and headline figures.
+- `fol benchmarks --write`: `docs/research/BENCHMARKS.md`, the research as a document
+  generated from the database, sentences included.
+- The **Winning Benchmarks** page of the workbench, with two new chart builders
+  (columns with intervals; rows of a dot on an interval with an inner band). The
+  "champions and the field" view moved there from the Analytics Lab.
+- A quality check for tied places in the conference standings, and a test helper that
+  reads what a chart on a page actually drew.
+
+**Decisions** ([0009](decisions/0009-benchmarks.md))
+
+- A benchmark is a frequency with its count and its interval, never a threshold. A
+  band is a way of grouping; its width can be changed.
+- Seasons are made comparable by wins per 82 games, league rank within the season, and
+  comparing teams only with teams of their own season.
+- Separation is within-season concordance, one metric at a time, with an interval from
+  resampling whole seasons because the teams of a season depend on each other.
+- Eras are configuration; "the modern era" is labelled a convention.
+- The research document is generated, never typed.
+- History is not applied to a current team. That is a forecast and waits for a model.
+
+**What the research says** (all thirty seasons; the document has the rest)
+
+- No team below 50 wins per 82 games won the championship: 0 of 643, which by the
+  interval is consistent with a long-run rate of up to 0.6%. Of the teams at 50 to 55,
+  6 of 121 did (2% to 10%).
+- All thirty champions ranked in the league's top ten in net rating that season, 27 in
+  the top five, and 23 in the top ten at both ends. All were seeded first to third.
+- Against the rest of the league, record and net rating put a champion ahead of a
+  same-season team about 93% of the time; defensive rating 85% (79% to 90%) and
+  offensive rating 83% (77% to 88%) - no difference worth the name. Shooting at both
+  ends follows; turnovers, offensive rebounding and free-throw rate separate
+  champions from the rest little or not at all, and pace not at all (50%).
+- Against the teams they actually had to beat the figures fall: among playoff teams,
+  net rating favours the team that won a series 81% of the time, and among teams that
+  won a series it favours the conference finalist 68% of the time.
+
+**Verification**
+
+- Analytics are tested on hand-built histories with known answers - the Wilson interval
+  against worked values and at both ends for every sample size to 200, band edges,
+  nested stages, ties counting half, a lower-is-better metric, a high-scoring and a
+  low-scoring era that only a within-season comparison gets right, an interval whose
+  width is checked against the exact resampling distribution - and on the three
+  fixture seasons.
+- On the real database every season has sixteen playoff teams, eight, four, two and
+  one at the later stages; the stage counts add up to 480, 240, 120, 60 and 30.
+- The page was looked at in both themes and at a laptop width, and its controls were
+  clicked through in a browser: the era switch, a span of chosen seasons, the stage,
+  the measure and the width of a band, "among", the field of a comparison. Looking
+  changed the rank chart (full width, the best rank labelled), the separation chart
+  (ordered by value, axis fitted to the data and its reference line, a clipped label),
+  the tables beside them (cut off; now full width), and a caption that did not apply
+  to seeds.
+- The sweep runs the page from two starting states: 148 page runs without an exception.
+
+**Found on the way**
+
+- Through 2000-01 the league's standings leave equal records on the same place: nine
+  conference standings have two teams on one place. Kept as published, reported by a
+  new warning-level check, and noted wherever seeds are used.
+- `fol benchmarks` on a project with no database would have created an empty one;
+  it now checks first, as `fol db` does.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| Automated tests | 1,907 passed, none skipped; under three minutes with `pytest -n auto` |
+| Test sensitivity | 68 planted bugs in the research, the eras, the report, the new charts, the page and the command: 63 caught at once; 5 exposed gaps in the tests (two interval end points, two headline counts, a shared extreme, a missing share in the report), each closed and then caught |
+| Data-quality checks | 45 checks on the real data: 0 errors, 3 standing warnings (the two known ones and the tied standings) |
+| UI review | The new page in both themes and at 1366 pixels, every tab; controls clicked through in a browser; the Analytics Lab re-checked after losing a tab |
+| Architectural boundaries | `tests/architecture` passes. Research formulas are in `analytics`, eras in `domain` and `config`, wording and assembly in `services`; the page computes nothing |
+| Lint | `ruff check` and `ruff format --check` clean |
+
+**Open items carried forward**
+
+- Roster make-up and payroll distribution of contenders - part of the roadmap's first
+  research question - cannot be measured: player detail covers recent seasons only and
+  there is no contract history. Player history must be extended before the player
+  value work (milestone 9); payroll needs contract data the user has yet to supply.
+- Benchmarks use regular-season figures only.
+- The research document depends on the database, so no test can tell when the
+  committed copy is stale; it is regenerated at each milestone gate.
+
 ## Milestone 7 - Front Office UI foundation (2026-10-01)
 
 **Built**

@@ -12,6 +12,8 @@ import pandas as pd
 import streamlit as st
 
 from front_office.services import (
+    Era,
+    EraView,
     Lab,
     LabStatus,
     PlayerProfile,
@@ -19,6 +21,7 @@ from front_office.services import (
     Qualification,
     Relationship,
     RosterSummary,
+    StageSummary,
     TeamProfile,
     TeamTable,
     Window,
@@ -63,11 +66,6 @@ def league_averages(build: int | None) -> pd.DataFrame:
 @st.cache_data(show_spinner=False)
 def league_changes(build: int | None) -> pd.DataFrame:
     return lab().league.changes()
-
-
-@st.cache_data(show_spinner=False)
-def history(build: int | None) -> pd.DataFrame:
-    return lab().league.history()
 
 
 @st.cache_data(show_spinner=False)
@@ -233,6 +231,97 @@ def contract_summary(build: int | None, season: str):  # type: ignore[no-untyped
 def player_seasons_played(build: int | None) -> tuple[str, ...]:
     """Seasons with player statistics, newest first."""
     return lab().status().player_seasons
+
+
+# --- benchmarks ---------------------------------------------------------------------------
+#
+# An era reaches these functions as plain values - a configured era's key, or "custom"
+# with the first and last season of a span chosen on the page - so that a result can be
+# cached on them.
+
+CUSTOM_ERA = "custom"
+
+
+def _era(key: str, first: str | None, last: str | None) -> Era:
+    if key == CUSTOM_ERA:
+        return Era.between(str(first), str(last))
+    return lab().benchmarks.era(key)
+
+
+@st.cache_data(show_spinner=False)
+def benchmark_eras(build: int | None) -> tuple[Era, ...]:
+    return tuple(lab().benchmarks.eras)
+
+
+@st.cache_data(show_spinner=False)
+def benchmark_seasons(build: int | None) -> tuple[str, ...]:
+    """Seasons whose postseason is complete, oldest first."""
+    return lab().benchmarks.seasons()
+
+
+@st.cache_data(show_spinner=False)
+def benchmark_view(build: int | None, era: str, first: str | None, last: str | None) -> EraView:
+    return lab().benchmarks.view(_era(era, first, last))
+
+
+@st.cache_data(show_spinner=False)
+def benchmark_summary(
+    build: int | None, era: str, first: str | None, last: str | None, stage: str
+) -> StageSummary:
+    return lab().benchmarks.summary(_era(era, first, last), stage)
+
+
+@st.cache_data(show_spinner=False)
+def benchmark_rates(
+    build: int | None,
+    era: str,
+    first: str | None,
+    last: str | None,
+    measure: str,
+    width: float | None,
+    among: str | None,
+) -> pd.DataFrame:
+    return lab().benchmarks.rates(_era(era, first, last), measure, width=width, among=among)
+
+
+@st.cache_data(show_spinner=False)
+def benchmark_profiles(
+    build: int | None, era: str, first: str | None, last: str | None
+) -> pd.DataFrame:
+    return lab().benchmarks.profiles(_era(era, first, last))
+
+
+@st.cache_data(show_spinner=False)
+def benchmark_rank_counts(
+    build: int | None, era: str, first: str | None, last: str | None
+) -> pd.DataFrame:
+    return lab().benchmarks.rank_counts(_era(era, first, last))
+
+
+@st.cache_data(show_spinner=False)
+def benchmark_separation(
+    build: int | None,
+    era: str,
+    first: str | None,
+    last: str | None,
+    stage: str,
+    among: str | None,
+) -> pd.DataFrame:
+    return lab().benchmarks.separation(_era(era, first, last), stage, among=among)
+
+
+@st.cache_data(show_spinner=False)
+def benchmark_dataset(
+    build: int | None, era: str, first: str | None, last: str | None
+) -> pd.DataFrame:
+    return lab().benchmarks.dataset(_era(era, first, last))
+
+
+@st.cache_data(show_spinner=False)
+def benchmark_highlights(
+    build: int | None, era: str, first: str | None, last: str | None, x: str, y: str
+) -> pd.DataFrame:
+    return lab().benchmarks.highlights(_era(era, first, last), x, y)
 
 
 # --- rosters: the user's own work, changed from the page, so never cached -----------------

@@ -22,6 +22,7 @@ from front_office.domain.seasons import Season
 from front_office.storage import Database, OperationsLog, RosterRepository, StorageError, Warehouse
 
 if TYPE_CHECKING:
+    from front_office.services.benchmarks import BenchmarkService
     from front_office.services.builder import BuilderService
     from front_office.services.contracts import ContractService
     from front_office.services.health import HealthService
@@ -184,3 +185,9 @@ class Lab:
         from front_office.services.health import HealthService
 
         return HealthService(self)
+
+    @property
+    def benchmarks(self) -> BenchmarkService:
+        from front_office.services.benchmarks import BenchmarkService
+
+        return BenchmarkService(self)

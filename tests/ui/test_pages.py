@@ -8,17 +8,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 
 from front_office.config import load_settings
-from front_office.services import DEFAULT_QUALIFICATION, Lab, relationship
+from front_office.services import DEFAULT_QUALIFICATION, Lab, floor, relationship
 from tests.helpers import ABDELNABY, BOS, BROWN, NYK, PRITCHARD, TATUM, WHITE
-from tests.ui.conftest import TIMEOUT, figures, texts
+from tests.ui.conftest import TIMEOUT, drawn, figures, texts
 from wb import state
 from wb.views import builder as builder_view
 
-PAGES = ("league", "players", "teams", "contracts", "lab", "builder", "health")
+PAGES = ("league", "benchmarks", "players", "teams", "contracts", "lab", "builder", "health")
 STATES = {
     "default": {},
     "team": {state.TEAM: BOS},
@@ -289,6 +290,289 @@ class TestContracts:
         assert set(listing["team"]) == {"BOS"} and len(listing) == 4
 
 
+def frame_with(opened: AppTest, *columns: str):  # type: ignore[no-untyped-def]
+    """The first table on a page that has all of these columns."""
+    return next(
+        frame.value for frame in opened.dataframe if set(columns) <= set(frame.value.columns)
+    )
+
+
+class TestBenchmarks:
+    def test_it_opens_on_every_completed_season_and_says_what_it_is(
+        self, page, plain_home: Path
+    ) -> None:
+        opened = page(plain_home, "benchmarks")
+        said = texts(opened)
+        assert "**All seasons**: 1996-97 to 2025-26, 3 seasons, 89 team-seasons." in said
+        assert "History, not a forecast" in said
+        assert "the sidebar's filters do not narrow it" in said
+        assert [tab.label for tab in opened.tabs] == [
+            "How far teams went",
+            "What they looked like",
+            "What separates them",
+            "The field",
+            "Team-seasons",
+        ]
+        badges = texts(opened)
+        assert "Measured" in badges and "Derived" in badges and "Estimate" not in badges
+
+    def test_headlines_are_the_services_summary(self, page, plain_home: Path) -> None:
+        shown = figures(page(plain_home, "benchmarks"))
+        with Lab(load_settings(plain_home)) as lab:
+            era = lab.benchmarks.era("all")
+            summary = lab.benchmarks.summary(era, "made_conference_finals")
+            view = lab.benchmarks.view(era)
+        assert shown["Conference finals"] == (str(summary.teams), f"of {view.teams} team-seasons")
+        assert shown["Conference finals"] == ("12", "of 89 team-seasons")
+        assert shown["Fewest wins per 82"] == ("49.6", "2012-13 IND")
+        assert shown["Fewest wins per 82"][0] == f"{summary.fewest_wins:.1f}"
+        assert shown["Median wins per 82"] == (f"{summary.median_wins:.1f}", "Half won more")
+        assert shown["Median net rating"] == (
+            f"{summary.median_net_rating:+.1f}",
+            f"Median league rank {summary.median_net_rank:g}",
+        )
+        assert shown["Top 10 at both ends"] == (
+            f"{summary.top_ten_both_ends} of {summary.teams}",
+            f"Top 5 net rating: {summary.top_five_net}",
+        )
+
+    def test_the_stage_changes_who_the_page_is_about(self, page, plain_home: Path) -> None:
+        opened = page(plain_home, "benchmarks", bench_stage="won_championship")
+        assert figures(opened)["Champion"] == ("3", "of 89 team-seasons")
+        said = texts(opened)
+        assert "**How often teams won the championship, by wins per 82 games**" in said
+        assert "**3 teams that won the championship** in colour, among all **89" in said
+
+    def test_an_era_narrows_the_seasons(self, page, plain_home: Path) -> None:
+        opened = page(plain_home, "benchmarks", bench_era="play_in")
+        assert "**Play-In era**: 2025-26, 1 season, 30 team-seasons." in texts(opened)
+        assert "Since the play-in tournament" in texts(opened)
+        assert figures(opened)["Conference finals"] == ("4", "of 30 team-seasons")
+
+    def test_other_seasons_are_chosen_on_the_page(self, page, plain_home: Path) -> None:
+        session = {"bench_era": "custom", "bench_from": "1996-97", "bench_to": "2012-13"}
+        opened = page(plain_home, "benchmarks", **session)
+        assert "**Seasons chosen**: 1996-97 to 2012-13, 2 seasons, 59 team-seasons." in texts(
+            opened
+        )
+        assert figures(opened)["Conference finals"] == ("8", "of 59 team-seasons")
+        # A span cannot end before it starts.
+        later = page(plain_home, "benchmarks", bench_era="custom", bench_from="2012-13")
+        ends = next(box for box in later.selectbox if box.key == "bench_to")
+        assert list(ends.options) == ["2012-13", "2025-26"]
+
+    def test_the_table_under_the_chart_is_the_services_rates(self, page, plain_home: Path) -> None:
+        opened = page(plain_home, "benchmarks")
+        table = frame_with(opened, "Teams", "Champion").set_index("Wins per 82 games")
+        with Lab(load_settings(plain_home)) as lab:
+            rates = lab.benchmarks.rates(lab.benchmarks.era("all"), "wins_per_82")
+        for stage, column in (("won_championship", "Champion"), ("made_playoffs", "Playoffs")):
+            expected = rates[rates["stage"] == stage].set_index("band")
+            assert table[column].tolist() == pytest.approx(expected["rate"].tolist())
+            assert table["Teams"].tolist() == expected["teams"].tolist()
+        assert table.index.tolist() == rates["band"].drop_duplicates().tolist()
+
+    def test_the_chart_draws_the_chosen_stage_with_its_intervals(
+        self, page, plain_home: Path
+    ) -> None:
+        opened = page(plain_home, "benchmarks", bench_stage="won_championship")
+        columns, intervals = drawn(opened)["bench_rates"].data
+        with Lab(load_settings(plain_home)) as lab:
+            rates = lab.benchmarks.rates(lab.benchmarks.era("all"), "wins_per_82")
+        champions = rates[rates["stage"] == "won_championship"]
+        assert list(columns.y) == pytest.approx(champions["rate"].tolist())
+        assert columns.x[0] == f"{champions['band'].iloc[0]}<br>n = {champions['teams'].iloc[0]}"
+        ends = [value for value in intervals.y if value is not None]
+        expected = [
+            end for pair in zip(champions["low"], champions["high"], strict=True) for end in pair
+        ]
+        assert ends == pytest.approx(expected)
+        # The two teams of the top band, Miami in 2013 and Chicago in 1997, both won it.
+        top = champions.iloc[-1]
+        assert (top["band"], top["reached"], top["teams"]) == ("65 to 70", 2, 2)
+        assert "<b>Wins per 82 games 65 to 70</b>" in columns.customdata[-1][0]
+        assert "2 of 2 teams (100.0%)" in columns.customdata[-1][0]
+        assert "95% interval" in columns.customdata[-1][0]
+
+    def test_the_field_picks_out_the_teams_that_got_there(self, page, plain_home: Path) -> None:
+        rest, chosen = drawn(page(plain_home, "benchmarks"))["bench_field"].data
+        assert (len(chosen.x), len(rest.x)) == (12, 77)
+        champions = drawn(page(plain_home, "benchmarks", bench_stage="won_championship"))
+        rest, chosen = champions["bench_field"].data
+        assert (len(chosen.x), len(rest.x)) == (3, 86)
+        assert {row[0] for row in chosen.customdata} == {
+            "1996-97 Chicago Bulls",
+            "2012-13 Miami Heat",
+            "2025-26 New York Knicks",
+        }
+
+    def test_the_rank_and_separation_charts_draw_the_services_figures(
+        self, page, plain_home: Path
+    ) -> None:
+        charts = drawn(page(plain_home, "benchmarks"))
+        with Lab(load_settings(plain_home)) as lab:
+            era = lab.benchmarks.era("all")
+            profiles = lab.benchmarks.profiles(era)
+            separation = lab.benchmarks.separation(era, "made_conference_finals")
+        ranks = profiles[
+            (profiles["group"] == "made_conference_finals") & (profiles["kind"] == "rank")
+        ]
+        medians = charts["bench_ranks"].data[-1]
+        assert list(medians.x) == pytest.approx(ranks["median"].tolist())
+        # Better ranks sit to the right: the axis runs from last place down to first.
+        worst, best = charts["bench_ranks"].layout.xaxis.range
+        assert (worst, best) == (30.5, 0.5)
+        dots = charts["bench_separation"].data[-1]
+        assert list(dots.x) == pytest.approx(separation["concordance"].tolist())
+        assert list(dots.y) == separation["name"].tolist()
+        note = charts["bench_separation"].layout.annotations[0]
+        assert (note.text, note.x) == ("Coin flip", 0.5)
+
+    def test_the_floor_is_stated_with_what_it_rests_on(self, page, plain_home: Path) -> None:
+        said = texts(page(plain_home, "benchmarks"))
+        with Lab(load_settings(plain_home)) as lab:
+            rates = lab.benchmarks.rates(lab.benchmarks.era("all"), "wins_per_82")
+        found = floor(rates, "made_conference_finals")
+        assert found is not None
+        assert (
+            f"Of the teams below the **{found.band}** band, none reached the conference "
+            f"finals: 0 of {found.teams_below}." in said
+        )
+        assert f"up to {found.ceiling * 100:.1f}%" in said
+        assert "rare on this evidence, not impossible" in said
+
+    def test_shares_can_be_of_the_teams_that_had_already_got_somewhere(
+        self, page, plain_home: Path
+    ) -> None:
+        session = {"bench_among_made_conference_finals": "made_playoffs"}
+        opened = page(plain_home, "benchmarks", **session)
+        table = frame_with(opened, "Teams", "Champion")
+        # Forty-eight playoff teams, every one of which made the playoffs.
+        assert table["Teams"].sum() == 48 and (table["Playoffs"] == 1.0).all()
+        assert (
+            "**How often teams that made the playoffs reached the conference finals, by "
+            "wins per 82 games**" in texts(opened)
+        )
+        fields = next(
+            box for box in opened.selectbox if box.key == "bench_among_made_conference_finals"
+        )
+        assert list(fields.options) == [
+            "Every team",
+            "Teams that reached the postseason",
+            "Teams that made the playoffs",
+            "Teams that won a playoff series",
+        ]
+
+    def test_a_wider_band_groups_the_teams_differently(self, page, plain_home: Path) -> None:
+        usual = frame_with(page(plain_home, "benchmarks"), "Teams", "Champion")
+        wide = frame_with(
+            page(plain_home, "benchmarks", bench_width_wins_per_82=10), "Teams", "Champion"
+        )
+        assert len(wide) < len(usual) and wide["Teams"].sum() == usual["Teams"].sum() == 89
+
+    def test_seeds_are_their_own_bands_and_carry_the_note_on_old_standings(
+        self, page, plain_home: Path
+    ) -> None:
+        opened = page(plain_home, "benchmarks", bench_measure="conference_rank")
+        table = frame_with(opened, "Teams", "Champion")
+        assert table["Conference seed"].tolist() == [str(seed) for seed in range(1, 16)]
+        said = texts(opened)
+        assert "Through 2000-01 the league's standings leave equal records" in said
+        assert "A band holds its lower edge" not in said
+        # No season of the Play-In era is old enough for the note.
+        recent = page(
+            plain_home, "benchmarks", bench_measure="conference_rank", bench_era="play_in"
+        )
+        assert "Through 2000-01" not in texts(recent)
+
+    def test_profiles_name_the_teams_at_the_ends(self, page, plain_home: Path) -> None:
+        opened = page(plain_home, "benchmarks", bench_stage="won_championship")
+        units = frame_with(opened, "Measure", "Lowest was").set_index("Measure")
+        wins = units.loc["Wins per 82 games"]
+        assert (wins["Lowest"], wins["Lowest was"]) == ("53.0", "2025-26 New York Knicks")
+        assert (wins["Highest"], wins["Highest was"]) == ("69.0", "1996-97 Chicago Bulls")
+        assert units.at["Conference seed", "Lowest was"] == "2 teams"
+        near = frame_with(opened, "League rank in", "Top 10").set_index("League rank in")
+        assert near.loc["Net rating"].tolist() == ["1 of 3", "2 of 3", "3 of 3", "3 of 3"]
+        assert near.at["Both ends", "Top 10"] == "3 of 3"
+        assert pd.isna(near.at["Both ends", "Top 1"])
+
+    def test_league_ranks_are_the_services_profile(self, page, plain_home: Path) -> None:
+        opened = page(plain_home, "benchmarks")
+        ranks = frame_with(opened, "metric", "p25", "p75").set_index("metric")
+        with Lab(load_settings(plain_home)) as lab:
+            profiles = lab.benchmarks.profiles(lab.benchmarks.era("all"))
+        mine = profiles[
+            (profiles["group"] == "made_conference_finals") & (profiles["kind"] == "rank")
+        ]
+        assert len(ranks) == len(mine) == 14
+        assert (
+            ranks.at["Net rating", "median"] == mine.set_index("metric").at["net_rating", "median"]
+        )
+
+    def test_separation_shows_the_services_figures_in_its_order(
+        self, page, plain_home: Path
+    ) -> None:
+        opened = page(plain_home, "benchmarks")
+        table = frame_with(opened, "concordance", "pairs")
+        with Lab(load_settings(plain_home)) as lab:
+            expected = lab.benchmarks.separation(
+                lab.benchmarks.era("all"), "made_conference_finals"
+            )
+        assert table["metric"].tolist() == expected["name"].tolist()
+        assert table["concordance"].tolist() == pytest.approx(expected["concordance"].tolist())
+        said = texts(opened)
+        assert (
+            "**12 teams that reached the conference finals** against **77 that did not**, "
+            "in 3 seasons: 308 same-season pairs." in said
+        )
+        assert "not what caused what" in said
+
+    def test_the_field_of_a_comparison_can_be_the_teams_they_had_to_beat(
+        self, page, plain_home: Path
+    ) -> None:
+        session = {"bench_stage": "won_a_round", "bench_field_won_a_round": "made_playoffs"}
+        opened = page(plain_home, "benchmarks", **session)
+        assert (
+            "**24 teams that won a playoff series** against **24 that did not**, in 3 "
+            "seasons: 192 same-season pairs." in texts(opened)
+        )
+        fields = next(box for box in opened.selectbox if box.key == "bench_field_won_a_round")
+        assert list(fields.options) == [
+            "Every other team that season",
+            "The other teams that reached the postseason",
+            "The other teams that made the playoffs",
+        ]
+
+    def test_every_team_season_is_listed(self, page, plain_home: Path) -> None:
+        opened = page(plain_home, "benchmarks")
+        rows = frame_with(opened, "team_name", "postseason_result", "wins_per_82")
+        assert len(rows) == 89 and rows["season"].iloc[0] == "2025-26"
+        assert (rows["postseason_result"] == "Champion").sum() == 3
+        assert "89 team-seasons, newest first" in texts(opened)
+
+    def test_an_era_with_no_season_on_record_says_so(self, page, scratch_home: Path) -> None:
+        (scratch_home / "configs" / "eras.yaml").write_text(
+            "eras:\n  - key: future\n    name: Seasons to come\n    first_season: '2030-31'\n",
+            encoding="utf-8",
+        )
+        opened = page(scratch_home, "benchmarks")
+        said = texts(opened)
+        assert "**Seasons to come**: no completed seasons, 0 seasons, 0 team-seasons." in said
+        assert "Nobody in these seasons" in said and "Choose a wider era." in said
+        assert len(opened.metric) == 0
+
+    def test_before_any_season_is_complete_it_says_so(
+        self, page, plain_home: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from wb import data
+
+        monkeypatch.setattr(data, "benchmark_seasons", lambda build: ())
+        opened = page(plain_home, "benchmarks")
+        assert "No completed season yet" in texts(opened)
+        assert len(opened.tabs) == 0
+
+
 class TestLab:
     def test_the_correlation_shown_is_the_labs(self, page, plain_home: Path) -> None:
         opened = page(plain_home, "lab")
@@ -310,19 +594,27 @@ class TestLab:
         opened = page(plain_home, "lab", **{state.SEASON: "1996-97"})
         assert figures(opened)["Teams"][0] == "29"
 
-    def test_history_makes_no_prediction(self, page, plain_home: Path) -> None:
-        said = texts(page(plain_home, "lab"))
-        assert "**3 champions** in colour against **86 other team-seasons** in gray." in said
-        assert "nothing here predicts a title" in said
+    def test_history_has_moved_to_the_benchmarks(self, page, plain_home: Path) -> None:
+        opened = page(plain_home, "lab")
+        assert [tab.label for tab in opened.tabs] == [
+            "Relationships",
+            "Distributions",
+            "Metric glossary",
+        ]
 
     def test_the_glossary_lists_every_metric(self, page, plain_home: Path) -> None:
         opened = page(plain_home, "lab")
         glossary = next(
             frame.value for frame in opened.dataframe if "Definition" in frame.value.columns
         )
-        assert len(glossary) == 90
-        assert set(glossary["Group"]) == {"Player metrics", "Team metrics", "Roster indicators"}
-        assert "90 metrics." in texts(opened)
+        assert len(glossary) == 92
+        assert set(glossary["Group"]) == {
+            "Player metrics",
+            "Team metrics",
+            "Roster indicators",
+            "Benchmark measures",
+        }
+        assert "92 metrics." in texts(opened)
 
     def test_the_glossary_can_be_searched(self, page, plain_home: Path) -> None:
         opened = page(plain_home, "lab", lab_glossary_search="true shooting")
@@ -658,7 +950,7 @@ class TestHealth:
         frames = [frame.value for frame in opened.dataframe]
         checks = next(frame for frame in frames if "Requires" in frame.columns)
         tables = next(frame for frame in frames if "Domain" in frame.columns)
-        assert len(checks) == 44 and set(checks["Result"]) == {"Passed", "Warning", "Error"}
+        assert len(checks) == 45 and set(checks["Result"]) == {"Passed", "Warning", "Error"}
         assert checks["Result"].iloc[0] != "Passed"
         assert len(tables) == 19
         assert tables.set_index("Table").at["team_seasons", "Rows"] == 89

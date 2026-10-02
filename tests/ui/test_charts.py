@@ -31,6 +31,17 @@ TIDY = pd.DataFrame(
         "text": ["25.0", "12.0", "55%", "60%"],
     }
 )
+RATES = pd.DataFrame(
+    {
+        "band": ["40 to 45", "45 to 50", "50 to 55"],
+        "rate": [0.0, 0.25, 0.6],
+        "low": [0.0, 0.1, 0.4],
+        "high": [0.2, 0.5, 0.8],
+        "inner_low": [0.0, 0.2, 0.5],
+        "inner_high": [0.1, 0.3, 0.7],
+        "text": ["none of 10", "5 of 20", "6 of 10"],
+    }
+)
 
 
 def scatter(palette: Palette, **kwargs) -> go.Figure:
@@ -94,6 +105,30 @@ BUILDERS: dict[str, Callable[[Palette], go.Figure]] = {
     "meter": lambda p: charts.meter(
         value=105.0, value_text="$105", thresholds={"Cap": 100.0, "Tax": 120.0}, palette=p
     ),
+    "interval_columns": lambda p: charts.interval_columns(
+        RATES,
+        label="band",
+        value="rate",
+        low="low",
+        high="high",
+        text="text",
+        palette=p,
+        value_title="Share of teams",
+    ),  # fmt: skip
+    "interval_rows": lambda p: charts.interval_rows(
+        RATES,
+        label="band",
+        value="rate",
+        low="low",
+        high="high",
+        text="text",
+        palette=p,
+        inner_low="inner_low",
+        inner_high="inner_high",
+        reference=0.5,
+        reference_label="Coin flip",
+        tickformat=".0%",
+    ),  # fmt: skip
 }
 EVERY_CHART = pytest.mark.parametrize("build", BUILDERS.values(), ids=BUILDERS.keys())
 BOTH_MODES = pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
@@ -523,6 +558,146 @@ class TestComparisonDots:
                 crowd, metric="metric", who="who", percentile="percentile", text="text",
                 palette=LIGHT,
             )  # fmt: skip
+
+
+class TestIntervalColumns:
+    def test_one_column_per_band_in_order_in_one_hue(self) -> None:
+        columns = BUILDERS["interval_columns"](LIGHT).data[0]
+        assert columns.type == "bar" and list(columns.x) == RATES["band"].tolist()
+        assert list(columns.y) == [0.0, 0.25, 0.6]
+        assert columns.marker.color == LIGHT.accent
+        assert columns.customdata[1].tolist() == ["5 of 20"]
+
+    def test_each_column_carries_its_interval_from_low_to_high(self) -> None:
+        interval = BUILDERS["interval_columns"](LIGHT).data[1]
+        assert interval.mode == "lines" and interval.hoverinfo == "skip"
+        assert list(interval.x) == [
+            "40 to 45", "40 to 45", None, "45 to 50", "45 to 50", None,
+            "50 to 55", "50 to 55", None,
+        ]  # fmt: skip
+        assert list(interval.y) == [0.0, 0.2, None, 0.1, 0.5, None, 0.4, 0.8, None]
+        assert interval.line.color == LIGHT.ink_secondary
+
+    def test_shares_are_read_from_zero_in_percent_with_level_labels(self) -> None:
+        figure = BUILDERS["interval_columns"](LIGHT)
+        assert figure.layout.yaxis.tickformat == ".0%"
+        assert figure.layout.yaxis.rangemode == "tozero"
+        assert figure.layout.yaxis.title.text == "Share of teams"
+        assert figure.layout.xaxis.type == "category" and figure.layout.xaxis.tickangle == 0
+
+    def test_few_columns_stay_thin_and_many_still_have_air(self) -> None:
+        def gap(columns: int) -> float:
+            frame = pd.DataFrame(
+                {"band": [f"b{n}" for n in range(columns)], "rate": 0.5, "low": 0.4, "high": 0.6,
+                 "text": "t"}
+            )  # fmt: skip
+            return charts.interval_columns(
+                frame, label="band", value="rate", low="low", high="high", text="text",
+                palette=LIGHT,
+            ).layout.bargap  # fmt: skip
+
+        assert gap(3) == 0.9 and gap(40) == 0.3
+        assert gap(3) > gap(14) > gap(40)
+        # On the width the chart is laid out for, a column is no thicker than a bar may be.
+        band = charts.COLUMN_PLOT_WIDTH / 14
+        assert band * (1 - gap(14)) <= charts.MAX_BAR_THICKNESS + 1e-9
+
+    def test_nothing_to_show_is_an_empty_chart_not_an_error(self) -> None:
+        figure = charts.interval_columns(
+            RATES.iloc[0:0], label="band", value="rate", low="low", high="high", text="text",
+            palette=LIGHT,
+        )  # fmt: skip
+        assert len(figure.data[0].x) == 0 and len(figure.data[1].x) == 0
+
+
+class TestIntervalRows:
+    @staticmethod
+    def bands(figure: go.Figure) -> list:
+        return [shape for shape in figure.layout.shapes if shape.type == "rect"]
+
+    def test_a_dot_per_row_at_its_value_with_the_first_row_on_top(self) -> None:
+        figure = BUILDERS["interval_rows"](LIGHT)
+        dots = figure.data[-1]
+        assert dots.mode == "markers" and list(dots.x) == [0.0, 0.25, 0.6]
+        assert list(dots.y) == RATES["band"].tolist()
+        assert dots.marker.color == LIGHT.accent
+        assert dots.customdata[2].tolist() == ["6 of 10"]
+        assert list(figure.layout.yaxis.categoryarray) == RATES["band"].tolist()
+        assert figure.layout.yaxis.autorange == "reversed"
+
+    def test_a_thin_line_spans_each_rows_interval(self) -> None:
+        line = BUILDERS["interval_rows"](LIGHT).data[0]
+        assert line.mode == "lines" and line.hoverinfo == "skip"
+        assert list(line.x) == [0.0, 0.2, None, 0.1, 0.5, None, 0.4, 0.8, None]
+        assert list(line.y)[:3] == ["40 to 45", "40 to 45", None]
+        assert line.line.color == LIGHT.deemphasis
+
+    def test_an_inner_band_sits_inside_the_line_when_asked_for(self) -> None:
+        bands = self.bands(BUILDERS["interval_rows"](LIGHT))
+        assert [(band.x0, band.x1) for band in bands] == [(0.0, 0.1), (0.2, 0.3), (0.5, 0.7)]
+        for position, band in enumerate(bands):
+            assert band.y0 == position - charts.BAND_THICKNESS
+            assert band.y1 == position + charts.BAND_THICKNESS
+            assert band.fillcolor == LIGHT.deemphasis and band.line.width == 0
+        plain = charts.interval_rows(
+            RATES, label="band", value="rate", low="low", high="high", text="text", palette=LIGHT
+        )
+        assert self.bands(plain) == []
+
+    def test_a_row_without_an_inner_band_gets_none(self) -> None:
+        frame = RATES.assign(inner_low=[0.0, None, 0.5])
+        figure = charts.interval_rows(
+            frame, label="band", value="rate", low="low", high="high", text="text",
+            palette=LIGHT, inner_low="inner_low", inner_high="inner_high",
+        )  # fmt: skip
+        assert [(band.x0, band.x1) for band in self.bands(figure)] == [(0.0, 0.1), (0.5, 0.7)]
+
+    def test_the_reference_is_a_hairline_named_above_the_plot(self) -> None:
+        figure = BUILDERS["interval_rows"](LIGHT)
+        lines = [shape for shape in figure.layout.shapes if shape.type == "line"]
+        assert len(lines) == 1 and lines[0].x0 == lines[0].x1 == 0.5
+        assert lines[0].line.width == charts.HAIRLINE
+        note = figure.layout.annotations[0]
+        assert (note.text, note.x, note.yref, note.yanchor) == ("Coin flip", 0.5, "paper", "bottom")
+        plain = charts.interval_rows(
+            RATES, label="band", value="rate", low="low", high="high", text="text", palette=LIGHT
+        )
+        assert len(plain.layout.shapes) == 0 and len(plain.layout.annotations) == 0
+
+    def test_the_axis_can_run_from_worst_to_best(self) -> None:
+        figure = charts.interval_rows(
+            RATES, label="band", value="rate", low="low", high="high", text="text",
+            palette=LIGHT, axis_range=(30.5, 0.5), value_title="League rank",
+            tickvals=(1, 10, 20, 30),
+        )  # fmt: skip
+        assert list(figure.layout.xaxis.range) == [30.5, 0.5]
+        assert list(figure.layout.xaxis.tickvals) == [1, 10, 20, 30]
+        assert figure.layout.xaxis.title.text == "League rank"
+
+    def test_the_axis_fits_the_intervals_and_the_line_they_are_read_against(self) -> None:
+        figure = BUILDERS["interval_rows"](LIGHT)
+        left, right = figure.layout.xaxis.range
+        assert left < 0.0 and right > 0.8  # every interval, with a little room
+        assert right - left < 1.0
+        # A reference far from the data is still on the chart.
+        far = charts.interval_rows(
+            RATES, label="band", value="rate", low="low", high="high", text="text",
+            palette=LIGHT, reference=2.0,
+        )  # fmt: skip
+        assert far.layout.xaxis.range[1] > 2.0
+        assert figure.layout.margin.t == 30  # room for the name of the line
+        plain = charts.interval_rows(
+            RATES, label="band", value="rate", low="low", high="high", text="text", palette=LIGHT
+        )
+        assert plain.layout.xaxis.range is None and plain.layout.margin.t == 12
+
+    def test_the_chart_grows_with_its_rows(self) -> None:
+        three = BUILDERS["interval_rows"](LIGHT).layout.height
+        one = charts.interval_rows(
+            RATES.head(1), label="band", value="rate", low="low", high="high", text="text",
+            palette=LIGHT,
+        ).layout.height  # fmt: skip
+        assert three - one == 2 * charts.ROW_HEIGHT
 
 
 class TestMeter:

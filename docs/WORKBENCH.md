@@ -1,6 +1,6 @@
 # The Workbench
 
-The workbench is the lab's interface: seven pages over the database, opened in your
+The workbench is the lab's interface: eight pages over the database, opened in your
 browser.
 
 ```powershell
@@ -14,7 +14,8 @@ no data yet it says so and tells you to run `fol refresh`. Stop it with Ctrl+C.
 ## The frame
 
 **Navigation** is at the top of the sidebar. **Filters** are below it and apply to every
-page; a choice you make on one page still holds on the next.
+page but Winning Benchmarks, which chooses its own seasons; a choice you make on one
+page still holds on the next.
 
 | Filter | What it does |
 | --- | --- |
@@ -69,6 +70,28 @@ of the same number of games. With fewer games than that it says so instead.
 before; standings; every team's offense against its defense; net rating; thirty seasons
 of league trends; the playoff bracket and every champion with where it ranked.
 
+**Winning Benchmarks.** What the teams that reached each stage of the postseason
+looked like, over the seasons you choose: all of them, the last five or ten, the modern
+era, the Play-In era, or any span. Pick the stage - made the playoffs, won a series,
+reached the conference finals or the Finals, won the championship - and read:
+
+- *How far teams went*: of the teams in each band of wins, net rating or seed, the
+  share that got that far, of every team or only of those that had already reached an
+  earlier stage. The line through each column is the 95% interval for the share; under
+  each band is the number of teams in it. A band is a way of grouping, not a
+  threshold: change its width and see.
+- *What they looked like*: where those teams ranked in the league in their own season,
+  metric by metric, and the spread of their record, ratings and seed, with the teams
+  at the extremes named.
+- *What separates them*: for each metric, how often a team that got there had the
+  better value than a team of the same season that did not. 50% is a coin flip.
+- *The field*: any two metrics for every team-season, with those teams picked out.
+- *Team-seasons*: the rows it all rests on, for export.
+
+It is history, not a forecast: nothing on the page is the chance that a team does
+something this season. The same research as a document is
+[research/BENCHMARKS.md](research/BENCHMARKS.md).
+
 **Player Explorer.** Every player of a season by category of metric. A player's profile:
 percentile bars, form over trailing games, every season, game log, on/off ratings,
 contract. Up to three players side by side.
@@ -82,8 +105,7 @@ aprons, and the configured cap rules with their sources. Empty until you import 
 contract file; see [CONTRACT_DATA.md](CONTRACT_DATA.md).
 
 **Analytics Lab.** Any two metrics against each other, for players or teams, with how
-strongly they move together. How one metric is spread. Every team-season since 1996-97
-with champions picked out. The metric glossary.
+strongly they move together. How one metric is spread. The metric glossary.
 
 **Team Builder.** Rosters you assemble by hand. For each: payroll, share of the cap,
 room under each line, how the roster stands against the roster limits, and what its
@@ -97,5 +119,6 @@ what is held of each dataset, and any fetch that is failing.
 
 ## What it does not do yet
 
-No value scores, no fit analysis, no optimiser, no probabilities. Those are later
-roadmap stages, and nothing in the workbench presents an estimate as a prediction.
+No value scores, no fit analysis, no optimiser, no forecasts. Those are later roadmap
+stages. The benchmarks give historical frequencies; nothing in the workbench presents
+one as a prediction.

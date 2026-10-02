@@ -185,3 +185,12 @@ describes what is on screen rather than what was once intended.
 | BLK/36 | Blocks per 36 minutes | `blk_per_36` | derived | number | higher | Blocks scaled to 36 minutes, so players with different minutes can be compared. Computed from the group's pooled totals. |
 | TOV% | Turnover percentage | `tov_pct` | derived | percentage | lower | TOV / (FGA + 0.44 x FTA + TOV). Share of the player's own plays that end in a turnover. Computed from the group's pooled totals. |
 | AST/TO | Assist-to-turnover ratio | `ast_to_tov` | derived | number | higher | Assists divided by turnovers. Computed from the group's pooled totals. |
+
+## Benchmark measures
+
+### Record
+
+| Metric | Name | Key | Origin | Shown as | Better | Definition |
+| --- | --- | --- | --- | --- | --- | --- |
+| W/82 | Wins per 82 games | `wins_per_82` | derived | number | higher | Winning percentage times 82: a record on the scale of a full season, so that seasons cut short by a lockout or a pandemic compare with the rest. |
+| Seed | Conference seed | `conference_rank` | measured | whole number | lower | Final position in the conference standings, as published by the league: the seed a team took into the postseason. |

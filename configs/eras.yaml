@@ -1,0 +1,44 @@
+# NBA Front Office Lab - eras for historical research.
+#
+# An era is a filter, not a finding: where "the modern era" begins is a convention. The
+# definitions are kept here, each with its reason, so that they can be seen and changed.
+#
+# An era is one of:
+#   - every season on record        (no first_season, last_season or latest_seasons)
+#   - a fixed span                  (first_season and/or last_season)
+#   - the most recent N seasons     (latest_seasons)
+#
+# The first era listed is the one the workbench opens with. Only seasons whose
+# postseason is complete are ever counted.
+
+eras:
+  - key: all
+    name: All seasons
+    note: Every season on record with a completed postseason.
+
+  - key: last_10
+    name: Last 10 seasons
+    latest_seasons: 10
+    note: The ten most recent completed seasons.
+
+  - key: last_5
+    name: Last 5 seasons
+    latest_seasons: 5
+    note: >-
+      The five most recent completed seasons. Five champions and ten finalists: too
+      few to say much about the later rounds.
+
+  - key: modern
+    name: Modern era
+    first_season: "2015-16"
+    note: >-
+      A convention, not a fact: the seasons since pace and three-point volume began
+      their climb to today's levels. League three-point attempts passed 28% of all
+      shots in 2015-16.
+
+  - key: play_in
+    name: Play-In era
+    first_season: "2020-21"
+    note: >-
+      Since the play-in tournament for the seventh to tenth seeds began. Sixteen teams
+      still make the playoffs, but twenty now reach the postseason.

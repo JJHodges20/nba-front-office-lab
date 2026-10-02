@@ -94,7 +94,7 @@ def test_metrics_prints_the_glossary() -> None:
 def test_metrics_write_creates_the_document(project: Path) -> None:
     result = runner.invoke(app, ["metrics", "--write"])
     assert result.exit_code == 0, result.output
-    assert "90 metrics" in result.output
+    assert "92 metrics" in result.output
     written = (project / "docs" / "METRICS.md").read_text(encoding="utf-8")
     assert written.startswith("# Metric Glossary")
     assert "\r" not in written
@@ -213,7 +213,7 @@ class TestRawAndCheck:
         assert "note  team_games [2012-13]" in result.output
         assert "warning  team_games.points_add_up: 2 of 7,792 failed" in result.output
         assert "error  player_game_logs.points_sum_to_team_points" in result.output
-        assert "2 with warnings, 2 with errors; 0 table parts not built" in result.output
+        assert "3 with warnings, 2 with errors; 0 table parts not built" in result.output
 
     def test_check_on_an_empty_store_reports_what_is_missing(self) -> None:
         result = runner.invoke(app, ["check"])
@@ -348,6 +348,27 @@ class TestDatabaseCommands:
         for path in (built_template[0] / "data").glob("front_office.sqlite*"):
             shutil.copy(path, project / "data" / path.name)
 
+    def test_benchmarks_before_anything_is_built(self, project: Path) -> None:
+        result = runner.invoke(app, ["benchmarks"])
+        assert result.exit_code == 1
+        assert "no data has been built yet; run: fol refresh" in result.output
+        assert not (project / "data" / "front_office.sqlite").exists()
+
+    def test_benchmarks_prints_the_research(self, prebuilt: None) -> None:
+        result = runner.invoke(app, ["benchmarks"])
+        assert result.exit_code == 0, result.output
+        assert result.output.startswith("# What Contenders Have Looked Like")
+        assert "## How far teams went: by record" in result.output
+        assert "| All seasons | 1996-97 to 2025-26 (3) | 89 |" in result.output
+
+    def test_benchmarks_write_creates_the_document(self, project: Path, prebuilt: None) -> None:
+        result = runner.invoke(app, ["benchmarks", "--write"])
+        assert result.exit_code == 0, result.output
+        assert "(3 completed seasons)" in result.output
+        written = (project / "docs" / "research" / "BENCHMARKS.md").read_bytes()
+        assert written.startswith(b"# What Contenders Have Looked Like")
+        assert b"\r" not in written
+
     def test_db_after_a_build(self, prebuilt: None) -> None:
         result = runner.invoke(app, ["db"])
         assert result.exit_code == 0, result.output
@@ -355,7 +376,7 @@ class TestDatabaseCommands:
         assert "team_games" in result.output and "7,792" in result.output
         assert "Build 1 finished" in result.output
         assert "(problems)" in result.output
-        assert "2 check errors, 2 check warnings" in result.output
+        assert "2 check errors, 3 check warnings" in result.output
         assert "different version" not in result.output
 
     def test_a_build_that_would_empty_a_table_is_refused(

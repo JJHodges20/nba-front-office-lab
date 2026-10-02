@@ -33,6 +33,10 @@ MOST_SAMPLED = 4
 # is chosen is only found by starting there.
 STARTS: dict[str, dict[str, dict[str, object]]] = {
     "league": {"open": {}, "team": {state.TEAM: BOS}},
+    "benchmarks": {
+        "open": {},
+        "champions": {"bench_stage": "won_championship", "bench_era": "custom"},
+    },
     # Brown played 71 games, so every trailing span has a form chart to draw.
     "players": {"open": {}, "player": {state.PLAYER: BROWN}},
     "teams": {"open": {}, "team": {state.TEAM: BOS}},
@@ -45,7 +49,7 @@ STARTS: dict[str, dict[str, dict[str, object]]] = {
 # its starts: the page is about that choice. Elsewhere a few teams and players stand for
 # all of them.
 OWN_SUBJECT = {"teams": state.TEAM, "players": state.PLAYER}
-SAMPLED = (state.TEAM, state.PLAYER, "'Add a player'")
+SAMPLED = (state.TEAM, state.PLAYER, "'Add a player'", "bench_field_x", "bench_field_y")
 CASES = [(name, start) for name, starts in STARTS.items() for start in starts]
 
 

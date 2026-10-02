@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 import streamlit as st
 
 from wb import components, data, formats, state
-from wb.views import builder, contracts, health, lab, league, players, teams
+from wb.views import benchmarks, builder, contracts, health, lab, league, players, teams
 
 st.set_page_config(
     page_title="NBA Front Office Lab",
@@ -30,6 +30,12 @@ PAGES = {
             icon=":material/leaderboard:",
             url_path="league",
             default=True,
+        ),
+        st.Page(
+            benchmarks.render,
+            title="Winning Benchmarks",
+            icon=":material/emoji_events:",
+            url_path="benchmarks",
         ),
     ],
     "Explore": [

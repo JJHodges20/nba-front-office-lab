@@ -8,10 +8,14 @@ starts at build 1.
 
 from __future__ import annotations
 
+import base64
+import json
 import shutil
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
+import numpy as np
+import plotly.graph_objects as go
 import pytest
 from streamlit.testing.v1 import AppTest
 
@@ -98,6 +102,28 @@ def app(open_at: Callable[[Path], None]) -> Callable[[Path], AppTest]:
 def figures(app: AppTest) -> dict[str, tuple[str, str | None]]:
     """The headline figures on a page: label -> (value, context)."""
     return {metric.label: (metric.value, metric.delta or None) for metric in app.metric}
+
+
+def _unpacked(value: object) -> object:
+    """A chart specification with the arrays Plotly packed as bytes turned back into lists."""
+    if isinstance(value, dict):
+        if {"dtype", "bdata"} <= set(value):
+            array = np.frombuffer(base64.b64decode(value["bdata"]), dtype=np.dtype(value["dtype"]))
+            if "shape" in value:
+                array = array.reshape([int(size) for size in str(value["shape"]).split(",")])
+            return array.tolist()
+        return {key: _unpacked(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_unpacked(item) for item in value]
+    return value
+
+
+def drawn(app: AppTest) -> dict[str, go.Figure]:
+    """Every chart a page drew, by the key it was drawn under."""
+    return {
+        chart.key: go.Figure(_unpacked(json.loads(chart.proto.spec)))
+        for chart in app.get("plotly_chart")
+    }
 
 
 def texts(app: AppTest) -> str:

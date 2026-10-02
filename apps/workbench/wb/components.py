@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 import pandas as pd
@@ -169,16 +169,20 @@ def chart(
     key: str,
     filename: str,
     catalog: MetricCatalog | None = None,
+    formats: Mapping[str, Callable[[object], str]] | None = None,
 ) -> None:
     """A chart with its table view and its exports.
 
     Nothing on a chart is reachable only by hovering: the same values are in the table
     underneath, which can be saved as CSV. The camera button on the chart saves it as an
-    image; the HTML export keeps it interactive.
+    image; the HTML export keeps it interactive. Metric columns are shown in their own
+    format when a ``catalog`` is given; ``formats`` does the same for other columns. The
+    CSV always holds the plain numbers.
     """
     st.plotly_chart(figure, theme=None, config=charts.image_config(filename), key=key)
     with st.expander("Table view and export", icon=":material/table_view:"):
-        shown = table if catalog is None else _styled(table, catalog)
+        plain = catalog is None and not formats
+        shown = table if plain else _styled(table, catalog, formats)
         st.dataframe(shown, hide_index=True, placeholder="—", key=f"{key}_table")
         with st.container(horizontal=True, gap="small"):
             export(table, filename, key=f"{key}_csv")
@@ -233,6 +237,13 @@ def metric_columns(
     return settings
 
 
-def _styled(table: pd.DataFrame, catalog: MetricCatalog):  # type: ignore[no-untyped-def]
-    formats = {key: catalog[key].format_value for key in table.columns if key in catalog}
-    return table.style.format(formats, na_rep="—")
+def _styled(  # type: ignore[no-untyped-def]
+    table: pd.DataFrame,
+    catalog: MetricCatalog | None,
+    extra: Mapping[str, Callable[[object], str]] | None = None,
+):
+    formats: dict = {}
+    if catalog is not None:
+        formats = {key: catalog[key].format_value for key in table.columns if key in catalog}
+    formats.update(extra or {})
+    return table.style.format(formats, na_rep=EMPTY_CELL)
