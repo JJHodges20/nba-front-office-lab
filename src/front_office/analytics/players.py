@@ -467,6 +467,41 @@ def combined_on_off(on_off: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame({"on_off_net": on - off})
 
 
+TEAM_MINUTES_COLUMNS = ("player_id", "season", "season_type", "team_id", "minutes")
+
+
+def team_minutes(player_seasons: pd.DataFrame, player_game_logs: pd.DataFrame) -> pd.DataFrame:
+    """Each player's minutes for each team played for, by season and season type.
+
+    A season line covers every team a traded player appeared for, so the split comes
+    from the game logs. Only the split: the published season minutes are exact, while
+    the logs round every game to the whole minute and a few old box scores have minutes
+    missing, so the published total is divided between the teams in proportion to the
+    logged minutes. A player whose logged minutes are all zero is divided by games, and
+    one with no log at all is credited to the team the season line names.
+
+    Returns one row per player per team: :data:`TEAM_MINUTES_COLUMNS`.
+    """
+    keys = ["player_id", "season", "season_type"]
+    published = player_seasons[[*keys, "team_id", "minutes"]].rename(
+        columns={"team_id": "last_team_id", "minutes": "published"}
+    )
+    logged = player_game_logs.groupby([*keys, "team_id"], as_index=False).agg(
+        logged=("minutes", "sum"), games=("game_id", "size")
+    )
+    by_player = logged.groupby(keys)
+    all_logged = by_player["logged"].transform("sum").astype("float64")
+    by_minutes = f.safe_divide(logged["logged"], all_logged)
+    by_games = logged["games"] / by_player["games"].transform("sum")
+    logged["fraction"] = by_minutes.where(all_logged > 0, by_games)
+
+    stints = published.merge(logged[[*keys, "team_id", "fraction"]], on=keys, how="left")
+    unlogged = stints["fraction"].isna()
+    stints["team_id"] = stints["team_id"].where(~unlogged, stints["last_team_id"]).astype("int64")
+    stints["minutes"] = stints["published"] * stints["fraction"].where(~unlogged, 1.0)
+    return stints[list(TEAM_MINUTES_COLUMNS)].reset_index(drop=True)
+
+
 def player_season_metrics(
     player_seasons: pd.DataFrame,
     on_off: pd.DataFrame | None = None,

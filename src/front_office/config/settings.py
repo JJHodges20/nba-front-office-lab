@@ -20,6 +20,7 @@ from pydantic import (
     PositiveInt,
     ValidationError,
     field_validator,
+    model_validator,
 )
 
 from front_office.domain.seasons import Season
@@ -44,12 +45,24 @@ class PathSettings(_Section):
 
 class SeasonSettings(_Section):
     history_start: str = "1996-97"
+    player_history_start: str | None = None
+    """First season of league-wide player statistics. ``None``: as far back as teams go."""
     player_detail_seasons: PositiveInt = 3
 
-    @field_validator("history_start")
+    @field_validator("history_start", "player_history_start")
     @classmethod
-    def _season_label(cls, value: str) -> str:
-        return Season.parse(value).label
+    def _season_label(cls, value: str | None) -> str | None:
+        return None if value is None else Season.parse(value).label
+
+    @model_validator(mode="after")
+    def _players_within_history(self) -> SeasonSettings:
+        start = self.player_history_start
+        if start is not None and Season.parse(start) < Season.parse(self.history_start):
+            raise ValueError(
+                f"player_history_start ({start}) is before history_start "
+                f"({self.history_start}): player statistics need their team's season"
+            )
+        return self
 
 
 class NbaStatsSettings(_Section):
@@ -112,6 +125,11 @@ class Settings(_Section):
     @property
     def history_start(self) -> Season:
         return Season.parse(self.seasons.history_start)
+
+    @property
+    def player_history_start(self) -> Season:
+        """First season of league-wide player statistics."""
+        return Season.parse(self.seasons.player_history_start or self.seasons.history_start)
 
 
 def find_project_root(start: Path | None = None) -> Path:

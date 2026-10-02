@@ -23,6 +23,7 @@ import pandas as pd
 
 from front_office.domain.schema import TableContract
 from front_office.domain.tables._fields import BOX_SCORE_COLUMNS
+from front_office.domain.tables.value import PART_COLUMNS
 
 Tables = Mapping[str, pd.DataFrame]
 
@@ -35,6 +36,16 @@ TOTALS_TOLERANCE = 0.02
 RATING_TOLERANCE = 0.1
 # Game-log minutes are whole minutes; a season total is exact.
 MINUTES_ROUNDING_PER_GAME = 0.51
+# A team's minutes in a game are exact; each player's are rounded to the whole minute.
+MINUTES_ROUNDING_PER_PLAYER = 0.5
+# The league corrects a player's season totals and box scores separately. Across thirty
+# seasons the two never differ by more than one game or four points; more than this is
+# a fault in the lab until it is explained.
+PLAYER_GAMES_TOLERANCE = 1
+PLAYER_POINTS_TOLERANCE = 5
+# Three team box scores in thirty seasons disagree with their players' lines, by at most
+# seven points: one player listed with the opponent, one with four points too many.
+TEAM_POINTS_TOLERANCE = 10
 # The largest contracts start at 35% of the cap and grow 8% a year; the smallest
 # (two-way, ten-day) are a few tenths of a percent. Outside this band, suspect a typo.
 MAX_PLAUSIBLE_CAP_SHARE = 0.45
@@ -42,6 +53,8 @@ MIN_PLAUSIBLE_CAP_SHARE = 0.0002
 # A team carries 14-15 standard contracts in season and up to 21 players in the offseason.
 MIN_PLAUSIBLE_ROSTER = 10
 MAX_PLAUSIBLE_ROSTER = 21
+# Modeled values are sums of floating-point terms; further apart than this is a fault.
+VALUE_TOLERANCE = 1e-6
 
 ROUND_SIZES = {1: 8, 2: 4, 3: 2, 4: 1}
 
@@ -425,18 +438,33 @@ def _seasons_with_logs(tables: Tables) -> pd.DataFrame:
     return tables["player_seasons"].merge(covered, on=["season", "season_type"])
 
 
-def _player_games_match_logs(tables: Tables) -> tuple[int, pd.DataFrame]:
+def _player_totals_against_logs(tables: Tables, *, exact: bool) -> tuple[int, pd.DataFrame]:
     seasons = _seasons_with_logs(tables).set_index(["player_id", "season", "season_type"])
     sums = _player_log_sums(tables).reindex(seasons.index)
-    wrong = (seasons["games_played"] != sums["games"]) | (seasons["pts"] != sums["pts"])
+    games_gap = (seasons["games_played"] - sums["games"]).abs()
+    points_gap = (seasons["pts"] - sums["pts"]).abs()
+    if exact:
+        wrong = (games_gap != 0) | (points_gap != 0)
+    else:
+        allowed = np.maximum(TOTALS_TOLERANCE * seasons["pts"], PLAYER_POINTS_TOLERANCE)
+        wrong = (games_gap > PLAYER_GAMES_TOLERANCE) | (points_gap > allowed)
     failing = _failing(
         seasons,
-        wrong,
+        # A player with no log at all has nothing to compare: that is a contradiction.
+        wrong | sums["games"].isna(),
         ["player_name", "games_played", "pts"],
         games_in_logs=sums["games"],
         pts_in_logs=sums["pts"],
     )
     return len(seasons), failing
+
+
+def _player_games_match_logs(tables: Tables) -> tuple[int, pd.DataFrame]:
+    return _player_totals_against_logs(tables, exact=True)
+
+
+def _player_games_close_to_logs(tables: Tables) -> tuple[int, pd.DataFrame]:
+    return _player_totals_against_logs(tables, exact=False)
 
 
 def _player_minutes_close_to_logs(tables: Tables) -> tuple[int, pd.DataFrame]:
@@ -453,13 +481,34 @@ def _player_minutes_close_to_logs(tables: Tables) -> tuple[int, pd.DataFrame]:
     return len(seasons), failing
 
 
+def _team_games_with_player_sums(tables: Tables) -> pd.DataFrame:
+    """Each team game that has player rows, with what those rows add up to."""
+    by_team = (
+        tables["player_game_logs"]
+        .groupby(["game_id", "team_id"])
+        .agg(player_pts=("pts", "sum"), player_minutes=("minutes", "sum"), players=("pts", "size"))
+    )
+    games = tables["team_games"].set_index(["game_id", "team_id"])[["pts", "minutes"]]
+    return games.join(by_team, how="inner")
+
+
 def _player_points_sum_to_team_points(tables: Tables) -> tuple[int, pd.DataFrame]:
-    logs = tables["player_game_logs"]
-    by_team = logs.groupby(["game_id", "team_id"])["pts"].sum().rename("player_pts")
-    games = tables["team_games"].set_index(["game_id", "team_id"])[["pts"]]
-    joined = games.join(by_team, how="inner")
+    joined = _team_games_with_player_sums(tables)
     wrong = joined["pts"] != joined["player_pts"]
-    return len(joined), joined[wrong].reset_index()
+    return len(joined), joined.loc[wrong, ["pts", "player_pts"]].reset_index()
+
+
+def _player_points_close_to_team_points(tables: Tables) -> tuple[int, pd.DataFrame]:
+    joined = _team_games_with_player_sums(tables)
+    wrong = (joined["pts"] - joined["player_pts"]).abs() > TEAM_POINTS_TOLERANCE
+    return len(joined), joined.loc[wrong, ["pts", "player_pts"]].reset_index()
+
+
+def _player_minutes_sum_to_team_minutes(tables: Tables) -> tuple[int, pd.DataFrame]:
+    joined = _team_games_with_player_sums(tables)
+    gap = (joined["minutes"] - joined["player_minutes"]).abs()
+    wrong = gap > MINUTES_ROUNDING_PER_PLAYER * joined["players"]
+    return len(joined), joined.loc[wrong, ["minutes", "player_minutes", "players"]].reset_index()
 
 
 def _logged_games_have_players(tables: Tables) -> tuple[int, pd.DataFrame]:
@@ -559,6 +608,59 @@ def _teams_have_plausible_rosters(tables: Tables) -> tuple[int, pd.DataFrame]:
         per_team["standard_contracts"] > MAX_PLAUSIBLE_ROSTER
     )
     return len(per_team), per_team[odd]
+
+
+# --- player value -------------------------------------------------------------------
+
+
+def _regular_player_seasons(tables: Tables) -> pd.DataFrame:
+    seasons = tables["player_seasons"]
+    return seasons[seasons["season_type"] == "regular"]
+
+
+def _impact_parts_add_up(tables: Tables) -> tuple[int, pd.DataFrame]:
+    scores = tables["player_value_scores"]
+    rated = scores[scores["impact"].notna()]
+    from_parts = rated[list(PART_COLUMNS)].sum(axis=1)
+    from_sides = rated["impact_offense"] + rated["impact_defense"]
+    wrong = ((from_parts - rated["impact"]).abs() > VALUE_TOLERANCE) | (
+        (from_sides - rated["impact"]).abs() > VALUE_TOLERANCE
+    )
+    failing = _failing(
+        rated,
+        wrong,
+        ["player_id", "season", "impact"],
+        from_parts=from_parts,
+        offense_plus_defense=from_sides,
+    )
+    return len(rated), failing
+
+
+def _every_season_is_valued(tables: Tables) -> tuple[int, pd.DataFrame]:
+    scores = tables["player_value_scores"]
+    columns = ["player_id", "season", "player_name"]
+    if scores.empty:
+        # No fitted model: nothing is valued, and the build says so in a note.
+        return 0, pd.DataFrame(columns=columns)
+    seasons = _regular_player_seasons(tables)
+    rated = scores[scores["impact"].notna()]
+    valued = set(zip(rated["player_id"], rated["season"], strict=True))
+    missing = [
+        key not in valued for key in zip(seasons["player_id"], seasons["season"], strict=True)
+    ]
+    return len(seasons), seasons.loc[missing, columns]
+
+
+def _average_minute_has_no_impact(tables: Tables) -> tuple[int, pd.DataFrame]:
+    scores = tables["player_value_scores"]
+    rated = scores[scores["impact"].notna()]
+    minutes = _regular_player_seasons(tables)[["player_id", "season", "minutes"]]
+    joined = rated.merge(minutes, on=["player_id", "season"])
+    weighted = (joined["impact"] * joined["minutes"]).groupby(joined["season"]).sum()
+    total = joined["minutes"].groupby(joined["season"]).sum()
+    mean = (weighted / total.where(total > 0)).rename("minutes_weighted_impact")
+    off = mean.abs() > VALUE_TOLERANCE
+    return len(mean), mean[off].rename_axis("season").reset_index()
 
 
 E, W = Severity.ERROR, Severity.WARNING
@@ -664,9 +766,19 @@ _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
     Check(
         "games_and_points_match_logs",
         "player_seasons",
-        "Each player's games played and points equal the player's game log.",
-        E,
+        "Each player's games played and points equal the player's game log. The league "
+        "corrects the two separately, so a few dozen player-seasons differ by a basket "
+        "or a game.",
+        W,
         _player_games_match_logs,
+    ),
+    Check(
+        "games_and_points_close_to_logs",
+        "player_seasons",
+        f"Each player's games played are within {PLAYER_GAMES_TOLERANCE} of the game log, "
+        f"and points within {PLAYER_POINTS_TOLERANCE} or {TOTALS_TOLERANCE:.0%}.",
+        E,
+        _player_games_close_to_logs,
     ),
     Check(
         "minutes_close_to_logs",
@@ -685,9 +797,28 @@ _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
     Check(
         "points_sum_to_team_points",
         "player_game_logs",
-        "In every game, a team's players' points sum to the team's points.",
-        E,
+        "In every game, a team's players' points sum to the team's points. Two box "
+        "scores of the 1990s do not: a player listed with the opponent, and a line with "
+        "four points too many.",
+        W,
         _player_points_sum_to_team_points,
+    ),
+    Check(
+        "points_close_to_team_points",
+        "player_game_logs",
+        f"In every game, a team's players' points are within {TEAM_POINTS_TOLERANCE} of "
+        "the team's points.",
+        E,
+        _player_points_close_to_team_points,
+    ),
+    Check(
+        "minutes_sum_to_team_minutes",
+        "player_game_logs",
+        "In every game, a team's players' minutes sum to the team's minutes, to within "
+        "the rounding of each player's minutes. Some box scores of 2005-06 and 2006-07, "
+        "and of the 1990s, do not.",
+        W,
+        _player_minutes_sum_to_team_minutes,
     ),
     Check(
         "logged_games_have_players",
@@ -734,6 +865,28 @@ _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
         "means the file is incomplete.",
         W,
         _teams_have_plausible_rosters,
+    ),
+    Check(
+        "impact_parts_add_up",
+        "player_value_scores",
+        "A season's impact is the sum of its parts, and of its offense and defense.",
+        E,
+        _impact_parts_add_up,
+    ),
+    Check(
+        "every_season_is_valued",
+        "player_value_scores",
+        "Every player's regular season has an impact, once a value model has been fitted.",
+        E,
+        _every_season_is_valued,
+    ),
+    Check(
+        "average_minute_has_no_impact",
+        "player_value_scores",
+        "In every season the minutes-weighted average impact is zero: impact is measured "
+        "against the league's average minute.",
+        E,
+        _average_minute_has_no_impact,
     ),
 )
 

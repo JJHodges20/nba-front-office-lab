@@ -950,8 +950,8 @@ class TestHealth:
         frames = [frame.value for frame in opened.dataframe]
         checks = next(frame for frame in frames if "Requires" in frame.columns)
         tables = next(frame for frame in frames if "Domain" in frame.columns)
-        assert len(checks) == 45 and set(checks["Result"]) == {"Passed", "Warning", "Error"}
+        assert len(checks) == 52 and set(checks["Result"]) == {"Passed", "Warning", "Error"}
         assert checks["Result"].iloc[0] != "Passed"
-        assert len(tables) == 19
+        assert len(tables) == 20
         assert tables.set_index("Table").at["team_seasons", "Rows"] == 89
         assert "No dataset slice is failing" in texts(opened)

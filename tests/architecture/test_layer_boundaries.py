@@ -28,8 +28,18 @@ LAYER_RULES: dict[str, set[str]] = {
     "storage": {"domain"},
     "quality": {"domain"},
     "analytics": {"domain"},
-    "pipelines": {"domain", "config", "providers", "rawstore", "processing", "storage", "quality"},
-    "services": {"domain", "config", "storage", "analytics", "quality"},
+    "modeling": {"domain", "analytics"},
+    "pipelines": {
+        "domain",
+        "config",
+        "providers",
+        "rawstore",
+        "processing",
+        "storage",
+        "quality",
+        "modeling",
+    },
+    "services": {"domain", "config", "storage", "analytics", "quality", "modeling"},
     "interfaces": {"domain", "config", "pipelines", "services"},
 }
 

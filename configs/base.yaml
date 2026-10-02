@@ -12,9 +12,13 @@ seasons:
   # First season for which stats.nba.com publishes team advanced statistics
   # (possessions, offensive/defensive rating). Historical team research starts here.
   history_start: "1996-97"
-  # Player-level detail (season stats, game logs, rosters, on/off) is ingested for the
-  # current league year and this many seasons before it. Team-level history always goes
-  # back to history_start.
+  # League-wide player statistics (season totals, on-court ratings, game logs) are
+  # ingested from this season on: eight requests a season. Player value is validated
+  # against how teams did in later seasons, so it needs the whole history.
+  player_history_start: "1996-97"
+  # Team-by-team player detail (rosters with birth dates, on/off splits) costs sixty
+  # requests a season, so it is kept for the current league year and this many seasons
+  # before it.
   player_detail_seasons: 3
 
 providers:

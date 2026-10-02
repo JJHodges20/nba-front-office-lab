@@ -278,6 +278,9 @@ class HealthService:
                         "data only.",
                     )
                 )
+            detail = _detail_gap(players, self._lab.warehouse.distinct("player_on_off", "season"))
+            if detail is not None:
+                gaps.append(detail)
 
         current = Season.league_year_on(day).label
         if team_seasons and team_seasons[-1] < current:
@@ -291,6 +294,21 @@ class HealthService:
             )
         order = {WARNING: 0, INFO: 1}
         return tuple(sorted(gaps, key=lambda gap: order[gap.severity]))
+
+
+def _detail_gap(player_seasons: list[str], detail_seasons: list[str]) -> Gap | None:
+    """Seasons with player statistics but without the team-by-team detail, if any."""
+    if not player_seasons or not detail_seasons:
+        return None
+    first, last = min(detail_seasons), max(detail_seasons)
+    if first == min(player_seasons):
+        return None
+    return Gap(
+        "Player detail",
+        INFO,
+        f"Rosters and on/off splits cover {first} to {last}. Earlier seasons have player "
+        "statistics without them: fetching them takes sixty requests a season.",
+    )
 
 
 def describe_age(age: timedelta) -> str:

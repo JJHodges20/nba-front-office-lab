@@ -22,7 +22,7 @@ page still holds on the next.
 | Season | Any season with team data, newest first. |
 | Phase | Regular season or playoffs. |
 | Team | Makes one team the subject. Clear it for the whole league. |
-| Player | Makes one player the subject. Offered for seasons with player detail. |
+| Player | Makes one player the subject. Offered for seasons with player statistics. |
 | Comparison window | The full season, the last 5, 10 or 20 games, or a date range. |
 
 Selecting a row in a table of teams or players sets the same filters: tick the box at

@@ -146,24 +146,33 @@ def team_requests(season: Season, team_ids: Iterable[int], *, on_off: bool) -> l
 
 @dataclass(frozen=True, slots=True)
 class IngestPlan:
-    """Which seasons to fetch, and which of them at player level."""
+    """Which seasons to fetch, and how deep each of them goes."""
 
     current: Season
     seasons: tuple[Season, ...]
+    player_stats: frozenset[Season]
+    """Seasons fetched with league-wide player statistics: eight requests each."""
     player_detail: frozenset[Season]
+    """Seasons also fetched team by team - rosters, on/off splits: sixty requests each."""
 
 
 def default_plan(settings: Settings, today: date) -> IngestPlan:
-    """Team history from the configured start; player detail for the most recent seasons."""
+    """Team and player history from their configured starts; team-by-team player detail
+    for the most recent seasons."""
     current = Season.league_year_on(today)
-    detail_from = max(
-        current.offset(-settings.seasons.player_detail_seasons), settings.history_start
-    )
+    stats_from = settings.player_history_start
+    detail_from = max(current.offset(-settings.seasons.player_detail_seasons), stats_from)
     return IngestPlan(
         current=current,
         seasons=tuple(Season.span(settings.history_start, current)),
-        player_detail=frozenset(Season.span(detail_from, current)),
+        player_stats=_from(stats_from, current),
+        player_detail=_from(detail_from, current),
     )
+
+
+def _from(first: Season, current: Season) -> frozenset[Season]:
+    """Every season from ``first`` to the current one; none if that is still to come."""
+    return frozenset(Season.span(first, current)) if first <= current else frozenset()
 
 
 class Ingestor:
@@ -190,10 +199,16 @@ class Ingestor:
     def ingest_globals(self, current: Season) -> list[FetchOutcome]:
         return self.run(global_requests(current))
 
-    def ingest_season(self, season: Season, *, players: bool) -> list[FetchOutcome]:
-        """Fetch one season: league-wide datasets first, then per-team ones if wanted."""
+    def ingest_season(
+        self, season: Season, *, players: bool, detail: bool | None = None
+    ) -> list[FetchOutcome]:
+        """Fetch one season: the league-wide datasets, then the team-by-team ones.
+
+        ``players`` adds league-wide player statistics. ``detail`` adds each team's
+        roster and on/off splits; it needs ``players`` and, left unsaid, follows it.
+        """
         outcomes = self.run(league_requests(season, players=players))
-        if not players:
+        if not players or detail is False:
             return outcomes
 
         standings = self._store.latest(NBA_STATS, D.STANDINGS.value, {"season": season.label})

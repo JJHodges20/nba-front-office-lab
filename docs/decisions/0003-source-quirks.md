@@ -40,6 +40,9 @@ The rules in force:
 | Postseason outcomes before the Finals are decided | Null |
 | A column the source added | Ignored |
 | Equal records left on the same place in the standings (through 2000-01) | Kept as published; a check warns, and benchmarks by seed say so |
+| A player's season totals a basket or a game away from the game log (46 player-seasons of 20,668, mostly before 2006-07) | Kept as published; a check warns. More than a game, or than five points or 2%, is an error |
+| A player listed with the opponent in a box score (one game of 1996-97), a line with four points too many (one of 1998-99) | Kept as published; a check warns. More than ten points from the team's score is an error |
+| Player minutes that do not add up to the game (about 130 box scores, most of them from 2005-06 and 2006-07) | Kept as published; a check warns. Season minutes come from the published totals, never from the logs |
 | A column the source removed or renamed | Rejected, naming the column |
 
 ## Consequences

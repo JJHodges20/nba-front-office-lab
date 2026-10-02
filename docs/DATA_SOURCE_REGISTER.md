@@ -41,9 +41,12 @@ the cap, and maximum salaries are 25%, 30% and 35% of it.
   from the 1996-97 season onwards, which sets the start of the lab's team history.
 - The lab throttles its requests (one every 1.2 seconds by default) and stores every
   response in the raw store, so a finished season is fetched once rather than repeatedly.
-- Play-in games exist from 2019-20. Player detail is ingested for the current league
-  year and the three seasons before it; raise `seasons.player_detail_seasons` in
-  `configs/base.yaml` for more.
+- Play-in games exist from 2019-20.
+- League-wide player statistics (season totals, on-court ratings, game logs) are ingested
+  for every season from `seasons.player_history_start`: eight requests a season.
+  Team-by-team detail (rosters with birth dates, on/off splits) costs sixty requests a
+  season, so it is kept for the current league year and the three seasons before it;
+  raise `seasons.player_detail_seasons` in `configs/base.yaml` for more.
 
 | Dataset | Endpoint | One snapshot per |
 | --- | --- | --- |

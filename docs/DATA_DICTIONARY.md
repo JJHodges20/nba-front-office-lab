@@ -44,6 +44,7 @@ measured statistics, modeled estimates and user assumptions visibly apart.
 | [`salary_cap_rules`](#salary_cap_rules) | cap_rules | One row per NBA season. | V0 |
 | [`contracts`](#contracts) | contracts | One row per player per team per run of consecutive seasons. | V1 |
 | [`contract_years`](#contract_years) | contracts | One row per contract per season. | V1 |
+| [`player_value_scores`](#player_value_scores) | player_value | One row per player per season. | V3 |
 | [`custom_rosters`](#custom_rosters) | user_rosters | One row per roster. | V1 |
 | [`roster_players`](#roster_players) | user_rosters | One row per player per roster. | V1 |
 | [`fetch_log`](#fetch_log) | operations | One row per fetch attempt. | V1 |
@@ -439,6 +440,43 @@ Salary for each season of each contract, with its share of that season's cap.
 | `guarantee` | string | no | identifier |  | How much of the season's salary is guaranteed. Null if the file does not say. One of: `full`, `partial`, `none`. |
 | `years_remaining` | integer | yes | derived | seasons | Seasons left on the contract after this one. |
 
+### player_value_scores
+
+The value model's estimate of each player in each regular season: what the season showed, what was expected going into it, and what both are worth in wins. A row for a season the player has not played holds the projection alone.
+
+- **Grain:** One row per player per season.
+- **Primary key:** `player_id`, `season`
+- **Indexes:** `season`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `player_id` | integer | yes | identifier |  | Player id. References `players.player_id`. |
+| `season` | string | yes | identifier |  | Season label, e.g. 2025-26. |
+| `model_version` | string | yes | operational |  | Revision of the fitted value model that produced the row. |
+| `age` | integer | no | derived | years | Age in the season: as published if the player appeared, otherwise carried forward from the last season played. |
+| `minutes_share` | float | no | derived | fraction | Minutes played as a share of the team's game minutes, added up over every team played for: 1 is every minute of every game. |
+| `reliability` | float | no | derived | fraction | Share of the season's estimate that rests on the player's own numbers; the rest is what is assumed of any player used that much. |
+| `impact` | float | no | modeled | points per 100 possessions | Estimated effect on a team's net rating while on the court, against the league's average minute, from this season alone. |
+| `impact_offense` | float | no | modeled | points per 100 possessions | The part of impact that is points added on offense. |
+| `impact_defense` | float | no | modeled | points per 100 possessions | The part of impact that is points saved on defense. |
+| `impact_from_efficiency` | float | no | modeled | points per 100 possessions | The part of impact that comes from scoring efficiency. |
+| `impact_from_creation` | float | no | modeled | points per 100 possessions | The part of impact that comes from creation: scoring attempts, assists and free throws. |
+| `impact_from_shooting` | float | no | modeled | points per 100 possessions | The part of impact that comes from spacing: three-point attempts. |
+| `impact_from_rebounding` | float | no | modeled | points per 100 possessions | The part of impact that comes from rebounding. |
+| `impact_from_ball_security` | float | no | modeled | points per 100 possessions | The part of impact that comes from ball security: turnovers. |
+| `impact_from_defensive_activity` | float | no | modeled | points per 100 possessions | The part of impact that comes from defensive activity: steals, blocks and fouls. |
+| `impact_from_on_court` | float | no | modeled | points per 100 possessions | The part of impact that comes from the team's results with the player on the court. |
+| `impact_from_team_context` | float | no | modeled | points per 100 possessions | The part of impact that comes from the results of the teams played for. |
+| `impact_from_baseline` | float | no | modeled | points per 100 possessions | The part of impact that is assumed rather than shown: the level given to the share of the estimate the minutes do not vouch for, less the constant that puts the league's average minute at zero. |
+| `wins_added` | float | no | modeled | wins | Wins the season was worth over a replacement player in the same minutes. |
+| `projected_impact` | float | no | modeled | points per 100 possessions | Impact expected going into the season, from the seasons before it and age. |
+| `projected_offense` | float | no | modeled | points per 100 possessions | The offensive part of projected impact. |
+| `projected_defense` | float | no | modeled | points per 100 possessions | The defensive part of projected impact. |
+| `projection_reliability` | float | no | derived | fraction | Share of the projection that rests on the player's own earlier numbers. Null for a player with no earlier season. |
+| `projection_seasons` | integer | yes | derived |  | Earlier seasons the projection draws on; 0 for a player with none. |
+| `projected_share` | float | no | modeled | fraction | Share of team minutes expected going into the season. |
+| `projected_wins` | float | no | modeled | wins | Wins over a replacement player expected going into the season, over 82 games. |
+
 ### custom_rosters
 
 Rosters assembled by the user in the Team Builder.
@@ -571,7 +609,6 @@ Called for by the roadmap; each gets a contract in the milestone that builds it.
 | Table | Domain | Purpose | Milestone |
 | --- | --- | --- | --- |
 | `player_archetypes` | player_value | Role classification outputs. | 9 |
-| `player_value_scores` | player_value | Versioned player value calculations. | 9 |
 | `lineups` | lineups | Five-player lineup identities. | 10 |
 | `lineup_stats` | lineups | Minutes and performance for lineups. | 10 |
 | `model_predictions` | modeling | Versioned postseason probability outputs. | 12 |

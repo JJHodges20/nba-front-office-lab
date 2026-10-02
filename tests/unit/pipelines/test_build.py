@@ -98,7 +98,7 @@ class TestBuild:
         assert first["lab_version"] == __version__
         assert (first["build_errors"], first["build_notes"]) == (0, 3)
         # The fixture holds player logs for two teams only, so two checks fail on it.
-        assert (first["check_errors"], first["check_warnings"]) == (2, 3)
+        assert (first["check_errors"], first["check_warnings"]) == (2, 5)
         assert first["status"] == "problems"
 
     def test_a_build_with_problems_still_loads_and_says_so(

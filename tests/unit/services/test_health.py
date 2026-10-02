@@ -17,6 +17,7 @@ from front_office.services.health import (
     OK,
     STALE,
     WARNING,
+    _detail_gap,
     _missing_between,
     describe_age,
 )
@@ -25,7 +26,11 @@ TODAY = date(2026, 10, 1)
 
 
 def newest_fetch(lab: Lab) -> datetime:
-    return pd.Timestamp(lab.read("raw_snapshots")["fetched_at"].max()).to_pydatetime()
+    """When stats.nba.com was last fetched. A contract file is imported at the moment the
+    test runs, so its snapshot says nothing about the fixture store's age."""
+    snapshots = lab.read("raw_snapshots")
+    held = snapshots[snapshots["source"] == "nba_stats"]
+    return pd.Timestamp(held["fetched_at"].max()).to_pydatetime()
 
 
 def attempt(status: str, minutes: int, *, error: str | None = None) -> dict:
@@ -189,9 +194,9 @@ class TestIssuesAndChecks:
 
     def test_checks_list_failures_first_errors_before_warnings(self, lab: Lab) -> None:
         checks = lab.health.checks()
-        assert len(checks) == 45
+        assert len(checks) == 52
         failed = checks[~checks["passed"]]
-        assert checks["passed"].tolist() == [False] * len(failed) + [True] * (45 - len(failed))
+        assert checks["passed"].tolist() == [False] * len(failed) + [True] * (52 - len(failed))
         assert failed["severity"].tolist() == sorted(failed["severity"].tolist())
         assert "error" in set(failed["severity"]) and "warning" in set(failed["severity"])
 
@@ -235,6 +240,18 @@ class TestGaps:
         assert messages["Current season"] == (
             "2026-27 has no games in the data yet; the newest season with statistics is 2025-26."
         )
+
+    def test_player_detail_that_starts_later_than_player_statistics_is_a_known_limit(
+        self,
+    ) -> None:
+        history = ["1996-97", "1997-98", "2023-24", "2024-25", "2025-26"]
+        gap = _detail_gap(history, ["2023-24", "2024-25", "2025-26"])
+        assert gap is not None and (gap.area, gap.severity) == ("Player detail", INFO)
+        assert gap.message.startswith("Rosters and on/off splits cover 2023-24 to 2025-26.")
+        # Covering every season of player statistics, or having none, is not a gap here.
+        assert _detail_gap(history, history) is None
+        assert _detail_gap(history, []) is None
+        assert _detail_gap([], []) is None
 
     def test_with_contracts_the_gap_is_the_seasons_without_a_cap(self, contract_lab) -> None:
         gaps = {gap.area: gap for gap in contract_lab.health.gaps(today=TODAY)}

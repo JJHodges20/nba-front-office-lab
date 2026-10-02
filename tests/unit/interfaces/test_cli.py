@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import shutil
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,9 +16,13 @@ from front_office.interfaces.cli.app import app, money
 from front_office.pipelines.ingest import Ingestor, RefreshPolicy
 from front_office.rawstore import RawStore
 from tests.conftest import FIXTURE_RAW
-from tests.helpers import Clock, D, FakeProvider
+from tests.helpers import FETCHED_AT, Clock, D, FakeProvider
 
 runner = CliRunner()
+
+# An hour after the fixture store was fetched: inside its refresh window, whatever the
+# day the tests run on.
+NOW = FETCHED_AT + timedelta(hours=1)
 
 
 @pytest.fixture(autouse=True)
@@ -105,7 +109,7 @@ class TestIngest:
 
     @pytest.fixture
     def provider(self, project: Path, monkeypatch: pytest.MonkeyPatch) -> FakeProvider:
-        clock = Clock(datetime.now(UTC))
+        clock = Clock(NOW)
         fake = FakeProvider(clock=clock)
 
         def build(settings, *, force=False, on_outcome=None) -> Ingestor:
@@ -152,9 +156,12 @@ class TestIngest:
         standings = [partition["season"] for partition in self.requested(provider, "standings")]
         assert standings[0] == "1996-97"
         assert len(standings) >= 31
+        # League-wide player statistics for every season of history ...
         with_players = {p["season"] for p in self.requested(provider, "player_season_base")}
-        assert len(with_players) == 4  # the current league year and three before it
-        assert max(with_players) == standings[-1]
+        assert with_players == set(standings)
+        # ... and team-by-team detail for the current league year and three before it.
+        with_detail = {p["season"] for p in self.requested(provider, "team_roster")}
+        assert len(with_detail) == 4 and max(with_detail) == standings[-1]
         assert self.requested(provider, "team_years") == [{}]
 
     def test_a_second_run_skips_what_is_already_stored(self, provider: FakeProvider) -> None:
@@ -212,8 +219,9 @@ class TestRawAndCheck:
         assert "team_seasons" in result.output and "7,792" in result.output
         assert "note  team_games [2012-13]" in result.output
         assert "warning  team_games.points_add_up: 2 of 7,792 failed" in result.output
-        assert "error  player_game_logs.points_sum_to_team_points" in result.output
-        assert "3 with warnings, 2 with errors; 0 table parts not built" in result.output
+        assert "warning  player_game_logs.points_sum_to_team_points" in result.output
+        assert "error  player_game_logs.points_close_to_team_points" in result.output
+        assert "5 with warnings, 2 with errors; 0 table parts not built" in result.output
 
     def test_check_on_an_empty_store_reports_what_is_missing(self) -> None:
         result = runner.invoke(app, ["check"])
@@ -376,7 +384,7 @@ class TestDatabaseCommands:
         assert "team_games" in result.output and "7,792" in result.output
         assert "Build 1 finished" in result.output
         assert "(problems)" in result.output
-        assert "2 check errors, 3 check warnings" in result.output
+        assert "2 check errors, 5 check warnings" in result.output
         assert "different version" not in result.output
 
     def test_a_build_that_would_empty_a_table_is_refused(
@@ -404,7 +412,7 @@ class TestDatabaseCommands:
     ) -> None:
         from front_office.storage import Database, OperationsLog
 
-        clock = Clock(datetime.now(UTC))
+        clock = Clock(NOW)
         fake = FakeProvider(clock=clock)
         fake.fail = {D.TEAM_SEASON_ADVANCED}
 
@@ -429,7 +437,7 @@ class TestDatabaseCommands:
         assert set(everything["status"]) == {"stored", "failed"}
 
     def test_refresh_fetches_then_builds(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        clock = Clock(datetime.now(UTC))
+        clock = Clock(NOW)
         fake = FakeProvider(clock=clock)
         calls: list[str] = []
 
@@ -451,7 +459,7 @@ class TestDatabaseCommands:
         assert "requests:" in result.output
 
     def test_refresh_still_builds_when_a_fetch_fails(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        clock = Clock(datetime.now(UTC))
+        clock = Clock(NOW)
         fake = FakeProvider(clock=clock)
         fake.fail = {D.TEAM_SEASON_OPPONENT}
         built: list[bool] = []
@@ -580,3 +588,127 @@ class TestUi:
         assert cli._open_when_ready("http://localhost:8501", patience=1) is True
         assert asked == ["http://localhost:8501/_stcore/health"]
         assert opened == ["http://localhost:8501"]
+
+
+class TestValueCommands:
+    """fol value fit and fol value show, on the invented league."""
+
+    SPEC_FILE = 'first_test_season: "2004-05"\nresamples: 100\n'
+
+    @pytest.fixture
+    def model_file(self, project: Path) -> Path:
+        return project / "configs" / "models" / "player_value.json"
+
+    @pytest.fixture
+    def league_lab(self, project: Path, model_file: Path) -> None:
+        """The invented league in the database, a specification that fits it, no model."""
+        from front_office.domain.value_model import ValueSpec
+        from tests.synthetic_lab import write_lab
+        from tests.value_reference import planted_league
+
+        (project / "configs" / "models" / "player_value.yaml").write_text(
+            self.SPEC_FILE, encoding="utf-8"
+        )
+        model_file.unlink()
+        write_lab(project, planted_league(ValueSpec(first_test_season="2004-05")))
+
+    def test_show_prints_the_shipped_model_and_its_evidence(self) -> None:
+        result = runner.invoke(app, ["value", "show"])
+        assert result.exit_code == 0, result.output
+        assert "Revision " in result.output and "Fitted on " in result.output
+        assert "each predicted from the seasons before it" in result.output
+        for heading in (
+            "Predicting a team's net rating, out of sample",
+            "The value model with one part left out",
+            "Weights, with 95% intervals from resampling seasons",
+        ):
+            assert heading in result.output
+        for row in ("Value model", "Players' PIE", "Team results", "score_eff", "new_player"):
+            assert row in result.output, row
+        assert "Replacement level -" in result.output
+        assert "Next season's share of team minutes: RMSE" in result.output
+
+    def test_show_without_a_model_says_how_to_fit_one(self, model_file: Path) -> None:
+        model_file.unlink()
+        result = runner.invoke(app, ["value", "show"])
+        assert result.exit_code == 1
+        assert "No value model has been fitted" in result.output
+        assert "Run: fol value fit --write" in result.output
+
+    def test_fit_shows_the_model_and_saves_nothing_unless_asked(
+        self, league_lab: None, model_file: Path
+    ) -> None:
+        result = runner.invoke(app, ["value", "fit"])
+        assert result.exit_code == 0, result.output
+        # 110 players a season for nine seasons, less the one a season with nothing counted.
+        assert (
+            "Fitted on 80 team-seasons and 981 player-seasons, 2000-01 to 2008-09." in result.output
+        )
+        assert "Tested on 50 team-seasons, 2004-05 to 2008-09" in result.output
+        assert "Not saved. To save it as revision 1: fol value fit --write" in result.output
+        assert not model_file.exists()
+
+    def test_fit_write_saves_the_model_and_says_how_to_apply_it(
+        self, league_lab: None, model_file: Path
+    ) -> None:
+        result = runner.invoke(app, ["value", "fit", "--write"])
+        assert result.exit_code == 0, result.output
+        flat = " ".join(result.output.split())
+        assert "(revision 1). To apply it: fol build" in flat
+        assert model_file.is_file()
+        shown = runner.invoke(app, ["value", "show"])
+        assert shown.exit_code == 0 and "Revision 1, fitted " in shown.output
+
+    def test_fitting_again_without_a_change_writes_nothing(
+        self, league_lab: None, model_file: Path
+    ) -> None:
+        assert runner.invoke(app, ["value", "fit", "--write"]).exit_code == 0
+        written = model_file.read_text(encoding="utf-8")
+        result = runner.invoke(app, ["value", "fit", "--write"])
+        assert result.exit_code == 0, result.output
+        assert "The same as revision 1, already on file. Nothing to write." in result.output
+        assert model_file.read_text(encoding="utf-8") == written
+
+    def test_a_changed_specification_becomes_the_next_revision(
+        self, league_lab: None, project: Path, model_file: Path
+    ) -> None:
+        assert runner.invoke(app, ["value", "fit", "--write"]).exit_code == 0
+        (project / "configs" / "models" / "player_value.yaml").write_text(
+            self.SPEC_FILE + "ballast_minutes: 1500\n", encoding="utf-8"
+        )
+        preview = runner.invoke(app, ["value", "fit"])
+        assert "Not saved. To save it as revision 2" in preview.output
+        assert '"revision": 1' in model_file.read_text(encoding="utf-8")
+        result = runner.invoke(app, ["value", "fit", "--write"])
+        assert "(revision 2)" in " ".join(result.output.split())
+        assert '"revision": 2' in model_file.read_text(encoding="utf-8")
+
+    def test_fit_before_anything_is_built_says_so_and_creates_nothing(self, project: Path) -> None:
+        result = runner.invoke(app, ["value", "fit"])
+        assert result.exit_code == 1
+        assert "Error: the database has not been built; run: fol refresh" in result.output
+        assert not (project / "data" / "front_office.sqlite").exists()
+
+    def test_fit_on_data_that_cannot_support_it_says_what_is_missing(
+        self, project: Path, built_template
+    ) -> None:
+        (project / "data").mkdir(exist_ok=True)
+        for path in (built_template[0] / "data").glob("front_office.sqlite*"):
+            shutil.copy(path, project / "data" / path.name)
+        result = runner.invoke(app, ["value", "fit", "--write"])
+        assert result.exit_code == 1
+        assert "Error: the value model is tested from 2006-07 and needs at least 3" in " ".join(
+            result.output.split()
+        )
+
+    def test_an_invalid_specification_is_reported(self, league_lab: None, project: Path) -> None:
+        (project / "configs" / "models" / "player_value.yaml").write_text(
+            "ballast_minutes: 0\n", encoding="utf-8"
+        )
+        result = runner.invoke(app, ["value", "fit"])
+        assert result.exit_code == 1
+        assert "invalid value model specification" in result.output
+
+    def test_value_alone_lists_its_commands(self) -> None:
+        result = runner.invoke(app, ["value"])
+        assert "fit" in result.output and "show" in result.output

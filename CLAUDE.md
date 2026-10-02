@@ -21,6 +21,8 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe check                     # normalise the raw store + run quality checks
 .\.venv\Scripts\fol.exe build                     # rebuild data\front_office.sqlite from the raw store
 .\.venv\Scripts\fol.exe db                        # row counts and the last build's result
+.\.venv\Scripts\fol.exe value show                # the fitted player value model and its evidence
+.\.venv\Scripts\fol.exe value fit --write         # fit it again on the built database (then: fol build)
 .\.venv\Scripts\fol.exe ui --no-browser           # the workbench at http://localhost:8501 (Ctrl+C stops it)
 .\.venv\Scripts\python.exe scripts\make_fixtures.py   # rebuild tests/fixtures/raw from data/raw
 ```
@@ -67,11 +69,23 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   and `docs/research/BENCHMARKS.md` come from `fol dictionary|metrics|benchmarks --write`.
   The first two are checked by tests; the third depends on the database, so regenerate
   it at a milestone gate after the data or the research code changes.
+- **A model is fitted on request and applied by every build.** `fol value fit --write`
+  writes `configs/models/player_value.json`; `fol build` applies it and never fits. Do
+  not edit that file, and do not fit inside a build, a service or a page. Changing
+  `configs/models/player_value.yaml`, a feature or a term changes nothing until the
+  model is fitted again - and a test fails until it is
+  (`docs/decisions/0010-player-value.md`).
+- **A model earns its place out of sample.** Anything added to the value model is run
+  through the expanding-window test against the model without it, and stays only if
+  the difference is clear of zero. Record what was tried and left out in the decision.
+- **Modeled values are estimates on screen too**: impact, projections and wins carry
+  the modeled tag, and a weight is shown with its interval or not at all.
 - **Source quirks get a rule, a note and a test.** Never repair data silently inside a
   normaliser (`docs/decisions/0003-source-quirks.md`).
-- **Rebuilt versus kept tables.** Every build drops and rewrites the league tables. The
-  user's rosters and the fetch/build history are kept and must never be put in the
-  rebuilt group (`domain/tables/__init__.py`, `docs/decisions/0005-database.md`).
+- **Rebuilt versus kept tables.** Every build drops and rewrites the league tables and
+  the modeled tables computed from them. The user's rosters and the fetch/build history
+  are kept and must never be put in the rebuilt group (`domain/tables/__init__.py`,
+  `docs/decisions/0005-database.md`).
 - **Only `storage` touches SQL.** Other layers call `Warehouse`, `RosterRepository` or
   `OperationsLog`. Always open a `Database` in a `with` block: on Windows an open
   connection keeps the file locked.
@@ -121,6 +135,10 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
 - Tests never touch the real `data/` directory: use the `project` / `settings` fixtures.
 - `tests/fixtures/raw` is a miniature raw store of real responses. The `raw`,
   `normalized` and `tables` fixtures read it; `tables` is a private copy a test may break.
+- The fixture store holds one season of players for two teams, so nothing can be fitted
+  on it. `tests/league.py` invents a league of many seasons whose team ratings a test
+  plants; `tests/value_reference.py` computes the value model on it with plain loops, as
+  an independent answer; `tests/synthetic_lab.py` loads it into a database.
 - stats.nba.com adds and drops response columns between seasons: select by name, list
   what you need in `required=`, never index by position.
 - When patching files from a shell heredoc, backslashes get mangled. Use the editor

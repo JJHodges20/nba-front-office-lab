@@ -118,6 +118,32 @@ class TestDefaultPlan:
         assert plan.seasons[-1] == Season(2026)
         assert len(plan.seasons) == 31
 
+    def test_player_statistics_cover_the_whole_history(self, settings: Settings) -> None:
+        plan = default_plan(settings, date(2026, 10, 1))
+        assert plan.player_stats == frozenset(plan.seasons)
+        assert plan.player_detail < plan.player_stats
+
+    def test_player_statistics_can_start_later_than_team_history(self, project: Path) -> None:
+        from front_office.config import load_settings
+
+        (project / "configs" / "base.yaml").write_text(
+            "seasons:\n  player_history_start: '2020-21'\n", encoding="utf-8"
+        )
+        plan = default_plan(load_settings(project), date(2026, 10, 1))
+        assert plan.seasons[0] == Season(1996)
+        assert min(plan.player_stats) == Season(2020) and len(plan.player_stats) == 7
+        assert min(plan.player_detail) == Season(2023)
+
+    def test_player_statistics_that_start_in_the_future_are_none_yet(self, project: Path) -> None:
+        from front_office.config import load_settings
+
+        (project / "configs" / "base.yaml").write_text(
+            "seasons:\n  player_history_start: '2030-31'\n", encoding="utf-8"
+        )
+        plan = default_plan(load_settings(project), date(2026, 10, 1))
+        assert plan.player_stats == frozenset() and plan.player_detail == frozenset()
+        assert len(plan.seasons) == 31
+
     def test_player_detail_covers_the_current_year_and_the_configured_seasons_before_it(
         self, settings: Settings
     ) -> None:
@@ -214,6 +240,26 @@ class TestIngestor:
             (D.TEAM_ON_OFF, TEAMS[1]),
         ]
         assert {outcome.status for outcome in outcomes} == {FetchStatus.STORED}
+
+    def test_player_statistics_without_the_team_by_team_detail(
+        self, store: RawStore, clock: Clock
+    ) -> None:
+        provider = FakeProvider(clock=clock)
+        outcomes = ingestor(provider, store, clock).ingest_season(
+            Season(2010), players=True, detail=False
+        )
+        fetched = {outcome.request.dataset for outcome in outcomes}
+        assert {D.PLAYER_SEASON_BASE, D.PLAYER_SEASON_ADVANCED, D.PLAYER_GAME_LOGS} <= fetched
+        assert not {D.TEAM_ROSTER, D.TEAM_ON_OFF} & fetched
+        assert not [o for o in outcomes if o.request.team_id is not None]
+        assert len(outcomes) == 6 + 8  # team data, then four player datasets in two phases
+
+    def test_detail_needs_player_statistics(self, store: RawStore, clock: Clock) -> None:
+        provider = FakeProvider(clock=clock)
+        outcomes = ingestor(provider, store, clock).ingest_season(
+            Season(2025), players=False, detail=True
+        )
+        assert not [o for o in outcomes if o.request.team_id is not None]
 
     def test_on_off_is_not_requested_before_games_are_played(
         self, store: RawStore, clock: Clock

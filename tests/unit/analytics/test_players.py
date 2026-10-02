@@ -17,6 +17,7 @@ from front_office.analytics.players import (
     player_season_metrics,
     recent_availability,
     rolling_metrics,
+    team_minutes,
     window_metrics,
     window_totals,
 )
@@ -420,3 +421,89 @@ def test_true_shooting_in_metrics_is_the_formula(metrics, regular) -> None:
     """The metric table calls the formula module; it does not carry its own copy."""
     expected = f.true_shooting_pct(regular["pts"], regular["fga"], regular["fta"])
     pd.testing.assert_series_equal(metrics["ts_pct"], expected, check_names=False)
+
+
+class TestTeamMinutes:
+    """A season's minutes divided between the teams a player appeared for."""
+
+    def seasons(self, *rows: tuple[int, int, float]) -> pd.DataFrame:
+        columns = ["player_id", "team_id", "minutes"]
+        return pd.DataFrame(rows, columns=columns).assign(season="2025-26", season_type="regular")
+
+    def logs(self, *rows: tuple[int, int, int]) -> pd.DataFrame:
+        """(player, team, minutes) for one game each."""
+        frame = pd.DataFrame(rows, columns=["player_id", "team_id", "minutes"])
+        return frame.assign(
+            season="2025-26",
+            season_type="regular",
+            game_id=[f"{number:010d}" for number in range(len(frame))],
+        )
+
+    def minutes(self, seasons: pd.DataFrame, logs: pd.DataFrame) -> dict[tuple[int, int], float]:
+        found = team_minutes(seasons, logs)
+        assert not found.duplicated(["player_id", "season", "season_type", "team_id"]).any()
+        return {(row.player_id, row.team_id): row.minutes for row in found.itertuples()}
+
+    def test_a_player_who_stayed_put_keeps_the_published_minutes(self) -> None:
+        # The log rounds each game to the whole minute; the season total does not.
+        found = self.minutes(self.seasons((7, BOS, 71.4)), self.logs((7, BOS, 36), (7, BOS, 35)))
+        assert found == {(7, BOS): 71.4}
+
+    def test_a_traded_player_is_divided_in_proportion_to_the_logged_minutes(self) -> None:
+        logs = self.logs((7, BOS, 30), (7, BOS, 30), (7, NYK, 20))
+        found = self.minutes(self.seasons((7, NYK, 82.0)), logs)
+        assert found == {(7, BOS): pytest.approx(61.5), (7, NYK): pytest.approx(20.5)}
+        assert sum(found.values()) == pytest.approx(82.0)
+
+    def test_logged_minutes_that_are_missing_do_not_lose_published_ones(self) -> None:
+        # Some box scores of 2005-07 credit players with a fraction of what they played.
+        logs = self.logs((7, BOS, 30), (7, NYK, 10))
+        found = self.minutes(self.seasons((7, NYK, 120.0)), logs)
+        assert found == {(7, BOS): pytest.approx(90.0), (7, NYK): pytest.approx(30.0)}
+
+    def test_a_player_logged_at_zero_minutes_is_divided_by_games(self) -> None:
+        logs = self.logs((7, BOS, 0), (7, BOS, 0), (7, NYK, 0))
+        found = self.minutes(self.seasons((7, NYK, 1.5)), logs)
+        assert found == {(7, BOS): pytest.approx(1.0), (7, NYK): pytest.approx(0.5)}
+
+    def test_a_player_with_no_log_goes_to_the_team_the_season_names(self) -> None:
+        found = self.minutes(self.seasons((7, NYK, 300.0)), self.logs((8, BOS, 30)))
+        assert found == {(7, NYK): 300.0}
+
+    def test_a_log_without_a_season_line_is_not_a_stint(self) -> None:
+        found = self.minutes(self.seasons((7, NYK, 300.0)), self.logs((7, NYK, 30), (8, BOS, 30)))
+        assert set(found) == {(7, NYK)}
+
+    def test_seasons_and_phases_are_divided_apart(self) -> None:
+        seasons = pd.concat(
+            [
+                self.seasons((7, NYK, 100.0)),
+                self.seasons((7, BOS, 40.0)).assign(season_type="playoffs"),
+            ]
+        )
+        logs = pd.concat(
+            [
+                self.logs((7, BOS, 10), (7, NYK, 30)),
+                self.logs((7, BOS, 40)).assign(season_type="playoffs", game_id="P1"),
+            ]
+        )
+        found = team_minutes(seasons, logs).set_index(["season_type", "team_id"])["minutes"]
+        assert found.to_dict() == {
+            ("regular", BOS): pytest.approx(25.0),
+            ("regular", NYK): pytest.approx(75.0),
+            ("playoffs", BOS): pytest.approx(40.0),
+        }
+
+    def test_on_the_fixture_every_published_minute_is_assigned_once(self, normalized) -> None:
+        seasons, logs = normalized["player_seasons"], normalized["player_game_logs"]
+        found = team_minutes(seasons, logs)
+        assert str(found["team_id"].dtype) == "int64"
+        keys = ["player_id", "season", "season_type"]
+        summed = found.groupby(keys)["minutes"].sum()
+        published = seasons.set_index(keys)["minutes"]
+        assert len(summed) == len(published)
+        assert (summed - published.reindex(summed.index)).abs().max() < 1e-9
+        # A traded player has one row for each team: the season line counts the teams.
+        teams = found.groupby(keys).size()
+        assert (teams == seasons.set_index(keys)["team_count"].reindex(teams.index)).all()
+        assert teams.max() >= 2

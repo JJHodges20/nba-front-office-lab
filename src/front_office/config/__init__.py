@@ -1,9 +1,16 @@
-"""Config layer: settings, season rules and eras read from ``configs/``.
+"""Config layer: settings, season rules, eras and models read from ``configs/``.
 
 Depends only on the domain layer. This is the only place YAML is parsed.
 """
 
 from front_office.config.eras import eras_path, load_eras
+from front_office.config.models import (
+    load_value_model,
+    load_value_spec,
+    save_value_model,
+    value_model_path,
+    value_spec_path,
+)
 from front_office.config.season_rules import (
     SeasonRulesNotFound,
     configured_seasons,
@@ -28,4 +35,9 @@ __all__ = [
     "load_eras",
     "load_season_rules",
     "load_settings",
+    "load_value_model",
+    "load_value_spec",
+    "save_value_model",
+    "value_model_path",
+    "value_spec_path",
 ]

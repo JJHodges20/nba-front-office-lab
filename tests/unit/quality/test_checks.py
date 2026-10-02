@@ -11,17 +11,20 @@ import pandas as pd
 import pytest
 
 from front_office.domain.schema import DType, Field, Provenance, TableContract
+from front_office.domain.tables.value import PLAYER_VALUE_SCORES
 from front_office.pipelines.normalize import NBA_STATS_TABLES
 from front_office.quality import Check, Severity, all_checks, reference_checks, run_checks
 from front_office.quality.checks import CHECKS, MAX_EXAMPLES
 
 BOS, NYK = 1610612738, 1610612752
 
-# The fixture keeps player logs only for players of two teams, so these two checks, which
+# The fixture keeps player logs only for players of two teams, so these checks, which
 # need every player of every team, cannot pass on it. They are tested on a complete
 # subset below.
 NEEDS_FULL_PLAYER_LOGS = {
     "player_game_logs.points_sum_to_team_points",
+    "player_game_logs.points_close_to_team_points",
+    "player_game_logs.minutes_sum_to_team_minutes",
     "player_game_logs.logged_games_have_players",
 }
 # Real source glitches present in the fixture's 1996-97 season.
@@ -78,6 +81,8 @@ class TestBaseline:
             assert result.examined == 0
 
     def test_default_checks_are_the_cross_table_ones(self, tables) -> None:
+        # Every table a build produces, the modeled one included.
+        tables["player_value_scores"] = PLAYER_VALUE_SCORES.empty_frame()
         assert len(run_checks(tables)) == len(CHECKS)
 
 
@@ -339,6 +344,56 @@ class TestPlayers:
         tables["player_game_logs"] = logs.drop(index=logs.index[0])
         assert failures(tables, "player_seasons.games_and_points_match_logs") == 1
 
+    def test_a_basket_or_a_game_apart_is_the_source_and_only_a_warning(self, tables) -> None:
+        # What the league's own records do in 46 player-seasons of thirty: its season
+        # totals and its box scores are corrected separately.
+        seasons = tables["player_seasons"]
+        seasons.loc[seasons.index[0], "pts"] += 4
+        seasons.loc[seasons.index[1], "games_played"] += 1
+        found = results(tables)
+        exact = found["player_seasons.games_and_points_match_logs"]
+        assert (exact.failures, exact.severity) == (2, Severity.WARNING)
+        close = found["player_seasons.games_and_points_close_to_logs"]
+        assert (close.failures, close.severity) == (0, Severity.ERROR)
+
+    @pytest.mark.parametrize(
+        ("column", "by", "caught"),
+        [
+            ("games_played", 1, False),
+            ("games_played", 2, True),
+            ("games_played", -2, True),
+            ("pts", 5, False),
+            ("pts", 6, True),
+            ("pts", -6, True),
+        ],
+    )
+    def test_further_apart_than_the_source_ever_is_is_an_error(
+        self, tables, column: str, by: int, caught: bool
+    ) -> None:
+        seasons = tables["player_seasons"]
+        # A light scorer, so the allowance is the five points and not the two per cent.
+        row = seasons.index[(seasons["pts"] > 20) & (seasons["pts"] < 200)][0]
+        seasons.loc[row, column] += by
+        assert failures(tables, "player_seasons.games_and_points_close_to_logs") == int(caught)
+
+    def test_a_heavy_scorer_is_allowed_two_per_cent(self, tables) -> None:
+        seasons = tables["player_seasons"]
+        row = seasons["pts"].idxmax()
+        points = int(seasons.loc[row, "pts"])
+        assert points > 1500
+        seasons.loc[row, "pts"] = points + int(points * 0.02 / 1.02)
+        assert failures(tables, "player_seasons.games_and_points_close_to_logs") == 0
+        seasons.loc[row, "pts"] = points + int(points * 0.03)
+        assert failures(tables, "player_seasons.games_and_points_close_to_logs") == 1
+
+    def test_a_player_whose_log_is_missing_altogether_is_an_error(self, tables) -> None:
+        logs, seasons = tables["player_game_logs"], tables["player_seasons"]
+        player = seasons.loc[seasons["games_played"] > 0, "player_id"].iloc[0]
+        tables["player_game_logs"] = logs[logs["player_id"] != player]
+        lost = int((seasons["player_id"] == player).sum())
+        assert failures(tables, "player_seasons.games_and_points_close_to_logs") == lost
+        assert failures(tables, "player_seasons.games_and_points_match_logs") == lost
+
     def test_minutes_within_rounding_pass(self, tables) -> None:
         seasons = tables["player_seasons"]
         row = seasons.index[seasons["games_played"] >= 20][0]
@@ -393,8 +448,40 @@ class TestPlayerLogsAgainstTeamGames:
         logs = complete["player_game_logs"]
         logs.loc[logs.index[0], "pts"] += 1
         result = results(complete)["player_game_logs.points_sum_to_team_points"]
-        assert result.failures == 1
+        assert (result.failures, result.severity) == (1, Severity.WARNING)
         assert "player_pts=" in result.examples[0]
+        assert failures(complete, "player_game_logs.points_close_to_team_points") == 0
+
+    @pytest.mark.parametrize(("by", "caught"), [(10, False), (11, True), (-11, True)])
+    def test_points_far_from_the_team_score_are_an_error(
+        self, complete, by: int, caught: bool
+    ) -> None:
+        # The source's worst is seven: a player listed with the opponent in 1996.
+        logs = complete["player_game_logs"]
+        row = logs.index[logs["pts"] >= 11][0]
+        logs.loc[row, "pts"] += by
+        result = results(complete)["player_game_logs.points_close_to_team_points"]
+        assert (result.failures, result.severity) == (int(caught), Severity.ERROR)
+        assert failures(complete, "player_game_logs.points_sum_to_team_points") == 1
+
+    def test_minutes_are_allowed_half_a_minute_a_player(self, complete) -> None:
+        logs = complete["player_game_logs"]
+        game, team = logs["game_id"].iloc[0], logs["team_id"].iloc[0]
+        rows = logs.index[(logs["game_id"] == game) & (logs["team_id"] == team)]
+        games = complete["team_games"]
+        played = games.loc[(games["game_id"] == game) & (games["team_id"] == team), "minutes"]
+        # Put the players exactly on the team's minutes, then move one player.
+        logs.loc[rows, "minutes"] = 0
+        logs.loc[rows[0], "minutes"] = int(played.iloc[0])
+        check = "player_game_logs.minutes_sum_to_team_minutes"
+        before = failures(complete, check)
+        allowed = len(rows) // 2
+        logs.loc[rows[0], "minutes"] += allowed
+        assert failures(complete, check) == before
+        logs.loc[rows[0], "minutes"] += 1
+        result = results(complete)[check]
+        assert (result.failures, result.severity) == (before + 1, Severity.WARNING)
+        assert f"players={len(rows)}" in result.examples[0]
 
     def test_a_team_game_without_player_rows_is_reported(self, complete) -> None:
         logs = complete["player_game_logs"]

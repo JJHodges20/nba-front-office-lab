@@ -32,7 +32,19 @@ def test_paths_resolve_against_the_project_root(project: Path) -> None:
 def test_shipped_defaults(project: Path) -> None:
     settings = load_settings(project)
     assert settings.history_start.label == "1996-97"
+    assert settings.player_history_start.label == "1996-97"
     assert settings.seasons.player_detail_seasons == 3
+
+
+def test_player_history_follows_team_history_unless_it_starts_later(project: Path) -> None:
+    write_base(project, "seasons:\n  history_start: '2010-11'\n")
+    assert load_settings(project).player_history_start.label == "2010-11"
+    write_base(project, "seasons:\n  history_start: '2010-11'\n  player_history_start: '2015-16'\n")
+    settings = load_settings(project)
+    assert (settings.history_start.label, settings.player_history_start.label) == (
+        "2010-11",
+        "2015-16",
+    )
 
 
 def test_data_dir_can_be_overridden_by_environment(
@@ -62,6 +74,8 @@ def test_an_empty_base_file_uses_defaults(project: Path) -> None:
         "paths:\n  data_dirr: data\n",  # misspelt key
         "seasons:\n  history_start: '1996'\n",  # not a season label
         "seasons:\n  player_detail_seasons: 0\n",
+        "seasons:\n  player_history_start: '1990-91'\n",  # before the teams' history
+        "seasons:\n  player_history_start: 'recent'\n",
         "- just\n- a list\n",
         "paths: [unclosed\n",
     ],

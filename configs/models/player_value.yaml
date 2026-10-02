@@ -1,0 +1,32 @@
+# How the player value model is fitted. Nothing here is a weight: the data chooses the
+# weights. These are the choices a person makes first, and each was checked against the
+# out-of-sample test before it was written down (docs/research/PLAYER_VALUE.md).
+#
+# Editing this file changes nothing until the model is fitted again:
+#   fol value fit --write
+
+# How a player's earlier seasons are pooled, newest first: the weight of each minute.
+# Last season counts in full, the one before for half, the one before that a quarter.
+season_weights: [1.0, 0.5, 0.25]
+
+# Minutes of an unknown player mixed into every estimate. A player's own numbers get
+# half the say at this many weighted minutes. Anything from 500 to 1,000 tests the same.
+ballast_minutes: 750
+
+# The age at which the age term is zero: about the league's minutes-weighted mean age.
+age_centre: 27
+
+# First season predicted out of sample. Every earlier season is only ever training.
+first_test_season: "2006-07"
+
+# Replacement level is measured on players outside their team's top this-many in
+# minutes: the players a team can find without giving anything up.
+replacement_rank: 10
+
+# Wins per point of net rating are fitted on a season and this many either side.
+wins_window: 2
+
+# Intervals come from resampling whole seasons this many times.
+resamples: 2000
+seed: 0
+confidence: 0.95

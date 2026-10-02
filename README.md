@@ -52,10 +52,11 @@ python -m venv .venv
 .\.venv\Scripts\fol.exe ui          # open the workbench in your browser
 ```
 
-The first `fol refresh` makes about 440 requests and takes roughly ten minutes: team
-data for every season since 1996-97, and player detail for the current league year and
-the three seasons before it. Later runs fetch only what is new. Rebuilding the database
-takes about twenty seconds and never touches rosters you have built.
+The first `fol refresh` makes about 650 requests and takes roughly fifteen minutes: team
+and player statistics for every season since 1996-97, and team-by-team detail (rosters,
+on/off splits) for the current league year and the three seasons before it. Later runs
+fetch only what is new. Rebuilding the database takes about a minute and never touches
+rosters you have built.
 
 ### The workbench
 

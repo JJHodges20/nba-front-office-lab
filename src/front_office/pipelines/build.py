@@ -1,7 +1,8 @@
 """Rebuild the database from the raw store.
 
-A build normalises the raw store, runs every quality check, and then replaces the league
-tables and the build's own report in a single transaction. The workbench therefore
+A build normalises the raw store, applies the fitted models, runs every quality check,
+and then replaces the league tables, the modeled tables and the build's own report in a
+single transaction. The workbench therefore
 always sees one complete build: the previous one until the new one commits.
 
 A build with problems still loads - current data with its problems on display is more
@@ -19,6 +20,7 @@ from datetime import UTC, datetime
 import pandas as pd
 
 from front_office import __version__
+from front_office.config.models import load_value_model
 from front_office.config.season_rules import load_all_season_rules
 from front_office.config.settings import Settings
 from front_office.domain.datasets import NBA_STATS
@@ -59,7 +61,7 @@ def build_database(
     started = now()
     store = RawStore(settings.raw_dir)
     season_rules = list(load_all_season_rules(settings.season_rules_dir).values())
-    data = check_store(store, season_rules)
+    data = check_store(store, season_rules, load_value_model(settings.config_dir))
 
     frames = dict(data.tables.frames)
     frames[BUILD_ISSUES.name] = issues_frame(data.tables.issues)

@@ -21,11 +21,19 @@ from rich.table import Table
 from rich.text import Text
 
 from front_office import __version__
-from front_office.config import ConfigError, Settings, load_all_season_rules, load_settings
+from front_office.config import (
+    ConfigError,
+    Settings,
+    load_all_season_rules,
+    load_settings,
+    load_value_model,
+    value_model_path,
+)
 from front_office.config.settings import ENV_HOME
 from front_office.domain import PayrollLine, Season
 from front_office.domain.dictionary import render_data_dictionary
 from front_office.domain.tables import ALL_TABLES, PLANNED_TABLES
+from front_office.domain.value_model import Comparison, ValueModel
 from front_office.pipelines.build import build_database, database_status, log_fetches
 from front_office.pipelines.check import CheckSeverity, DataReport, check_raw_data
 from front_office.pipelines.contracts import (
@@ -41,6 +49,7 @@ from front_office.pipelines.ingest import (
     default_plan,
 )
 from front_office.pipelines.inventory import raw_inventory
+from front_office.pipelines.value import FIT_COMMAND, ValueFitError, fit_value, write_value_model
 from front_office.services import Lab, LabNotBuilt
 from front_office.services.benchmark_report import benchmark_report
 from front_office.services.glossary import METRIC_CATALOGS, metric_glossary
@@ -61,6 +70,10 @@ contracts_app = typer.Typer(
     help="Bring in player contract data from a file you supply.", no_args_is_help=True
 )
 app.add_typer(contracts_app, name="contracts")
+value_app = typer.Typer(
+    help="The player value model: fit it, test it, see what it rests on.", no_args_is_help=True
+)
+app.add_typer(value_app, name="value")
 console = Console()
 
 
@@ -103,6 +116,7 @@ def info() -> None:
     table.add_row("Data directory", escape(str(settings.data_dir)))
     table.add_row("Database", escape(str(settings.database_path)))
     table.add_row("Team history from", settings.seasons.history_start)
+    table.add_row("Player statistics from", settings.player_history_start.label)
     table.add_row("Player detail seasons", str(settings.seasons.player_detail_seasons))
     table.add_row("Cap rules configured", ", ".join(season.label for season in rules) or "none")
     console.print(table)
@@ -277,9 +291,10 @@ def _ingest(settings: Settings, season: list[str] | None, *, teams_only: bool, f
     ingestor = build_ingestor(settings, force=force, on_outcome=report)
     outcomes = ingestor.ingest_globals(plan.current)
     for one_season in chosen:
-        # A season named explicitly gets player detail unless --teams-only says otherwise.
-        players = not teams_only and (bool(season) or one_season in plan.player_detail)
-        outcomes += ingestor.ingest_season(one_season, players=players)
+        # A season named explicitly gets everything unless --teams-only says otherwise.
+        players = not teams_only and (bool(season) or one_season in plan.player_stats)
+        detail = not teams_only and (bool(season) or one_season in plan.player_detail)
+        outcomes += ingestor.ingest_season(one_season, players=players, detail=detail)
 
     counts = {status: 0 for status in FetchStatus}
     for outcome in outcomes:
@@ -536,6 +551,118 @@ def contracts_import(
     if not report.stored:
         _say("This file is identical to the last import; nothing new was stored.")
     _say("Run 'fol check' to validate the contract data against the rest.")
+
+
+@value_app.command("fit")
+def value_fit(
+    write: Annotated[
+        bool,
+        typer.Option("--write", help="Save the fitted model so that builds apply it."),
+    ] = False,
+) -> None:
+    """Fit the player value model on the built database and test it out of sample.
+
+    Without --write nothing changes: the fit is shown and thrown away.
+    """
+    try:
+        settings = load_settings()
+        report = fit_value(settings)
+    except (ConfigError, ValueFitError) as error:
+        raise _fail(error) from error
+    _print_value_model(report.model)
+    if report.previous is not None and not report.changed:
+        _say(
+            f"\nThe same as revision {report.previous.revision}, already on file. Nothing to write."
+        )
+        return
+    if not write:
+        _say(f"\nNot saved. To save it as revision {report.model.revision}: {FIT_COMMAND}")
+        return
+    target = write_value_model(settings, report.model)
+    _say(f"\nWrote {target} (revision {report.model.revision}). To apply it: fol build")
+
+
+@value_app.command("show")
+def value_show() -> None:
+    """Show the fitted player value model that builds apply, and the evidence for it."""
+    try:
+        settings = load_settings()
+        model = load_value_model(settings.config_dir)
+    except ConfigError as error:
+        raise _fail(error) from error
+    if model is None:
+        _say(f"No value model has been fitted ({value_model_path(settings.config_dir)}).")
+        _say(f"Run: {FIT_COMMAND}")
+        raise typer.Exit(code=1)
+    _say(f"Revision {model.revision}, fitted {model.fitted_at:%Y-%m-%d %H:%M} UTC.")
+    _print_value_model(model)
+
+
+def _print_value_model(model: ValueModel) -> None:
+    on, tested = model.fitted_on, model.validation
+    _say(
+        f"Fitted on {on.team_seasons:,} team-seasons and {on.player_seasons:,} player-seasons, "
+        f"{on.first_season} to {on.last_season}."
+    )
+    _say(
+        f"Tested on {tested.team_seasons:,} team-seasons, {tested.first_test_season} to "
+        f"{tested.last_test_season}, each predicted from the seasons before it."
+    )
+    confidence = f"{model.spec.confidence:.0%}"
+
+    def rows(table: Table, items: tuple[Comparison, ...]) -> None:
+        for item in items:
+            apart = "" if item.is_distinguishable else "  (not distinguishable)"
+            table.add_row(
+                item.label,
+                f"{item.rmse:.2f}",
+                f"{item.mae:.2f}",
+                f"{item.difference:+.2f} ({item.low:+.2f} to {item.high:+.2f}){apart}",
+            )
+
+    against = Table(title="Predicting a team's net rating, out of sample")
+    against.add_column("Method", style="bold")
+    against.add_column("RMSE", justify="right")
+    against.add_column("MAE", justify="right")
+    against.add_column(f"Value model's RMSE less this ({confidence} interval)")
+    against.add_row("Value model", f"{tested.net.rmse:.2f}", f"{tested.net.mae:.2f}", "")
+    rows(against, tested.baselines)
+    console.print(against)
+
+    without = Table(title="The value model with one part left out")
+    without.add_column("Left out", style="bold")
+    without.add_column("RMSE", justify="right")
+    without.add_column("MAE", justify="right")
+    without.add_column(f"RMSE less the full model's ({confidence} interval)")
+    rows(without, tested.ablations)
+    console.print(without)
+
+    weights = Table(title=f"Weights, with {confidence} intervals from resampling seasons")
+    weights.add_column("Term", style="bold")
+    for side in ("Offense", "Defense", "Both"):
+        weights.add_column(side, justify="right")
+    for term in model.terms:
+        weights.add_row(
+            term.key,
+            f"{term.offense:+.3f} ({term.offense_low:+.2f} to {term.offense_high:+.2f})",
+            f"{term.defense:+.3f} ({term.defense_low:+.2f} to {term.defense_high:+.2f})",
+            f"{term.net:+.3f} ({term.net_low:+.2f} to {term.net_high:+.2f})",
+        )
+    console.print(weights)
+
+    minutes = model.availability
+    _say(
+        f"Offense RMSE {tested.offense.rmse:.2f}, defense {tested.defense.rmse:.2f}. "
+        f"Replacement level {model.replacement_level:+.2f} per 100 possessions. A team's "
+        f"net rating is {tested.same_season.slope:.2f} times the sum of its players' "
+        f"impacts (correlation {tested.same_season.correlation:.2f})."
+    )
+    _say(
+        f"Next season's share of team minutes: RMSE {minutes.rmse:.3f} against "
+        f"{minutes.baseline_rmse:.3f} for assuming last season's share "
+        f"({minutes.difference:+.3f}, {minutes.low:+.3f} to {minutes.high:+.3f}; "
+        f"{minutes.players:,} player-seasons)."
+    )
 
 
 @app.command()

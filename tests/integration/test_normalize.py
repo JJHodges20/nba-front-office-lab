@@ -222,15 +222,17 @@ class TestCheckStore:
             "team_games.points_add_up",
             "team_seasons.ratings_are_consistent",
             "team_seasons.conference_ranks_are_distinct",
-        }
-        # The fixture holds player logs for two teams only, so the two checks that need
-        # every team's players fail on it by construction; nothing else does.
-        assert {check.check for check in report.check_errors} == {
+            # The fixture holds player logs for two teams only, so the checks that need
+            # every team's players fail on it by construction; nothing else does.
             "player_game_logs.points_sum_to_team_points",
+            "player_game_logs.minutes_sum_to_team_minutes",
+        }
+        assert {check.check for check in report.check_errors} == {
+            "player_game_logs.points_close_to_team_points",
             "player_game_logs.logged_games_have_players",
         }
         assert not report.ok
-        assert len(report.failed_checks) == 5
+        assert len(report.failed_checks) == 7
 
     def test_a_store_with_missing_data_is_not_ok(self, store: RawStore) -> None:
         remove(store, "team_season_base", "season=2012-13")

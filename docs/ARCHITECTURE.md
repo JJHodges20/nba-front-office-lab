@@ -29,19 +29,20 @@ it, and nothing else in the project.
 | Layer | Responsibility | May import |
 | --- | --- | --- |
 | `domain` | Shared vocabulary: seasons, cap-rule models, data contracts. Pure, no I/O. | nothing |
-| `config` | Settings, season rules and eras read from `configs/`. The only place YAML is parsed. | `domain` |
+| `config` | Settings, season rules, eras and model files read from `configs/`. The only place YAML is parsed. | `domain` |
 | `providers` | Adapters that retrieve data from external sources and return it unchanged. The only layer that touches the network. | `domain` |
 | `rawstore` | Immutable, timestamped snapshots of what providers returned. | `domain` |
 | `processing` | Pure functions that turn raw payloads into frames satisfying a data contract. | `domain` |
 | `storage` | Database schema (built from the data contracts) and repositories. The only layer that writes SQL. | `domain` |
 | `quality` | Data-quality checks. They report problems; they never repair data. | `domain` |
 | `analytics` | Every formula. Pure functions over frames. | `domain` |
-| `pipelines` | Orchestrates provider -> rawstore -> processing -> storage. | `domain`, `config`, `providers`, `rawstore`, `processing`, `storage`, `quality` |
-| `services` | What the UI and CLI call: repositories + analytics, returned display-ready. | `domain`, `config`, `storage`, `analytics`, `quality` |
+| `modeling` | Estimates fitted to the lab's own data and tested out of sample. Pure functions over frames. | `domain`, `analytics` |
+| `pipelines` | Orchestrates provider -> rawstore -> processing -> storage, and applies the fitted models. | `domain`, `config`, `providers`, `rawstore`, `processing`, `storage`, `quality`, `modeling` |
+| `services` | What the UI and CLI call: repositories + analytics, returned display-ready. | `domain`, `config`, `storage`, `analytics`, `quality`, `modeling` |
 | `interfaces` | The `fol` command line. Thin. | `domain`, `config`, `pipelines`, `services` |
 | `apps/` (UI) | Streamlit workbench. Displays what services return. | `domain`, `services` |
 
-The lower layers (`providers` through `analytics`) take plain values as arguments rather
+The lower layers (`providers` through `modeling`) take plain values as arguments rather
 than reading configuration themselves. Only `pipelines`, `services` and `interfaces` load
 settings, which keeps everything beneath them trivially testable.
 
