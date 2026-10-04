@@ -17,10 +17,12 @@ from front_office.config import Settings, load_all_season_rules, load_archetypes
 from front_office.domain.archetypes import ArchetypeSet
 from front_office.domain.schema import conform_frame
 from front_office.domain.tables import REBUILT_TABLES
+from front_office.domain.tables.fit import TEAM_FIT_PROFILES
 from front_office.domain.tables.value import PLAYER_ARCHETYPES, PLAYER_VALUE_SCORES
 from front_office.domain.value_model import ValueModel
 from front_office.modeling.archetypes import assign_archetypes
 from front_office.modeling.value import score_players
+from front_office.pipelines.fit import fit_profiles
 from front_office.processing.cap_rules import cap_rules_frame
 from front_office.storage import Database, OperationsLog, Warehouse
 from tests.league import SyntheticLeague
@@ -48,6 +50,7 @@ def league_frames(
         frames[PLAYER_ARCHETYPES.name] = conform_frame(
             assign_archetypes(frames, archetypes), PLAYER_ARCHETYPES
         )
+        frames[TEAM_FIT_PROFILES.name] = fit_profiles(frames, archetypes)
     return frames
 
 

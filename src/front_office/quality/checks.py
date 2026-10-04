@@ -21,6 +21,7 @@ from enum import StrEnum
 import numpy as np
 import pandas as pd
 
+from front_office.domain.fit import ROTATION_SIZE
 from front_office.domain.schema import TableContract
 from front_office.domain.tables._fields import BOX_SCORE_COLUMNS
 from front_office.domain.tables.value import PART_COLUMNS
@@ -679,6 +680,33 @@ def _one_primary_archetype(tables: Tables) -> tuple[int, pd.DataFrame]:
     return len(counts), failing
 
 
+USAGE_TOLERANCE = 0.1
+"""A real team's usage rates, weighted by minutes, add up to five players' worth. The
+league counts a player's plays per possession on the court and a traded player carries
+the usage of a whole season, so the sum lands a few percent short, never a tenth."""
+MINUTES_COVERED_TOLERANCE = 0.1
+
+
+def _usage_adds_up(tables: Tables) -> tuple[int, pd.DataFrame]:
+    fit = tables["team_fit_profiles"]
+    whole = fit[
+        (fit["minutes_covered"] >= 1 - MINUTES_COVERED_TOLERANCE) & fit["usage_sum"].notna()
+    ]
+    off = (whole["usage_sum"] - 1).abs() > USAGE_TOLERANCE
+    return len(whole), whole.loc[off, ["season", "team_id", "usage_sum"]]
+
+
+def _minutes_cover_the_season(tables: Tables) -> tuple[int, pd.DataFrame]:
+    fit = tables["team_fit_profiles"]
+    teams = tables["team_seasons"]
+    finished = teams.loc[teams["won_championship"].notna(), ["season", "team_id"]]
+    # A team whose roster is on record: at least a rotation's worth of players. Fewer is a
+    # team known only through players traded away from one that is.
+    rows = fit[fit["players"] >= ROTATION_SIZE].merge(finished, on=["season", "team_id"])
+    off = (rows["minutes_covered"] - 1).abs() > MINUTES_COVERED_TOLERANCE
+    return len(rows), rows.loc[off, ["season", "team_id", "minutes_covered"]]
+
+
 E, W = Severity.ERROR, Severity.WARNING
 
 _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
@@ -911,6 +939,22 @@ _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
         "against the league's average minute.",
         E,
         _average_minute_has_no_impact,
+    ),
+    Check(
+        "usage_adds_up",
+        "team_fit_profiles",
+        "A real team's players' usage rates, weighted by minutes, add up to five players' "
+        "worth: the profile reads the lineup the way the league counts plays.",
+        W,
+        _usage_adds_up,
+    ),
+    Check(
+        "minutes_cover_the_season",
+        "team_fit_profiles",
+        "In a finished season the players of a team whose roster is on record account for "
+        "the minutes the team had to fill.",
+        W,
+        _minutes_cover_the_season,
     ),
 )
 

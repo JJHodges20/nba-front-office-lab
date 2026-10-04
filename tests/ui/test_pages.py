@@ -28,6 +28,7 @@ PAGES = (
     "contracts",
     "lab",
     "builder",
+    "fit",
     "health",
 )
 STATES = {
@@ -649,15 +650,16 @@ class TestLab:
         glossary = next(
             frame.value for frame in opened.dataframe if "Definition" in frame.value.columns
         )
-        assert len(glossary) == 113
+        assert len(glossary) == 145
         assert set(glossary["Group"]) == {
             "Player metrics",
             "Team metrics",
             "Roster indicators",
             "Benchmark measures",
             "Player value",
+            "Roster fit",
         }
-        assert "113 metrics." in texts(opened)
+        assert "145 metrics." in texts(opened)
 
     def test_the_glossary_can_be_searched(self, page, plain_home: Path) -> None:
         opened = page(plain_home, "lab", lab_glossary_search="true shooting")
@@ -993,8 +995,8 @@ class TestHealth:
         frames = [frame.value for frame in opened.dataframe]
         checks = next(frame for frame in frames if "Requires" in frame.columns)
         tables = next(frame for frame in frames if "Domain" in frame.columns)
-        assert len(checks) == 54 and set(checks["Result"]) == {"Passed", "Warning", "Error"}
+        assert len(checks) == 57 and set(checks["Result"]) == {"Passed", "Warning", "Error"}
         assert checks["Result"].iloc[0] != "Passed"
-        assert len(tables) == 21
+        assert len(tables) == 22
         assert tables.set_index("Table").at["team_seasons", "Rows"] == 89
         assert "No dataset slice is failing" in texts(opened)

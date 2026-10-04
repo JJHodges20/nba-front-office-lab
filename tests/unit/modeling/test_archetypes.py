@@ -192,13 +192,13 @@ class TestMeasured:
         }
 
     def test_only_regular_seasons_with_enough_minutes_are_measured(self) -> None:
-        found = measured(self.tables(), rules(one(measures=("usage_pct",)), min_minutes=500))
+        found = measured(self.tables(), min_minutes=500)
         assert found["player_id"].tolist() == [1, 2, 3]
-        everyone = measured(self.tables(), rules(one(measures=("usage_pct",)), min_minutes=0))
+        everyone = measured(self.tables(), min_minutes=0)
         assert everyone["player_id"].tolist() == [1, 2, 3, 4]
 
     def test_rates_are_per_100_possessions_on_the_court(self) -> None:
-        found = measured(self.tables(), rules(one(measures=("usage_pct",)))).set_index("player_id")
+        found = measured(self.tables(), min_minutes=500).set_index("player_id")
         first = found.loc[1]
         assert first["fg3a_per_100"] == pytest.approx(6.25)
         assert (first["stl_per_100"], first["blk_per_100"]) == (2.0, 0.5)
@@ -208,7 +208,7 @@ class TestMeasured:
         assert (first["usage_pct"], first["assist_pct"]) == (0.30, 0.35)
 
     def test_three_point_accuracy_is_pulled_toward_the_league(self) -> None:
-        found = measured(self.tables(), rules(one(measures=("usage_pct",)))).set_index("player_id")
+        found = measured(self.tables(), min_minutes=500).set_index("player_id")
         # The league is every regular-season line of the season, the short one included.
         league = (100 + 150 + 0 + 10) / (250 + 360 + 0 + 30)
         prior = THREE_POINT_PRIOR_ATTEMPTS
@@ -226,25 +226,23 @@ class TestMeasured:
         # The season before: the same players, but the league as a whole shot far worse.
         earlier = regular.assign(season="2024-25", fg3m=regular["fg3m"] // 4)
         tables["player_seasons"] = pd.concat([regular, earlier], ignore_index=True)
-        found = measured(tables, rules(one(measures=("usage_pct",)))).set_index(
-            ["season", "player_id"]
-        )
+        found = measured(tables, min_minutes=500).set_index(["season", "player_id"])
         this_league = (100 + 150 + 0 + 10) / (250 + 360 + 0 + 30)
         that_league = (25 + 37 + 0 + 2) / (250 + 360 + 0 + 30)
         assert found.at[("2025-26", 3), "fg3_pct_regressed"] == pytest.approx(this_league)
         assert found.at[("2024-25", 3), "fg3_pct_regressed"] == pytest.approx(that_league)
 
     def test_a_player_with_no_turnovers_has_no_assists_per_turnover(self) -> None:
-        found = measured(self.tables(), rules(one(measures=("usage_pct",)))).set_index("player_id")
+        found = measured(self.tables(), min_minutes=500).set_index("player_id")
         assert np.isnan(found.at[3, "ast_per_tov"])
 
     def test_defensive_impact_is_the_value_models_where_there_is_one(self) -> None:
-        found = measured(self.tables(), rules(one(measures=("usage_pct",)))).set_index("player_id")
+        found = measured(self.tables(), min_minutes=500).set_index("player_id")
         assert found["impact_defense"].iloc[:2].tolist() == [0.5, 2.0]
         assert np.isnan(found.at[3, "impact_defense"])
 
     def test_groups_follow_position_height_and_usage(self) -> None:
-        found = measured(self.tables(), rules(one(measures=("usage_pct",)))).set_index("player_id")
+        found = measured(self.tables(), min_minutes=500).set_index("player_id")
         assert found["in_everyone"].all()
         assert found["in_guards"].tolist() == [True, False, False]
         # A forward at 6'11" is a big whatever the listing says; an F-C always is.
@@ -259,12 +257,12 @@ class TestMeasured:
         tables["players"] = tables["players"].assign(
             position=["G-F", "F", "F", "G"], height_inches=[78, 82, 76, 79]
         )
-        found = measured(tables, rules(one(measures=("usage_pct",)), min_minutes=0))
+        found = measured(tables, min_minutes=0)
         assert found["in_wings"].tolist() == [True, True, False, False]
 
     def test_no_players_no_rows(self) -> None:
         tables = {name: frame.iloc[0:0] for name, frame in self.tables().items()}
-        found = measured(tables, rules(one(measures=("usage_pct",))))
+        found = measured(tables, min_minutes=500)
         assert found.empty and "in_bigs" in found.columns
         assert assign_archetypes(tables, rules(one(measures=("usage_pct",)))).empty
 

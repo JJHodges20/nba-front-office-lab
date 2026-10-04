@@ -3,6 +3,133 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone 10 - Roster fit engine (2026-10-04)
+
+**Built**
+
+- `domain/fit.py`: thirty-two fit measures in the roadmap's six areas - offense, defense,
+  the possession battle, structure, depth, usage - and the sum of the parts, each defined
+  once (key, area, method, source, the roles a count refers to) so that the table that
+  stores them, the catalog that labels them and the code that computes them read off one
+  list. The rotation (the ten most-used players) and the bench (the sixth to tenth) are
+  written conventions.
+- `modeling/fit/profile.py`: a player's profile for a season (rates per 100 possessions,
+  groups, height, two positions, the value model's impact, the roles filled) and a
+  roster's profile from its members and their minutes; every real team-season profiled,
+  with previous-season profiles for the test. `modeling/fit/catalog.py`: the measures as
+  metrics; the glossary grows to 145. `domain/tables/fit.py`: `team_fit_profiles`, a
+  modeled table rebuilt by every build after the value and archetype tables, and two
+  quality checks (a real team's usage rates add up to five players' worth; its players
+  cover its minutes): 57 checks, from 54.
+- `modeling/fit/evidence.py` and `domain/fit_model.py`: the test of whether the measures
+  explain what the value model's out-of-sample predictions missed - each measure alone,
+  all together, and the combined correction with each area left out - with intervals
+  from resampling seasons. `configs/models/roster_fit.yaml` (the specification) and
+  `configs/models/roster_fit.json` (the evidence, revision 1); `fol fit test [--write]`
+  and `fol fit show`.
+- `services/fit.py` - `FitService`: a real team or a built roster profiled with the
+  build's own code and placed among the season's teams (percentile, rank, median), role
+  coverage with who comes nearest to each role, the sum of the parts with the value
+  model's error and whatever correction the evidence supports, and where the champions'
+  rosters stood. `services/fit_report.py` and `fol fit report --write` for
+  [research/ROSTER_FIT.md](research/ROSTER_FIT.md).
+- The **Roster Fit** page: Coverage, Profile, Sum of parts, The evidence, for the
+  sidebar's team or a roster built in the Team Builder. The percentile chart's axis
+  title now says what the percentile is among.
+- The archetype module's `measured()` takes its minutes floor as an argument, so
+  profiles cover every player; `fol build` and `fol check` answer a missing
+  configuration file with an error rather than a traceback.
+
+**Decisions** ([0012](decisions/0012-roster-fit.md))
+
+- Fit is described, not scored: measures in the roadmap's areas, each player weighted by
+  minutes, placed among the season's real teams within the season. No thresholds, and a
+  direction is stated only where it is unambiguous.
+- Whether fit adds anything is tested beyond the sum of the parts the way the value model
+  was tested: previous-season profiles so that nothing of the season predicted leaks in,
+  the value model's own misses as the target, one season at a time with only earlier
+  seasons to learn from, intervals from resampling whole seasons. A correction is applied
+  to a roster only if the measures together leave the predictions missing by clearly
+  less.
+- The evidence is a versioned file gathered on request and stamped with the value model
+  and the role rules it was measured against; the page and the report say when it is
+  behind what the database holds.
+- The sums of the parts are what fit is measured beyond, not candidates. Lineup data -
+  which five played together and how they did - is the direct way to measure fit and
+  remains the obvious next step.
+
+**What the research says** (evidence revision 1; the document has the rest)
+
+- On 510 team-seasons, 2009-10 to 2025-26, the value model's predictions missed by 2.96
+  points of net rating. No measure, on its own, left them missing by clearly less: every
+  change in error lies within ±0.02 of zero and none is distinguishable from nothing.
+  Steals (+0.34 points per standard deviation), perimeter defenders (+0.32) and assist
+  percentage (+0.22) are clear of zero when fitted on every season at once, and what they
+  explain in one season does not carry to the next.
+- All 27 tested measures together leave the predictions missing by *more*: 3.14 against
+  2.96 (+0.18, +0.06 to +0.33), and the combined correction is better without four of its
+  six areas - what fitting many weights to few seasons does when there is nothing to
+  find. So no correction is applied to rosters, and "Roster Fit" will not enter the
+  optimiser's objective as a validated term; role counts may constrain a roster.
+- Where the champions stood: all thirty in the top third of their season on the sum of
+  the parts; two in three on floor spacers, three-point accuracy, assist percentage,
+  rebound percentage, the bench's impact and the top three players' usage; on free-throw
+  rate, turnover percentage and the bench's creators as often below the middle as above.
+
+**Verification**
+
+- Each profile measure is worked by hand on made-up players: minutes weights, lineup sums,
+  the rotation and the bench, shares of the profiled minutes, players without a profile,
+  the top usage, reliance on one player, minutes covered. Player and team profiles are
+  checked against the invented league's own tables - a team's profile against the row the
+  build stored for it, a lagged profile against one assembled by hand, the league's
+  impacts adding up to nothing - and the fixture store's two real teams cover their
+  minutes and add up to five players' usage.
+- The evidence is tested on an invented league with one thing planted that the value
+  model cannot see: points of offense for every inch of last season's minutes-weighted
+  height. The height measure is found strongest and clear of zero, little else is, the
+  combined correction is usable and leaving out the structure area is missed. A season is
+  corrected from earlier seasons only; a relation with nothing left to luck has a closed
+  interval; the evidence survives being written down; too little history is refused.
+- The service and the page are checked against the invented league, the fixture store
+  and a built roster; the quality checks against a profiled league with each fault
+  planted in turn; the pipeline and the commands on a league whose value model carries a
+  test.
+- Mutation spot-check: 41 planted bugs across the profile, the definitions, the
+  evidence, the pipeline, the checks, the service, the report and the page: 34
+  caught at once; five exposed gaps - the two-position flag checked on one player only, the roles behind each count never pinned, a standardisation that could reach the tested season through a missing value, coverage counted beyond the rotation, a chart drawing measures that have no standing - each closed with a test and then caught; two mutations had missed their line and were caught once aimed.
+- The page in both themes on the real data and on a demo lab with a built roster of
+  eleven real players; clicked through in a browser on both: the subject, a team, a
+  season, every tab, a member row from a team and from a roster. Looking changed the
+  members table, whose value columns the roles column had pushed out of view.
+- The sweep runs the new page from two starts (a team; a built roster) without an
+  exception.
+
+**Found on the way**
+
+- The test league's generator duplicates a game id when a player has two stints with
+  the same team in a season (structure seed 7). The fitted-league fixture uses the
+  structure the other labs use; the generator is left as it is, noted here.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| Automated tests | 2,517 passed, none skipped; about four and a half minutes with `pytest -n auto` |
+| Test sensitivity | 41 planted bugs: 34 caught at once; 5 gaps closed with tests and then caught; 2 misaimed mutations caught once aimed |
+| Data-quality checks | 57 checks on the real data (build 13): 0 errors, 7 standing warnings; the two fit checks hold on all 892 team-seasons |
+| UI review | The new page in both themes, every tab, a team and a built roster; clicked through in a browser on the real data and on the demo lab |
+| Architectural boundaries | `tests/architecture` passes. The measures are defined in `domain`, computed in `modeling`, stored by `pipelines`, read by `services`; the page computes nothing; the evidence is gathered in one command and applied only through the service |
+| Lint | `ruff check` and `ruff format --check` clean |
+
+**Open items carried forward**
+
+- Fit is measured only as far as box scores and rules allow. Lineup data would let it be
+  measured directly and has not been ingested.
+- The evidence has to be gathered again after a new value model or a change of the role
+  rules; the page, the report and `fol fit show` say which versions it rests on.
+- Surplus value still waits on the user's contract file.
+
 ## Milestone 9 - Player value engine (2026-10-04)
 
 **Built**

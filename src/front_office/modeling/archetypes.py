@@ -126,8 +126,8 @@ def percentile(values: pd.Series, season: pd.Series) -> pd.Series:
     return (grouped.rank(method="average") - 0.5) / grouped.transform("count") * 100
 
 
-def measured(tables: Tables, spec: ArchetypeSet) -> pd.DataFrame:
-    """Every player-season with enough minutes: its measures and the groups it is in.
+def measured(tables: Tables, *, min_minutes: float) -> pd.DataFrame:
+    """Every player-season with at least ``min_minutes``: its measures and its groups.
 
     One row per player per regular season with ``season``, ``player_id``, a column per
     measure and a boolean ``in_<group>`` per group. ``impact_defense`` is missing where
@@ -160,7 +160,7 @@ def measured(tables: Tables, spec: ArchetypeSet) -> pd.DataFrame:
     at = pd.MultiIndex.from_frame(frame[["season", "player_id"]])
     frame["impact_defense"] = scores.reindex(at).to_numpy()
 
-    enough = (seasons["minutes"] >= spec.min_minutes) & (possessions > 0)
+    enough = (seasons["minutes"] >= min_minutes) & (possessions > 0)
     frame = frame[enough.to_numpy()].reset_index(drop=True)
 
     known = tables["players"].set_index("player_id")
@@ -216,7 +216,7 @@ def classify(players: pd.DataFrame, spec: ArchetypeSet) -> pd.DataFrame:
 
 def assign_archetypes(tables: Tables, spec: ArchetypeSet) -> pd.DataFrame:
     """Every row of ``player_archetypes`` that the tables support."""
-    return classify(measured(tables, spec), spec)
+    return classify(measured(tables, min_minutes=spec.min_minutes), spec)
 
 
 def persistence(assignments: pd.DataFrame, spec: ArchetypeSet) -> pd.DataFrame:

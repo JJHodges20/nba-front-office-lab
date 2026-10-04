@@ -152,14 +152,29 @@ players add up to beside the league. Change a slot or type a salary of your own
 directly in the table. It describes a roster; it does not rank or recommend players, and
 its pooled figures are not a projection of how the players would play together.
 
+**Roster Fit.** Do these players make sense together? The sidebar's team, or a roster you
+built, described in the roadmap's six areas of fit - role coverage, shooting, defense, the
+possession battle, structure, depth and usage - each player weighted by minutes, and
+placed among the season's real teams as a percentile and a rank. *Coverage*: who in the
+rotation fills each role, who comes nearest, and what nobody fills. *Profile*: every
+measure beside the league's median. *Sum of parts*: the players' impacts added up for the
+minutes given, with the value model's error - the estimate of a roster - and the fit
+correction, which the evidence on file supports or does not. *The evidence*: whether any
+measure, alone or all together, explained what the value model's predictions missed on
+seasons it had not seen; and where the champions' rosters stood. On the evidence the lab
+ships none does, so nothing is added to the sum of the parts and the profile describes.
+The same as a document: [research/ROSTER_FIT.md](research/ROSTER_FIT.md); why it is built
+this way: [decisions/0012-roster-fit.md](decisions/0012-roster-fit.md).
+
 **Data Health.** How the last build went, the state of each source, what is missing and
 what that costs, every quality check, every adjustment the build made to source data,
 what is held of each dataset, and any fetch that is failing.
 
 ## What it does not do yet
 
-No fit analysis, no optimiser, no forecast of a team's season. Those are later roadmap
-stages. The benchmarks give historical frequencies, and player value is an estimate of
-what a player adds; nothing in the workbench presents either as a prediction of how a
-team will do. A role is a rule applied to a player's statistics, not a measurement of how
-they play, and the page says so.
+No optimiser, no forecast of a team's season. Those are later roadmap stages. The
+benchmarks give historical frequencies, and player value is an estimate of what a player
+adds; nothing in the workbench presents either as a prediction of how a team will do. A
+role is a rule applied to a player's statistics, not a measurement of how they play, and
+the page says so. Roster fit describes a roster and reports what the evidence found; it
+does not score one.

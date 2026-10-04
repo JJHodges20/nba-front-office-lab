@@ -17,6 +17,7 @@ from front_office.domain.archetypes import ArchetypeSet
 from front_office.domain.cap_rules import SeasonRules
 from front_office.domain.tables import MODELED_TABLES
 from front_office.domain.value_model import ValueModel
+from front_office.pipelines.fit import add_fit_tables
 from front_office.pipelines.normalize import BUILT_TABLES, NormalizedTables, normalize
 from front_office.pipelines.value import add_archetype_tables, add_value_tables
 from front_office.quality import CheckResult, Severity, all_checks, run_checks
@@ -59,10 +60,12 @@ def check_store(
     value_model: ValueModel | None = None,
     archetypes: ArchetypeSet | None = None,
 ) -> DataReport:
-    """Normalise ``store``, apply the fitted models and the role rules, and check all of it."""
+    """Normalise ``store``, apply the fitted model and the role rules, profile every team,
+    and check all of it."""
     tables = normalize(store, season_rules=season_rules)
     add_value_tables(tables, value_model)
     add_archetype_tables(tables, archetypes)
+    add_fit_tables(tables, archetypes)
     return DataReport(tables, run_checks(tables.frames, all_checks(CHECKED_TABLES)))
 
 

@@ -448,6 +448,7 @@ def percentile_bars(
     palette: Palette,
     hover: Sequence[str] = (),
     group: str | None = None,
+    axis_title: str = "Percentile (higher is better)",
 ) -> go.Figure:
     """Where one player or team stands on a set of metrics, as bars from 0 to 100.
 
@@ -485,7 +486,7 @@ def percentile_bars(
         # Past 100 there is only room for the value written at the tip of a full bar.
         range=[0, 100 * (1 + LABEL_ROOM)],
         tickvals=[0, 25, 50, 75, 100],
-        title_text="Percentile (higher is better)",
+        title_text=axis_title,
     )
     figure.update_yaxes(
         autorange="reversed",

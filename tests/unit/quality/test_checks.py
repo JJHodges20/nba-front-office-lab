@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 
 from front_office.domain.schema import DType, Field, Provenance, TableContract
+from front_office.domain.tables.fit import TEAM_FIT_PROFILES
 from front_office.domain.tables.value import PLAYER_ARCHETYPES, PLAYER_VALUE_SCORES
 from front_office.pipelines.normalize import NBA_STATS_TABLES
 from front_office.quality import Check, Severity, all_checks, reference_checks, run_checks
@@ -84,6 +85,7 @@ class TestBaseline:
         # Every table a build produces, the modeled one included.
         tables["player_value_scores"] = PLAYER_VALUE_SCORES.empty_frame()
         tables["player_archetypes"] = PLAYER_ARCHETYPES.empty_frame()
+        tables["team_fit_profiles"] = TEAM_FIT_PROFILES.empty_frame()
         assert len(run_checks(tables)) == len(CHECKS)
 
 

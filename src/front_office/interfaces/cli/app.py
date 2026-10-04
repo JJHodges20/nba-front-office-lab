@@ -29,9 +29,11 @@ from front_office.config import (
     load_value_model,
     value_model_path,
 )
+from front_office.config.models import fit_evidence_path, load_fit_evidence
 from front_office.config.settings import ENV_HOME
 from front_office.domain import PayrollLine, Season
 from front_office.domain.dictionary import render_data_dictionary
+from front_office.domain.fit_model import FitEvidence
 from front_office.domain.tables import ALL_TABLES, PLANNED_TABLES
 from front_office.domain.value_model import Comparison, ValueModel
 from front_office.pipelines.build import build_database, database_status, log_fetches
@@ -41,6 +43,12 @@ from front_office.pipelines.contracts import (
     ContractImportError,
     import_contract_file,
     write_contract_template,
+)
+from front_office.pipelines.fit import (
+    FIT_TEST_COMMAND,
+    FitTestError,
+    gather_fit_evidence,
+    write_fit_evidence,
 )
 from front_office.pipelines.ingest import (
     FetchOutcome,
@@ -52,6 +60,7 @@ from front_office.pipelines.inventory import raw_inventory
 from front_office.pipelines.value import FIT_COMMAND, ValueFitError, fit_value, write_value_model
 from front_office.services import Lab, LabNotBuilt
 from front_office.services.benchmark_report import benchmark_report
+from front_office.services.fit_report import NoFitEvidence, fit_report
 from front_office.services.glossary import METRIC_CATALOGS, metric_glossary
 from front_office.services.value_report import NoValueModel, value_report
 
@@ -59,6 +68,7 @@ DATA_DICTIONARY = "docs/DATA_DICTIONARY.md"
 METRIC_GLOSSARY = "docs/METRICS.md"
 BENCHMARK_REPORT = "docs/research/BENCHMARKS.md"
 VALUE_REPORT = "docs/research/PLAYER_VALUE.md"
+FIT_REPORT = "docs/research/ROSTER_FIT.md"
 WORKBENCH = "apps/workbench/app.py"
 DEFAULT_PORT = 8501
 STARTUP_SECONDS = 30
@@ -76,6 +86,11 @@ value_app = typer.Typer(
     help="The player value model: fit it, test it, see what it rests on.", no_args_is_help=True
 )
 app.add_typer(value_app, name="value")
+fit_app = typer.Typer(
+    help="Roster fit: whether it adds anything to the sum of the parts, and the evidence.",
+    no_args_is_help=True,
+)
+app.add_typer(fit_app, name="fit")
 console = Console()
 
 
@@ -757,3 +772,146 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# --- roster fit ------------------------------------------------------------------------------
+
+
+@fit_app.command("test")
+def fit_test(
+    write: Annotated[
+        bool,
+        typer.Option("--write", help="Save the evidence so that the services apply it."),
+    ] = False,
+) -> None:
+    """Test whether the fit measures explain what the value model's predictions missed.
+
+    Without --write nothing changes: the evidence is shown and thrown away.
+    """
+    try:
+        settings = load_settings()
+        report = gather_fit_evidence(settings)
+    except (ConfigError, FitTestError) as error:
+        raise _fail(error) from error
+    _print_fit_evidence(report.evidence)
+    if report.previous is not None and not report.changed:
+        _say(
+            f"\nThe same as revision {report.previous.revision}, already on file. Nothing to write."
+        )
+        return
+    if not write:
+        _say(f"\nNot saved. To save it as revision {report.evidence.revision}: {FIT_TEST_COMMAND}")
+        return
+    target = write_fit_evidence(settings, report.evidence)
+    _say(f"\nWrote {target} (revision {report.evidence.revision}).")
+
+
+@fit_app.command("show")
+def fit_show() -> None:
+    """Show the roster fit evidence on file: what each measure adds to the sum of the parts."""
+    try:
+        settings = load_settings()
+        evidence = load_fit_evidence(settings.config_dir)
+    except ConfigError as error:
+        raise _fail(error) from error
+    if evidence is None:
+        _say(
+            f"No roster fit evidence has been gathered ({fit_evidence_path(settings.config_dir)})."
+        )
+        _say(f"Run: {FIT_TEST_COMMAND}")
+        raise typer.Exit(code=1)
+    _say(f"Revision {evidence.revision}, gathered {evidence.fitted_at:%Y-%m-%d %H:%M} UTC.")
+    _print_fit_evidence(evidence)
+
+
+def _print_fit_evidence(evidence: FitEvidence) -> None:
+    _say(
+        f"Tested on {evidence.team_seasons:,} team-seasons, {evidence.first_test_season} to "
+        f"{evidence.last_test_season}, each corrected with weights fitted to the seasons "
+        f"before it. The value model's predictions (revision {evidence.value_model_version}) "
+        f"missed by {evidence.baseline_rmse:.2f} points of net rating (RMSE)."
+    )
+    confidence = f"{evidence.spec.confidence:.0%}"
+
+    def change(item: object, *, missed: str) -> str:  # type: ignore[no-untyped-def]
+        span = item.change  # type: ignore[attr-defined]
+        apart = "" if span.is_clear else f"  ({missed})"
+        return f"{span.difference:+.2f} ({span.low:+.2f} to {span.high:+.2f}){apart}"
+
+    alone = Table(title="Each measure alone, correcting the sum of the parts")
+    alone.add_column("Measure", style="bold")
+    alone.add_column("Area")
+    alone.add_column(f"Per standard deviation ({confidence} interval)")
+    alone.add_column("RMSE", justify="right")
+    alone.add_column(f"RMSE less the sum of the parts' ({confidence} interval)")
+    for item in evidence.measures:
+        alone.add_row(
+            item.name,
+            item.area,
+            f"{item.coefficient:+.2f} ({item.coefficient_low:+.2f} to {item.coefficient_high:+.2f})",
+            f"{item.rmse:.2f}",
+            change(item, missed="not distinguishable"),
+        )
+    console.print(alone)
+
+    combined = evidence.combined
+    together = Table(title="Every measure together")
+    together.add_column("Correction", style="bold")
+    together.add_column("RMSE", justify="right")
+    together.add_column(f"RMSE less the sum of the parts' ({confidence} interval)")
+    together.add_row("Sum of the parts alone", f"{evidence.baseline_rmse:.2f}", "")
+    together.add_row(
+        "With every measure", f"{combined.rmse:.2f}", change(combined, missed="not usable")
+    )
+    console.print(together)
+    verdict = (
+        "The correction is applied to rosters: it leaves the sum of the parts missing by "
+        "clearly less."
+        if combined.is_usable
+        else "No correction is applied to rosters: together the measures do not leave the "
+        "sum of the parts missing by clearly less."
+    )
+    _say(verdict)
+
+    without = Table(title="The combined correction with one area left out")
+    without.add_column("Left out", style="bold")
+    without.add_column("RMSE", justify="right")
+    without.add_column(f"RMSE less the full correction's ({confidence} interval)")
+    for item in combined.ablations:
+        span = item.change
+        apart = (
+            "" if span.low > 0 else "  (better without)" if span.high < 0 else "  (cannot be told)"
+        )
+        without.add_row(
+            item.label,
+            f"{item.rmse:.2f}",
+            f"{span.difference:+.2f} ({span.low:+.2f} to {span.high:+.2f}){apart}",
+        )
+    console.print(without)
+
+
+@fit_app.command("report")
+def fit_report_command(
+    write: Annotated[
+        bool, typer.Option("--write", help=f"Write {FIT_REPORT} instead of printing.")
+    ] = False,
+) -> None:
+    """Write up roster fit: what a roster is described by, and what the test found."""
+    try:
+        settings = load_settings()
+        # Opening the lab creates the database; asking a question should not.
+        if not database_status(settings).exists:
+            raise LabNotBuilt
+        with Lab(settings) as lab:
+            lab.require_built()
+            document = fit_report(lab)
+            revision = lab.fit.status().revision
+    except (ConfigError, LabNotBuilt, NoFitEvidence) as error:
+        raise _fail(error) from error
+    if not write:
+        typer.echo(document, nl=False)
+        return
+    target = settings.project_root / FIT_REPORT
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(document, encoding="utf-8", newline="\n")
+    _say(f"Wrote {target} (revision {revision} of the fit evidence)")

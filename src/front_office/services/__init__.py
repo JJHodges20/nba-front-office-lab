@@ -25,6 +25,7 @@ from front_office.services.builder import (
 )
 from front_office.services.contracts import ContractService
 from front_office.services.explore import Relationship, relationship
+from front_office.services.fit import FitReport, FitService, FitStatus, SumOfParts
 from front_office.services.glossary import METRIC_CATALOGS, metric_glossary
 from front_office.services.health import Gap, HealthService, SourceStatus
 from front_office.services.lab import Lab, LabNotBuilt, LabStatus
@@ -50,6 +51,9 @@ __all__ = [
     "ContractService",
     "Era",
     "EraView",
+    "FitReport",
+    "FitService",
+    "FitStatus",
     "Floor",
     "Gap",
     "HealthService",
@@ -70,6 +74,7 @@ __all__ = [
     "RosterSummary",
     "SourceStatus",
     "StageSummary",
+    "SumOfParts",
     "TeamProfile",
     "TeamService",
     "TeamTable",

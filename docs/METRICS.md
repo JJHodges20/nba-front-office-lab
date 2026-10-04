@@ -233,3 +233,72 @@ describes what is on screen rather than what was once intended.
 | P-REL | Reliability of the projection | `projection_reliability` | derived | percentage | neither | Share of the projection that rests on the player's own earlier numbers. Missing for a player with no earlier season, who is given the level of a new player. |
 | P-MIN% | Projected share of team minutes | `projected_share` | modeled | percentage | neither | Share of team minutes expected going into the season, from the last three seasons' shares and age. It allows for the chance of not playing at all, and knows nothing of injuries or depth charts. |
 | P-WAR | Projected wins above replacement | `projected_wins` | modeled | number | higher | Projected impact above replacement level, times the projected share of team minutes, times the wins a point of net rating is worth, over 82 games. |
+
+## Roster fit
+
+### Offense
+
+| Metric | Name | Key | Origin | Shown as | Better | Definition |
+| --- | --- | --- | --- | --- | --- | --- |
+| Primary | Primary creators | `primary_creators` | modeled | whole number | neither | Players in the rotation who fill the primary creator role. |
+| Creators | Creators | `creators` | modeled | whole number | neither | Players in the rotation who fill the primary or the secondary creator role. |
+| Spacers | Floor spacers | `spacers` | modeled | whole number | neither | Players in the rotation who fill the floor spacer role. |
+| 3PA/100 | Three-point attempts | `three_point_rate` | modeled | number | neither | Minutes-weighted average of the players' three-point attempts per 100 possessions on the court. |
+| 3P% reg. | Three-point accuracy, regressed | `three_point_accuracy` | modeled | percentage | higher | Minutes-weighted average of the players' three-point percentage with league-average attempts mixed in, so that a few hot nights do not make a shooter. |
+| FT rate | Free-throw rate | `free_throw_rate` | modeled | percentage | neither | Minutes-weighted average of the players' free-throw attempts per field-goal attempt: the nearest a box score comes to pressure on the rim. |
+| AST% | Assist percentage | `assist_rate` | modeled | percentage | higher | Minutes-weighted average of the players' share of teammates' baskets assisted while on the court. |
+| O-SUM | Offense, sum of parts | `offense_sum` | modeled | signed number | higher | The players' offensive impacts added up for the minutes given: the points per 100 possessions a team would gain on offense if its players simply added up. |
+
+### Defense
+
+| Metric | Name | Key | Origin | Shown as | Better | Definition |
+| --- | --- | --- | --- | --- | --- | --- |
+| Perimeter | Perimeter defenders | `perimeter_defenders` | modeled | whole number | neither | Players in the rotation who fill the perimeter defender role. |
+| Wings | Switchable wings | `switchable_wings` | modeled | whole number | neither | Players in the rotation who fill the switchable wing role. |
+| Rim | Rim protectors | `rim_protectors` | modeled | whole number | neither | Players in the rotation who fill the rim protector role. |
+| STL/100 | Steals | `steal_rate` | modeled | number | higher | Minutes-weighted average of the players' steals per 100 possessions on the court. |
+| BLK/100 | Blocks | `block_rate` | modeled | number | higher | Minutes-weighted average of the players' blocks per 100 possessions on the court. |
+| D-SUM | Defense, sum of parts | `defense_sum` | modeled | signed number | higher | The players' defensive impacts added up for the minutes given: the points per 100 possessions a team would save if its players simply added up. |
+
+### Possession battle
+
+| Metric | Name | Key | Origin | Shown as | Better | Definition |
+| --- | --- | --- | --- | --- | --- | --- |
+| REB% | Rebound percentage | `rebound_rate` | modeled | percentage | higher | Minutes-weighted average of the players' share of available rebounds taken while on the court. |
+| TOV% | Turnover percentage | `turnover_rate` | modeled | percentage | lower | Minutes-weighted average of the players' turnovers per play used. |
+
+### Structure
+
+| Metric | Name | Key | Origin | Shown as | Better | Definition |
+| --- | --- | --- | --- | --- | --- | --- |
+| Height | Height, minutes-weighted | `height` | modeled | number | neither | Average listed height in inches, each player weighted by minutes. |
+| G min | Minutes by guards | `guard_minutes` | modeled | percentage | neither | Share of the minutes played by players listed at guard, alone or with another position. |
+| Wing min | Minutes by wings | `wing_minutes` | modeled | percentage | neither | Share of the minutes played by players of wing size listed at forward or at guard-forward. Guards and big men of that size are not wings here. |
+| Big min | Minutes by big men | `big_minutes` | modeled | percentage | neither | Share of the minutes played by players listed at center or standing 6'11" and taller. |
+| Two-pos | Minutes by two-position players | `multi_position` | modeled | percentage | neither | Share of the minutes played by players listed at two positions: the nearest the listings come to positional flexibility. Athleticism is not in the data at all. |
+
+### Depth
+
+| Metric | Name | Key | Origin | Shown as | Better | Definition |
+| --- | --- | --- | --- | --- | --- | --- |
+| Bench IMP | Bench impact | `bench_impact` | modeled | signed number | higher | Minutes-weighted average impact of the sixth to tenth players by minutes. |
+| Bench cre. | Bench creators | `bench_creators` | modeled | whole number | neither | Players among the sixth to tenth by minutes who fill a creator role. |
+| Bench bigs | Bench big men | `bench_bigs` | modeled | whole number | neither | Players among the sixth to tenth by minutes who are big men. |
+| Bench def. | Bench defenders | `bench_defenders` | modeled | whole number | neither | Players among the sixth to tenth by minutes who fill a defensive role: perimeter defender, switchable wing or rim protector. |
+| No profile | Minutes without a profile | `unprofiled_share` | modeled | percentage | neither | Share of the minutes played by players with no statistics to build a profile from: in a real season, newcomers to the league. |
+| Star share | Reliance on one player | `star_share` | modeled | percentage | lower | The top player's wins above replacement as a share of the rotation's, counting only players above replacement. The higher, the more rests on one player staying fit. |
+
+### Usage
+
+| Metric | Name | Key | Origin | Shown as | Better | Definition |
+| --- | --- | --- | --- | --- | --- | --- |
+| USG sum | Usage on the floor | `usage_sum` | modeled | percentage | neither | Five times the minutes-weighted average usage rate: what the players' usage adds up to with five of them on the court. A real team's adds up to 100%. A roster assembled from several teams can ask for more plays than a game has, or fewer. |
+| USG top 3 | Usage of the three highest-usage players | `usage_top` | modeled | percentage | neither | The three highest usage rates in the rotation added up: how much of the offense three players are used to running. |
+
+### Sum of parts
+
+| Metric | Name | Key | Origin | Shown as | Better | Definition |
+| --- | --- | --- | --- | --- | --- | --- |
+| IMP sum | Impact, sum of parts | `impact_sum` | modeled | signed number | higher | The players' impacts added up for the minutes given: the net rating, relative to the league, a team would have if its players simply added up. |
+| P-IMP sum | Projected impact, sum of parts | `projected_sum` | modeled | signed number | higher | The same with each player's projection going into the season instead of what the season showed. |
+| MIN cov. | Minutes covered | `minutes_covered` | modeled | percentage | neither | The players' minutes as a share of the minutes a team has to fill in the season. |

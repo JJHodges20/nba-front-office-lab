@@ -46,6 +46,7 @@ measured statistics, modeled estimates and user assumptions visibly apart.
 | [`contract_years`](#contract_years) | contracts | One row per contract per season. | V1 |
 | [`player_value_scores`](#player_value_scores) | player_value | One row per player per season. | V3 |
 | [`player_archetypes`](#player_archetypes) | player_value | One row per player per season per archetype the player is open to. | V3 |
+| [`team_fit_profiles`](#team_fit_profiles) | roster_fit | One row per team per regular season with player statistics. | V4 |
 | [`custom_rosters`](#custom_rosters) | user_rosters | One row per roster. | V1 |
 | [`roster_players`](#roster_players) | user_rosters | One row per player per roster. | V1 |
 | [`fetch_log`](#fetch_log) | operations | One row per fetch attempt. | V1 |
@@ -495,6 +496,53 @@ Each player's score for each role in each regular season, by the rules in config
 | `fills` | boolean | yes | modeled |  | Whether the score reaches the archetype's cut-off, a convention set in configuration. |
 | `is_primary` | boolean | yes | modeled |  | Whether, of the roles the player fills that season, this has the highest score. |
 | `archetype_version` | string | yes | operational |  | Version of the archetype definitions that produced the row. |
+
+### team_fit_profiles
+
+What each team's players added up to in a regular season, in the roadmap's areas of fit: role coverage, shooting, defense, the possession battle, structure, depth and usage, each player weighted by the minutes played for the team. The reference a built roster is placed among.
+
+- **Grain:** One row per team per regular season with player statistics.
+- **Primary key:** `season`, `team_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `season` | string | yes | identifier |  | Season label, e.g. 2025-26. |
+| `team_id` | integer | yes | identifier |  | Team id. References `teams.team_id`. |
+| `archetype_version` | string | yes | operational |  | Version of the archetype definitions the role counts come from. |
+| `model_version` | string | no | operational |  | Version of the value model the impacts come from; missing when none was fitted. |
+| `players` | integer | yes | derived |  | Players who played a minute for the team in the season. |
+| `primary_creators` | float | no | modeled | players | Players in the rotation who fill the primary creator role. |
+| `creators` | float | no | modeled | players | Players in the rotation who fill the primary or the secondary creator role. |
+| `spacers` | float | no | modeled | players | Players in the rotation who fill the floor spacer role. |
+| `three_point_rate` | float | no | modeled | per 100 possessions | Minutes-weighted average of the players' three-point attempts per 100 possessions on the court. |
+| `three_point_accuracy` | float | no | modeled | share | Minutes-weighted average of the players' three-point percentage with league-average attempts mixed in, so that a few hot nights do not make a shooter. |
+| `free_throw_rate` | float | no | modeled | share | Minutes-weighted average of the players' free-throw attempts per field-goal attempt: the nearest a box score comes to pressure on the rim. |
+| `assist_rate` | float | no | modeled | share | Minutes-weighted average of the players' share of teammates' baskets assisted while on the court. |
+| `offense_sum` | float | no | modeled | points per 100 possessions | The players' offensive impacts added up for the minutes given: the points per 100 possessions a team would gain on offense if its players simply added up. |
+| `perimeter_defenders` | float | no | modeled | players | Players in the rotation who fill the perimeter defender role. |
+| `switchable_wings` | float | no | modeled | players | Players in the rotation who fill the switchable wing role. |
+| `rim_protectors` | float | no | modeled | players | Players in the rotation who fill the rim protector role. |
+| `steal_rate` | float | no | modeled | per 100 possessions | Minutes-weighted average of the players' steals per 100 possessions on the court. |
+| `block_rate` | float | no | modeled | per 100 possessions | Minutes-weighted average of the players' blocks per 100 possessions on the court. |
+| `defense_sum` | float | no | modeled | points per 100 possessions | The players' defensive impacts added up for the minutes given: the points per 100 possessions a team would save if its players simply added up. |
+| `rebound_rate` | float | no | modeled | share | Minutes-weighted average of the players' share of available rebounds taken while on the court. |
+| `turnover_rate` | float | no | modeled | share | Minutes-weighted average of the players' turnovers per play used. |
+| `height` | float | no | modeled | inches | Average listed height in inches, each player weighted by minutes. |
+| `guard_minutes` | float | no | modeled | share | Share of the minutes played by players listed at guard, alone or with another position. |
+| `wing_minutes` | float | no | modeled | share | Share of the minutes played by players of wing size listed at forward or at guard-forward. Guards and big men of that size are not wings here. |
+| `big_minutes` | float | no | modeled | share | Share of the minutes played by players listed at center or standing 6'11" and taller. |
+| `multi_position` | float | no | modeled | share | Share of the minutes played by players listed at two positions: the nearest the listings come to positional flexibility. Athleticism is not in the data at all. |
+| `bench_impact` | float | no | modeled | points per 100 possessions | Minutes-weighted average impact of the sixth to tenth players by minutes. |
+| `bench_creators` | float | no | modeled | players | Players among the sixth to tenth by minutes who fill a creator role. |
+| `bench_bigs` | float | no | modeled | players | Players among the sixth to tenth by minutes who are big men. |
+| `bench_defenders` | float | no | modeled | players | Players among the sixth to tenth by minutes who fill a defensive role: perimeter defender, switchable wing or rim protector. |
+| `unprofiled_share` | float | no | modeled | share | Share of the minutes played by players with no statistics to build a profile from: in a real season, newcomers to the league. |
+| `star_share` | float | no | modeled | share | The top player's wins above replacement as a share of the rotation's, counting only players above replacement. The higher, the more rests on one player staying fit. |
+| `usage_sum` | float | no | modeled | share | Five times the minutes-weighted average usage rate: what the players' usage adds up to with five of them on the court. A real team's adds up to 100%. A roster assembled from several teams can ask for more plays than a game has, or fewer. |
+| `usage_top` | float | no | modeled | share | The three highest usage rates in the rotation added up: how much of the offense three players are used to running. |
+| `impact_sum` | float | no | modeled | points per 100 possessions | The players' impacts added up for the minutes given: the net rating, relative to the league, a team would have if its players simply added up. |
+| `projected_sum` | float | no | modeled | points per 100 possessions | The same with each player's projection going into the season instead of what the season showed. |
+| `minutes_covered` | float | no | modeled | share | The players' minutes as a share of the minutes a team has to fill in the season. |
 
 ### custom_rosters
 

@@ -195,9 +195,9 @@ class TestIssuesAndChecks:
 
     def test_checks_list_failures_first_errors_before_warnings(self, lab: Lab) -> None:
         checks = lab.health.checks()
-        assert len(checks) == 54
+        assert len(checks) == 57
         failed = checks[~checks["passed"]]
-        assert checks["passed"].tolist() == [False] * len(failed) + [True] * (54 - len(failed))
+        assert checks["passed"].tolist() == [False] * len(failed) + [True] * (57 - len(failed))
         assert failed["severity"].tolist() == sorted(failed["severity"].tolist())
         assert "error" in set(failed["severity"]) and "warning" in set(failed["severity"])
 

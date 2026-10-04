@@ -158,8 +158,8 @@ fol ui:  apps/workbench/app.py -> wb.views.<page> -> front_office.services.Lab -
 ```
 
 `services.Lab` opens the database and the season rules; the services hang off it:
-`players`, `teams`, `league`, `benchmarks`, `contracts`, `builder` (the user's rosters)
-and `health`.
+`players`, `teams`, `league`, `benchmarks`, `contracts`, `builder` (the user's rosters),
+`value`, `fit` and `health`.
 A service reads tables, calls analytics, and joins the result with names. It contains
 no formulas.
 
@@ -241,6 +241,24 @@ loads them): the measures, the groups a role can be open to, the weakest-percent
 score within a season, and how well each role carries over between seasons. Nothing in
 it is fitted, and the build applies the rules after the value model because the
 defensive roles use its defensive impact. See `docs/decisions/0011-archetypes.md`.
+
+## Roster fit
+
+```
+fol build:            value and archetype tables -> modeling.fit.team_profiles
+                      -> team_fit_profiles (every real team-season)
+fol fit test --write: the value model's test + last season's profiles
+                      -> modeling.fit.fit_evidence -> configs/models/roster_fit.json
+a page:               FitService.team / FitService.roster -> the same profile code,
+                      placed among team_fit_profiles; the evidence read off the file
+```
+
+The measures are defined once in `domain/fit.py` and the table contract, the metric
+catalog and `modeling/fit/profile.py` all read off that list. `modeling/fit/evidence.py`
+asks whether the measures, taken from the players' previous-season profiles, explain
+what the value model's out-of-sample predictions missed; `services/fit.py` profiles a
+team or a built roster and applies a correction only if the evidence supports one.
+See `docs/decisions/0012-roster-fit.md`.
 
 ## Conventions
 

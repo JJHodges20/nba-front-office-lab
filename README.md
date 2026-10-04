@@ -13,7 +13,7 @@ before roster scoring, optimisation or any predictive claim. The plan is in
 
 ## Status
 
-Milestones 1-9 of 14 are complete. The first seven are the roadmap's version 1.0,
+Milestones 1-10 of 14 are complete. The first seven are the roadmap's version 1.0,
 *League and Roster Analytics*: league data from stats.nba.com, a database built from it,
 tested player and team analytics, import of contract data with cap-normalised salaries,
 and a workbench to explore all of it and to build rosters by hand. The eighth adds the
@@ -25,11 +25,16 @@ player value engine of version 3: a model of what each player adds to a team, fi
 thirty seasons of team results and tested on seasons it had not seen, with projections,
 wins above replacement, value against salary where a contract file is on hand, and
 archetypes written as readable rules - on a page of the workbench and in
-[docs/research/PLAYER_VALUE.md](docs/research/PLAYER_VALUE.md).
+[docs/research/PLAYER_VALUE.md](docs/research/PLAYER_VALUE.md). The tenth adds the roster
+fit engine of version 4: a roster - a real team's, or one you built - described in the
+roadmap's six areas of fit and placed among the season's teams, and a test of whether any
+of that predicts a team's results beyond its players' impacts added up. On thirty seasons
+it does not, so fit is shown as description and nothing is added to the sum of the parts
+([docs/research/ROSTER_FIT.md](docs/research/ROSTER_FIT.md)).
 
-Nothing yet judges fit, optimises a roster or predicts an outcome. Those are the later
-stages. Player value is an estimate with a stated error, shown as one, and the workbench
-describes; it does not recommend.
+Nothing yet optimises a roster or predicts an outcome. Those are the later stages. Player
+value is an estimate with a stated error, shown as one, and the workbench describes; it
+does not recommend.
 
 **Contract data is not included.** No free source permits collecting NBA contracts
 automatically for this kind of project, so salaries come from a file you supply. Until
@@ -79,6 +84,7 @@ Stop it with Ctrl+C. [docs/WORKBENCH.md](docs/WORKBENCH.md) is the guide.
 | Contract Explorer | Salaries, team payrolls against the cap, tax and aprons, and the cap rules with their sources. |
 | Analytics Lab | Any two metrics against each other, how one is spread, and the metric glossary. |
 | Team Builder | Rosters you assemble by hand: payroll, cap share, room under each line, roster rules, pooled indicators. |
+| Roster Fit | Do these players make sense together? A team or a built roster described in the roadmap's areas of fit, placed among the season's teams, with the sum of its parts - and the evidence on whether fit adds anything to it. |
 | Data Health | Freshness, failed fetches, missing data, quality checks and source status. |
 
 Season, phase, team, player and comparison window are chosen once in the sidebar and
@@ -88,6 +94,8 @@ lab derived or estimated, and which you assumed.
 ![Player Explorer: a player's percentile profile and form](docs/images/player-explorer.png)
 
 ![Player Value: the season's leaders in wins above replacement, with impact at each end and reliability](docs/images/player-value.png)
+
+![Roster Fit: a team's measures placed among the season's teams, area by area](docs/images/roster-fit.png)
 
 ![Team Explorer: ratings with league ranks, the four factors and form](docs/images/team-explorer.png)
 
@@ -111,6 +119,9 @@ lab derived or estimated, and which you assumed.
 .\.venv\Scripts\fol.exe value show  # the fitted player value model and the evidence for it
 .\.venv\Scripts\fol.exe value fit   # fit it again on the built database (--write to save, then build)
 .\.venv\Scripts\fol.exe value report  # the value research, generated from the model and the database
+.\.venv\Scripts\fol.exe fit test    # test whether roster fit adds anything to the sum of the parts (--write to save)
+.\.venv\Scripts\fol.exe fit show    # the roster fit evidence on file
+.\.venv\Scripts\fol.exe fit report  # the roster fit research, generated from the evidence and the database
 .\.venv\Scripts\fol.exe ui --port 8600 --no-browser   # the workbench on another port
 ```
 
@@ -142,6 +153,7 @@ tests/              unit, architecture, integration and interface tests
 - [The workbench](docs/WORKBENCH.md) - how to read and use the pages
 - [Benchmark research](docs/research/BENCHMARKS.md) - what contenders have looked like, generated from the database
 - [Player value research](docs/research/PLAYER_VALUE.md) - the value model, how it was tested and what it found
+- [Roster fit research](docs/research/ROSTER_FIT.md) - what a roster is described by, and whether it matters beyond the sum of the parts
 - [Architecture](docs/ARCHITECTURE.md) - the layers and the rules between them
 - [Data dictionary](docs/DATA_DICTIONARY.md) - generated from the table contracts
 - [Metric glossary](docs/METRICS.md) - every player, team and roster metric, generated from the catalogs

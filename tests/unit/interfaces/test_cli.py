@@ -98,7 +98,7 @@ def test_metrics_prints_the_glossary() -> None:
 def test_metrics_write_creates_the_document(project: Path) -> None:
     result = runner.invoke(app, ["metrics", "--write"])
     assert result.exit_code == 0, result.output
-    assert "113 metrics" in result.output
+    assert "145 metrics" in result.output
     written = (project / "docs" / "METRICS.md").read_text(encoding="utf-8")
     assert written.startswith("# Metric Glossary")
     assert "\r" not in written
@@ -756,3 +756,75 @@ class TestValueCommands:
         assert result.exit_code == 1
         assert "no player values to report" in " ".join(result.output.split())
         assert "fol value fit --write, then fol build" in " ".join(result.output.split())
+
+
+class TestFitCommands:
+    """fol fit test and fol fit show."""
+
+    @pytest.fixture
+    def evidence_file(self, project: Path) -> Path:
+        return project / "configs" / "models" / "roster_fit.json"
+
+    @pytest.fixture
+    def fitted(self, project: Path, fitted_home: Path, evidence_file: Path) -> None:
+        """The invented league with a fitted value model and no fit evidence yet."""
+        shutil.copytree(fitted_home, project, dirs_exist_ok=True)
+        evidence_file.unlink()  # the shipped evidence came with the copied configs
+
+    def test_show_prints_the_shipped_evidence(self) -> None:
+        result = runner.invoke(app, ["fit", "show"])
+        assert result.exit_code == 0, result.output
+        flat = " ".join(result.output.split())
+        assert "Revision 1, gathered " in flat
+        assert "each corrected with weights fitted to the seasons before it" in flat
+        for heading in (
+            "Each measure alone, correcting the sum of the parts",
+            "Every measure together",
+            "The combined correction with one area left out",
+        ):
+            assert heading in flat, heading
+        for row in (
+            "Floor spacers",
+            "Rim protectors",
+            "Usage on the floor",
+            "Sum of the parts alone",
+        ):
+            assert row in flat, row
+        assert "No correction is applied to rosters" in flat
+
+    def test_show_without_evidence_says_how_to_gather_it(self, evidence_file: Path) -> None:
+        evidence_file.unlink()
+        result = runner.invoke(app, ["fit", "show"])
+        assert result.exit_code == 1
+        assert "No roster fit evidence has been gathered" in result.output
+        assert "Run: fol fit test --write" in result.output
+
+    def test_test_shows_the_evidence_and_saves_nothing_unless_asked(
+        self, fitted: None, evidence_file: Path
+    ) -> None:
+        result = runner.invoke(app, ["fit", "test"])
+        assert result.exit_code == 0, result.output
+        flat = " ".join(result.output.split())
+        assert "Tested on 30 team-seasons, 2006-07 to 2008-09" in flat
+        assert "Not saved. To save it as revision 1: fol fit test --write" in flat
+        assert not evidence_file.exists()
+
+    def test_test_write_saves_and_a_second_run_writes_nothing(
+        self, fitted: None, evidence_file: Path
+    ) -> None:
+        result = runner.invoke(app, ["fit", "test", "--write"])
+        assert result.exit_code == 0, result.output
+        assert "(revision 1)." in " ".join(result.output.split())
+        assert evidence_file.is_file()
+        again = runner.invoke(app, ["fit", "test", "--write"])
+        assert again.exit_code == 0, again.output
+        assert "The same as revision 1, already on file. Nothing to write." in " ".join(
+            again.output.split()
+        )
+        shown = runner.invoke(app, ["fit", "show"])
+        assert shown.exit_code == 0 and "Revision 1, gathered " in shown.output
+
+    def test_test_without_a_database_says_so(self) -> None:
+        result = runner.invoke(app, ["fit", "test"])
+        assert result.exit_code == 1
+        assert "Error: the database has not been built" in result.output

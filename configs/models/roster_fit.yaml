@@ -1,0 +1,16 @@
+# How the roster fit evidence is gathered. Nothing here is a weight or a verdict: the
+# evidence is what the data says when asked the way written down below, and each choice
+# was made before looking (docs/decisions/0012-roster-fit.md).
+#
+# Editing this file changes nothing until the evidence is gathered again:
+#   fol fit test --write
+
+# First season the fit measures are tested on. The value model's own test begins in
+# 2006-07; the fit test learns from its misses and needs a few seasons of them first.
+first_test_season: "2009-10"
+min_training_seasons: 3
+
+# Intervals come from resampling whole seasons this many times.
+resamples: 2000
+seed: 0
+confidence: 0.95

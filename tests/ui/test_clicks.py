@@ -162,6 +162,16 @@ class TestClicks:
         first = players[players["team_id"] == BOS].index[0]
         assert chosen(opened).player_id == first != players.index[0]
 
+    def test_a_fit_member_row_makes_that_player_the_subject(
+        self, page, click, plain_home: Path
+    ) -> None:
+        click(f"fit_members_team_{BOS}", row=1)
+        opened = page(plain_home, "fit", **{state.TEAM: BOS})
+        with Lab(load_settings(plain_home)) as lab:
+            members = lab.fit.team(BOS, "2025-26").members
+        assert chosen(opened).player_id == members.index[1]
+        assert chosen(opened).team_id == BOS
+
     def test_a_contract_row_makes_that_player_the_subject(
         self, page, click, contract_template: Path
     ) -> None:

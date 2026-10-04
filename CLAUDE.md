@@ -24,6 +24,9 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe value show                # the fitted player value model and its evidence
 .\.venv\Scripts\fol.exe value fit --write         # fit it again on the built database (then: fol build)
 .\.venv\Scripts\fol.exe value report --write      # regenerate docs/research/PLAYER_VALUE.md
+.\.venv\Scripts\fol.exe fit test --write          # gather the roster fit evidence again (configs/models/roster_fit.json)
+.\.venv\Scripts\fol.exe fit show                  # the roster fit evidence on file
+.\.venv\Scripts\fol.exe fit report --write        # regenerate docs/research/ROSTER_FIT.md
 .\.venv\Scripts\fol.exe ui --no-browser           # the workbench at http://localhost:8501 (Ctrl+C stops it)
 .\.venv\Scripts\python.exe scripts\make_fixtures.py   # rebuild tests/fixtures/raw from data/raw
 ```
@@ -67,10 +70,11 @@ Build one roadmap milestone at a time. A milestone is finished only when:
 - **No thresholds.** Report how often, for how many, with what uncertainty. A band is a
   way of grouping; nothing "needs" a figure. Compare teams within their own season.
 - **Generated documents are not edited.** `docs/DATA_DICTIONARY.md`, `docs/METRICS.md`,
-  `docs/research/BENCHMARKS.md` and `docs/research/PLAYER_VALUE.md` come from
-  `fol dictionary|metrics|benchmarks --write` and `fol value report --write`. The first
-  two are checked by tests; the research documents depend on the database, so regenerate
-  them at a milestone gate after the data, the model or the research code changes.
+  `docs/research/BENCHMARKS.md`, `docs/research/PLAYER_VALUE.md` and
+  `docs/research/ROSTER_FIT.md` come from `fol dictionary|metrics|benchmarks --write`,
+  `fol value report --write` and `fol fit report --write`. The first two are checked by
+  tests; the research documents depend on the database, so regenerate them at a milestone
+  gate after the data, a model, the evidence or the research code changes.
 - **A model is fitted on request and applied by every build.** `fol value fit --write`
   writes `configs/models/player_value.json`; `fol build` applies it and never fits. Do
   not edit that file, and do not fit inside a build, a service or a page. Changing
@@ -82,6 +86,13 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   the difference is clear of zero. Record what was tried and left out in the decision.
 - **Modeled values are estimates on screen too**: impact, projections and wins carry
   the modeled tag, and a weight is shown with its interval or not at all.
+- **Fit is description unless the evidence says otherwise.** The fit measures are defined
+  once in `domain/fit.py`; the table, the catalog and the computation read off that list.
+  `fol fit test --write` gathers `configs/models/roster_fit.json`, the test of whether the
+  measures explain what the value model's predictions missed; a correction is added to a
+  roster's sum of parts only when `combined.is_usable`, and on the evidence the lab ships
+  it is not. No page, and no later optimiser, may score fit with chosen weights; role
+  counts may constrain a roster, never rate it (`docs/decisions/0012-roster-fit.md`).
 - **Archetypes are rules, not findings.** They live in `configs/archetypes.yaml`; a
   player's score for a role is the weakest of their percentiles on its measures, among
   the group the role is open to, within the season. To change one: edit the file, raise

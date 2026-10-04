@@ -1,0 +1,742 @@
+{
+ "revision": 1,
+ "fitted_at": "2026-10-04T17:19:50",
+ "spec": {
+  "first_test_season": "2009-10",
+  "min_training_seasons": 3,
+  "resamples": 2000,
+  "seed": 0,
+  "confidence": 0.95
+ },
+ "value_model_version": "r1",
+ "archetype_version": "v1",
+ "first_test_season": "2009-10",
+ "last_test_season": "2025-26",
+ "team_seasons": 510,
+ "baseline_rmse": 2.9562,
+ "tested": [
+  "primary_creators",
+  "creators",
+  "spacers",
+  "three_point_rate",
+  "three_point_accuracy",
+  "free_throw_rate",
+  "assist_rate",
+  "perimeter_defenders",
+  "switchable_wings",
+  "rim_protectors",
+  "steal_rate",
+  "block_rate",
+  "rebound_rate",
+  "turnover_rate",
+  "height",
+  "guard_minutes",
+  "wing_minutes",
+  "big_minutes",
+  "multi_position",
+  "bench_impact",
+  "bench_creators",
+  "bench_bigs",
+  "bench_defenders",
+  "unprofiled_share",
+  "star_share",
+  "usage_sum",
+  "usage_top"
+ ],
+ "measures": [
+  {
+   "key": "primary_creators",
+   "name": "Primary creators",
+   "area": "Offense",
+   "teams": 510,
+   "coefficient": 0.0595,
+   "coefficient_low": -0.2015,
+   "coefficient_high": 0.2805,
+   "rmse": 2.9585,
+   "change": {
+    "difference": 0.0023,
+    "low": -0.012,
+    "high": 0.0169
+   }
+  },
+  {
+   "key": "creators",
+   "name": "Creators",
+   "area": "Offense",
+   "teams": 510,
+   "coefficient": 0.0575,
+   "coefficient_low": -0.1476,
+   "coefficient_high": 0.2444,
+   "rmse": 2.9582,
+   "change": {
+    "difference": 0.002,
+    "low": -0.0138,
+    "high": 0.0175
+   }
+  },
+  {
+   "key": "spacers",
+   "name": "Floor spacers",
+   "area": "Offense",
+   "teams": 510,
+   "coefficient": -0.0548,
+   "coefficient_low": -0.2819,
+   "coefficient_high": 0.178,
+   "rmse": 2.9679,
+   "change": {
+    "difference": 0.0117,
+    "low": -0.0072,
+    "high": 0.0331
+   }
+  },
+  {
+   "key": "three_point_rate",
+   "name": "Three-point attempts",
+   "area": "Offense",
+   "teams": 510,
+   "coefficient": 0.0482,
+   "coefficient_low": -0.1686,
+   "coefficient_high": 0.2993,
+   "rmse": 2.9619,
+   "change": {
+    "difference": 0.0058,
+    "low": -0.0104,
+    "high": 0.0226
+   }
+  },
+  {
+   "key": "three_point_accuracy",
+   "name": "Three-point accuracy, regressed",
+   "area": "Offense",
+   "teams": 510,
+   "coefficient": 0.0354,
+   "coefficient_low": -0.1587,
+   "coefficient_high": 0.1855,
+   "rmse": 2.9587,
+   "change": {
+    "difference": 0.0025,
+    "low": -0.011,
+    "high": 0.0157
+   }
+  },
+  {
+   "key": "free_throw_rate",
+   "name": "Free-throw rate",
+   "area": "Offense",
+   "teams": 510,
+   "coefficient": -0.1501,
+   "coefficient_low": -0.342,
+   "coefficient_high": 0.0429,
+   "rmse": 2.9567,
+   "change": {
+    "difference": 0.0006,
+    "low": -0.0098,
+    "high": 0.0108
+   }
+  },
+  {
+   "key": "assist_rate",
+   "name": "Assist percentage",
+   "area": "Offense",
+   "teams": 510,
+   "coefficient": 0.2174,
+   "coefficient_low": 0.0007,
+   "coefficient_high": 0.4257,
+   "rmse": 2.9526,
+   "change": {
+    "difference": -0.0035,
+    "low": -0.0178,
+    "high": 0.0099
+   }
+  },
+  {
+   "key": "perimeter_defenders",
+   "name": "Perimeter defenders",
+   "area": "Defense",
+   "teams": 510,
+   "coefficient": 0.3202,
+   "coefficient_low": 0.0639,
+   "coefficient_high": 0.5859,
+   "rmse": 2.9419,
+   "change": {
+    "difference": -0.0143,
+    "low": -0.0494,
+    "high": 0.0226
+   }
+  },
+  {
+   "key": "switchable_wings",
+   "name": "Switchable wings",
+   "area": "Defense",
+   "teams": 510,
+   "coefficient": 0.1441,
+   "coefficient_low": -0.0764,
+   "coefficient_high": 0.3523,
+   "rmse": 2.9598,
+   "change": {
+    "difference": 0.0037,
+    "low": -0.012,
+    "high": 0.0199
+   }
+  },
+  {
+   "key": "rim_protectors",
+   "name": "Rim protectors",
+   "area": "Defense",
+   "teams": 510,
+   "coefficient": 0.0461,
+   "coefficient_low": -0.1901,
+   "coefficient_high": 0.3038,
+   "rmse": 2.9626,
+   "change": {
+    "difference": 0.0064,
+    "low": -0.0089,
+    "high": 0.0207
+   }
+  },
+  {
+   "key": "steal_rate",
+   "name": "Steals",
+   "area": "Defense",
+   "teams": 510,
+   "coefficient": 0.3366,
+   "coefficient_low": 0.1127,
+   "coefficient_high": 0.5521,
+   "rmse": 2.9398,
+   "change": {
+    "difference": -0.0164,
+    "low": -0.0424,
+    "high": 0.0076
+   }
+  },
+  {
+   "key": "block_rate",
+   "name": "Blocks",
+   "area": "Defense",
+   "teams": 510,
+   "coefficient": -0.1932,
+   "coefficient_low": -0.4062,
+   "coefficient_high": 0.0091,
+   "rmse": 2.9532,
+   "change": {
+    "difference": -0.003,
+    "low": -0.0259,
+    "high": 0.0195
+   }
+  },
+  {
+   "key": "rebound_rate",
+   "name": "Rebound percentage",
+   "area": "Possession battle",
+   "teams": 510,
+   "coefficient": -0.0279,
+   "coefficient_low": -0.2735,
+   "coefficient_high": 0.2149,
+   "rmse": 2.9628,
+   "change": {
+    "difference": 0.0067,
+    "low": -0.0116,
+    "high": 0.0265
+   }
+  },
+  {
+   "key": "turnover_rate",
+   "name": "Turnover percentage",
+   "area": "Possession battle",
+   "teams": 510,
+   "coefficient": -0.035,
+   "coefficient_low": -0.2703,
+   "coefficient_high": 0.1993,
+   "rmse": 2.9637,
+   "change": {
+    "difference": 0.0076,
+    "low": -0.0065,
+    "high": 0.0205
+   }
+  },
+  {
+   "key": "height",
+   "name": "Height, minutes-weighted",
+   "area": "Structure",
+   "teams": 510,
+   "coefficient": 0.0423,
+   "coefficient_low": -0.1396,
+   "coefficient_high": 0.2316,
+   "rmse": 2.9599,
+   "change": {
+    "difference": 0.0037,
+    "low": -0.0124,
+    "high": 0.0196
+   }
+  },
+  {
+   "key": "guard_minutes",
+   "name": "Minutes by guards",
+   "area": "Structure",
+   "teams": 510,
+   "coefficient": 0.0746,
+   "coefficient_low": -0.2206,
+   "coefficient_high": 0.3244,
+   "rmse": 2.9757,
+   "change": {
+    "difference": 0.0195,
+    "low": -0.0064,
+    "high": 0.0481
+   }
+  },
+  {
+   "key": "wing_minutes",
+   "name": "Minutes by wings",
+   "area": "Structure",
+   "teams": 510,
+   "coefficient": -0.0007,
+   "coefficient_low": -0.2123,
+   "coefficient_high": 0.2034,
+   "rmse": 2.9581,
+   "change": {
+    "difference": 0.0019,
+    "low": -0.009,
+    "high": 0.0132
+   }
+  },
+  {
+   "key": "big_minutes",
+   "name": "Minutes by big men",
+   "area": "Structure",
+   "teams": 510,
+   "coefficient": -0.0383,
+   "coefficient_low": -0.2172,
+   "coefficient_high": 0.1284,
+   "rmse": 2.958,
+   "change": {
+    "difference": 0.0018,
+    "low": -0.0104,
+    "high": 0.0137
+   }
+  },
+  {
+   "key": "multi_position",
+   "name": "Minutes by two-position players",
+   "area": "Structure",
+   "teams": 510,
+   "coefficient": 0.0204,
+   "coefficient_low": -0.1895,
+   "coefficient_high": 0.2347,
+   "rmse": 2.9677,
+   "change": {
+    "difference": 0.0116,
+    "low": -0.0034,
+    "high": 0.0262
+   }
+  },
+  {
+   "key": "bench_impact",
+   "name": "Bench impact",
+   "area": "Depth",
+   "teams": 510,
+   "coefficient": 0.0703,
+   "coefficient_low": -0.0917,
+   "coefficient_high": 0.2441,
+   "rmse": 2.9568,
+   "change": {
+    "difference": 0.0006,
+    "low": -0.0124,
+    "high": 0.0137
+   }
+  },
+  {
+   "key": "bench_creators",
+   "name": "Bench creators",
+   "area": "Depth",
+   "teams": 510,
+   "coefficient": -0.151,
+   "coefficient_low": -0.3625,
+   "coefficient_high": 0.0704,
+   "rmse": 2.9552,
+   "change": {
+    "difference": -0.001,
+    "low": -0.0156,
+    "high": 0.0137
+   }
+  },
+  {
+   "key": "bench_bigs",
+   "name": "Bench big men",
+   "area": "Depth",
+   "teams": 510,
+   "coefficient": 0.0554,
+   "coefficient_low": -0.1279,
+   "coefficient_high": 0.2422,
+   "rmse": 2.9592,
+   "change": {
+    "difference": 0.0031,
+    "low": -0.0121,
+    "high": 0.0164
+   }
+  },
+  {
+   "key": "bench_defenders",
+   "name": "Bench defenders",
+   "area": "Depth",
+   "teams": 510,
+   "coefficient": 0.1786,
+   "coefficient_low": -0.0333,
+   "coefficient_high": 0.3931,
+   "rmse": 2.9551,
+   "change": {
+    "difference": -0.001,
+    "low": -0.0155,
+    "high": 0.0144
+   }
+  },
+  {
+   "key": "unprofiled_share",
+   "name": "Minutes without a profile",
+   "area": "Depth",
+   "teams": 510,
+   "coefficient": -0.2196,
+   "coefficient_low": -0.5107,
+   "coefficient_high": 0.0905,
+   "rmse": 2.9568,
+   "change": {
+    "difference": 0.0006,
+    "low": -0.0151,
+    "high": 0.0176
+   }
+  },
+  {
+   "key": "star_share",
+   "name": "Reliance on one player",
+   "area": "Depth",
+   "teams": 510,
+   "coefficient": -0.1232,
+   "coefficient_low": -0.3645,
+   "coefficient_high": 0.14,
+   "rmse": 2.961,
+   "change": {
+    "difference": 0.0049,
+    "low": -0.0094,
+    "high": 0.0169
+   }
+  },
+  {
+   "key": "usage_sum",
+   "name": "Usage on the floor",
+   "area": "Usage",
+   "teams": 510,
+   "coefficient": 0.1628,
+   "coefficient_low": -0.0472,
+   "coefficient_high": 0.3799,
+   "rmse": 2.954,
+   "change": {
+    "difference": -0.0022,
+    "low": -0.0165,
+    "high": 0.01
+   }
+  },
+  {
+   "key": "usage_top",
+   "name": "Usage of the three highest-usage players",
+   "area": "Usage",
+   "teams": 510,
+   "coefficient": 0.0838,
+   "coefficient_low": -0.1173,
+   "coefficient_high": 0.3113,
+   "rmse": 2.9572,
+   "change": {
+    "difference": 0.001,
+    "low": -0.0126,
+    "high": 0.0144
+   }
+  }
+ ],
+ "combined": {
+  "rmse": 3.1392,
+  "change": {
+   "difference": 0.1831,
+   "low": 0.0564,
+   "high": 0.3348
+  },
+  "intercept": -0.1638,
+  "terms": [
+   {
+    "key": "primary_creators",
+    "coefficient": -0.0193,
+    "low": -0.3148,
+    "high": 0.2055,
+    "mean": 0.5867,
+    "scale": 0.6551
+   },
+   {
+    "key": "creators",
+    "coefficient": -0.0104,
+    "low": -0.2988,
+    "high": 0.2947,
+    "mean": 1.8183,
+    "scale": 1.0257
+   },
+   {
+    "key": "spacers",
+    "coefficient": -0.1905,
+    "low": -0.4221,
+    "high": 0.0863,
+    "mean": 1.74,
+    "scale": 1.1758
+   },
+   {
+    "key": "three_point_rate",
+    "coefficient": 0.0011,
+    "low": -0.4092,
+    "high": 0.4214,
+    "mean": 5.1522,
+    "scale": 1.6222
+   },
+   {
+    "key": "three_point_accuracy",
+    "coefficient": 0.1087,
+    "low": -0.1896,
+    "high": 0.3325,
+    "mean": 0.3579,
+    "scale": 0.0076
+   },
+   {
+    "key": "free_throw_rate",
+    "coefficient": -0.2402,
+    "low": -0.5139,
+    "high": 0.0349,
+    "mean": 0.2814,
+    "scale": 0.046
+   },
+   {
+    "key": "assist_rate",
+    "coefficient": 0.0836,
+    "low": -0.2164,
+    "high": 0.3875,
+    "mean": 0.1486,
+    "scale": 0.0191
+   },
+   {
+    "key": "perimeter_defenders",
+    "coefficient": 0.1907,
+    "low": -0.1433,
+    "high": 0.5401,
+    "mean": 0.9167,
+    "scale": 0.9145
+   },
+   {
+    "key": "switchable_wings",
+    "coefficient": 0.0855,
+    "low": -0.1631,
+    "high": 0.3465,
+    "mean": 0.74,
+    "scale": 0.8077
+   },
+   {
+    "key": "rim_protectors",
+    "coefficient": 0.1552,
+    "low": -0.1072,
+    "high": 0.4391,
+    "mean": 0.435,
+    "scale": 0.559
+   },
+   {
+    "key": "steal_rate",
+    "coefficient": 0.2821,
+    "low": -0.0469,
+    "high": 0.5731,
+    "mean": 1.5542,
+    "scale": 0.1772
+   },
+   {
+    "key": "block_rate",
+    "coefficient": -0.3733,
+    "low": -0.6796,
+    "high": -0.1,
+    "mean": 1.011,
+    "scale": 0.1981
+   },
+   {
+    "key": "rebound_rate",
+    "coefficient": -0.0498,
+    "low": -0.3814,
+    "high": 0.2327,
+    "mean": 0.0892,
+    "scale": 0.0062
+   },
+   {
+    "key": "turnover_rate",
+    "coefficient": 0.0267,
+    "low": -0.2493,
+    "high": 0.3009,
+    "mean": 0.1269,
+    "scale": 0.0122
+   },
+   {
+    "key": "height",
+    "coefficient": 0.2692,
+    "low": -0.0597,
+    "high": 0.5601,
+    "mean": 78.6373,
+    "scale": 0.6296
+   },
+   {
+    "key": "guard_minutes",
+    "coefficient": 0.1145,
+    "low": -0.397,
+    "high": 0.5481,
+    "mean": 0.4997,
+    "scale": 0.0992
+   },
+   {
+    "key": "wing_minutes",
+    "coefficient": 0.1036,
+    "low": -0.4017,
+    "high": 0.59,
+    "mean": 0.383,
+    "scale": 0.114
+   },
+   {
+    "key": "big_minutes",
+    "coefficient": 0.086,
+    "low": -0.4948,
+    "high": 0.7057,
+    "mean": 0.2408,
+    "scale": 0.083
+   },
+   {
+    "key": "multi_position",
+    "coefficient": -0.108,
+    "low": -0.4041,
+    "high": 0.2058,
+    "mean": 0.255,
+    "scale": 0.1359
+   },
+   {
+    "key": "bench_impact",
+    "coefficient": 0.0345,
+    "low": -0.2263,
+    "high": 0.3256,
+    "mean": -0.7651,
+    "scale": 0.9151
+   },
+   {
+    "key": "bench_creators",
+    "coefficient": -0.1433,
+    "low": -0.4569,
+    "high": 0.1649,
+    "mean": 0.5067,
+    "scale": 0.6403
+   },
+   {
+    "key": "bench_bigs",
+    "coefficient": 0.0281,
+    "low": -0.1919,
+    "high": 0.2562,
+    "mean": 1.155,
+    "scale": 0.8452
+   },
+   {
+    "key": "bench_defenders",
+    "coefficient": -0.0465,
+    "low": -0.371,
+    "high": 0.2952,
+    "mean": 0.765,
+    "scale": 0.8285
+   },
+   {
+    "key": "unprofiled_share",
+    "coefficient": -0.234,
+    "low": -0.6544,
+    "high": 0.1977,
+    "mean": 0.1046,
+    "scale": 0.0873
+   },
+   {
+    "key": "star_share",
+    "coefficient": 0.033,
+    "low": -0.3259,
+    "high": 0.4368,
+    "mean": 0.2993,
+    "scale": 0.0823
+   },
+   {
+    "key": "usage_sum",
+    "coefficient": 0.2737,
+    "low": 0.0179,
+    "high": 0.5609,
+    "mean": 0.9831,
+    "scale": 0.0576
+   },
+   {
+    "key": "usage_top",
+    "coefficient": -0.1808,
+    "low": -0.3847,
+    "high": 0.0298,
+    "mean": 0.7474,
+    "scale": 0.0684
+   }
+  ],
+  "ablations": [
+   {
+    "key": "offense",
+    "label": "Offense",
+    "rmse": 3.0669,
+    "change": {
+     "difference": -0.0723,
+     "low": -0.1505,
+     "high": -0.0132
+    }
+   },
+   {
+    "key": "defense",
+    "label": "Defense",
+    "rmse": 3.1093,
+    "change": {
+     "difference": -0.03,
+     "low": -0.0885,
+     "high": 0.0292
+    }
+   },
+   {
+    "key": "possession",
+    "label": "Possession battle",
+    "rmse": 3.117,
+    "change": {
+     "difference": -0.0222,
+     "low": -0.0403,
+     "high": -0.0059
+    }
+   },
+   {
+    "key": "structure",
+    "label": "Structure",
+    "rmse": 3.0861,
+    "change": {
+     "difference": -0.0531,
+     "low": -0.0964,
+     "high": -0.011
+    }
+   },
+   {
+    "key": "depth",
+    "label": "Depth",
+    "rmse": 3.0773,
+    "change": {
+     "difference": -0.0619,
+     "low": -0.1138,
+     "high": -0.0234
+    }
+   },
+   {
+    "key": "usage",
+    "label": "Usage",
+    "rmse": 3.1287,
+    "change": {
+     "difference": -0.0106,
+     "low": -0.0227,
+     "high": 0.0005
+    }
+   }
+  ]
+ }
+}

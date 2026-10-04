@@ -10,13 +10,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from front_office.domain.schema import TableContract
-from front_office.domain.tables import finance, operations, players, rosters, teams, value
+from front_office.domain.tables import (
+    finance,
+    fit,
+    operations,
+    players,
+    rosters,
+    teams,
+    value,
+)
 
 # Built from the raw store; listed so that a table always follows the tables it references.
 LEAGUE_TABLES: tuple[TableContract, ...] = (*teams.TABLES, *players.TABLES, *finance.TABLES)
 
-# Computed from the league tables by a fitted model, in the same build.
-MODELED_TABLES: tuple[TableContract, ...] = value.TABLES
+# Computed from the league tables by a fitted model and the role rules, in the same build.
+MODELED_TABLES: tuple[TableContract, ...] = (*value.TABLES, *fit.TABLES)
 
 # Dropped and rewritten by every build: the league data, what the models make of it, and
 # the build's own report.

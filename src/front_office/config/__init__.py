@@ -6,6 +6,10 @@ Depends only on the domain layer. This is the only place YAML is parsed.
 from front_office.config.archetypes import archetypes_path, load_archetypes
 from front_office.config.eras import eras_path, load_eras
 from front_office.config.models import (
+    fit_evidence_path,
+    fit_spec_path,
+    load_fit_evidence,
+    load_fit_spec,
     load_value_model,
     load_value_spec,
     save_value_model,
@@ -35,6 +39,11 @@ __all__ = [
     "find_project_root",
     "load_all_season_rules",
     "load_archetypes",
+    "fit_evidence_path",
+    "fit_spec_path",
+    "load_fit_evidence",
+    "load_fit_spec",
+    "save_fit_evidence",
     "load_eras",
     "load_season_rules",
     "load_settings",

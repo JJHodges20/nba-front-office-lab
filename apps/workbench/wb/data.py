@@ -11,9 +11,12 @@ from datetime import date, datetime
 import pandas as pd
 import streamlit as st
 
+from front_office.domain.fit_model import FitEvidence
 from front_office.services import (
     Era,
     EraView,
+    FitReport,
+    FitStatus,
     Lab,
     LabStatus,
     ModelCard,
@@ -241,6 +244,36 @@ def value_card(build: int | None, revision: int | None) -> ModelCard | None:
     """The fitted model on file. Keyed on its revision too: fitting again changes the
     file without a build."""
     return lab().value.card()
+
+
+# --- roster fit -------------------------------------------------------------------------
+
+
+@st.cache_data(show_spinner=False)
+def fit_status(build: int | None) -> FitStatus:
+    return lab().fit.status()
+
+
+@st.cache_data(show_spinner=False)
+def fit_team(build: int | None, team_id: int, season: str) -> FitReport:
+    return lab().fit.team(team_id, season)
+
+
+def fit_roster(roster_id: int) -> FitReport:
+    """A built roster's profile. The roster changes from the Team Builder, so never cached."""
+    return lab().fit.roster(roster_id)
+
+
+@st.cache_data(show_spinner=False)
+def fit_evidence(build: int | None, revision: int | None) -> FitEvidence | None:
+    """The evidence on file. Keyed on its revision too: gathering it again changes the
+    file without a build."""
+    return lab().fit.evidence()
+
+
+@st.cache_data(show_spinner=False)
+def fit_champions(build: int | None) -> pd.DataFrame:
+    return lab().fit.champions()
 
 
 # --- contracts --------------------------------------------------------------------------

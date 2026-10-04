@@ -13,11 +13,14 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from front_office.config.settings import ConfigError, read_yaml
+from front_office.domain.fit_model import FitEvidence, FitSpec
 from front_office.domain.value_model import ValueModel, ValueSpec
 
 MODELS_DIR = "models"
 VALUE_SPEC_FILE = "player_value.yaml"
 VALUE_MODEL_FILE = "player_value.json"
+FIT_SPEC_FILE = "roster_fit.yaml"
+FIT_EVIDENCE_FILE = "roster_fit.json"
 
 
 def value_spec_path(config_dir: Path) -> Path:
@@ -66,3 +69,45 @@ def render_value_model(model: ValueModel) -> str:
     head = json.dumps(document, indent=1, ensure_ascii=False)
     lines = ",\n".join(f"  {json.dumps(row)}" for row in rows)
     return f'{head[:-2]},\n "backtest": [\n{lines}\n ]\n}}\n'
+
+
+# --- roster fit --------------------------------------------------------------------------
+
+
+def fit_spec_path(config_dir: Path) -> Path:
+    return config_dir / MODELS_DIR / FIT_SPEC_FILE
+
+
+def fit_evidence_path(config_dir: Path) -> Path:
+    return config_dir / MODELS_DIR / FIT_EVIDENCE_FILE
+
+
+def load_fit_spec(config_dir: Path) -> FitSpec:
+    """How the roster fit evidence is to be gathered."""
+    path = fit_spec_path(config_dir)
+    try:
+        return FitSpec.model_validate(read_yaml(path))
+    except ValidationError as error:
+        raise ConfigError(f"invalid roster fit specification in {path}:\n{error}") from error
+
+
+def load_fit_evidence(config_dir: Path) -> FitEvidence | None:
+    """The roster fit evidence on file, or ``None`` if none has been written."""
+    path = fit_evidence_path(config_dir)
+    if not path.is_file():
+        return None
+    try:
+        return FitEvidence.model_validate_json(path.read_text(encoding="utf-8"))
+    except ValidationError as error:
+        raise ConfigError(
+            f"{path} is not roster fit evidence this version of the lab can read:\n{error}\n"
+            "Gather it again: fol fit test --write"
+        ) from error
+
+
+def save_fit_evidence(config_dir: Path, evidence: FitEvidence) -> Path:
+    """Write the evidence where the services will find it."""
+    path = fit_evidence_path(config_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(evidence.model_dump_json(indent=1) + "\n", encoding="utf-8", newline="\n")
+    return path

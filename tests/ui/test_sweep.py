@@ -45,12 +45,14 @@ STARTS: dict[str, dict[str, dict[str, object]]] = {
     "contracts": {"open": {}, "team": {state.TEAM: BOS}},
     "lab": {"players": {}, "teams": {"lab_subject": "Teams"}},
     "builder": {"roster": {}},
+    # The roster start needs the roster the sweep creates; the team start needs a team.
+    "fit": {"team": {state.TEAM: BOS}, "roster": {"fit_subject": "Built roster"}},
     "health": {"open": {}},
 }
 # The one filter a page is swept through in full although it is long, from the first of
 # its starts: the page is about that choice. Elsewhere a few teams and players stand for
 # all of them.
-OWN_SUBJECT = {"teams": state.TEAM, "players": state.PLAYER}
+OWN_SUBJECT = {"teams": state.TEAM, "players": state.PLAYER, "fit": state.TEAM}
 SAMPLED = (state.TEAM, state.PLAYER, "'Add a player'", "bench_field_x", "bench_field_y")
 CASES = [(name, start) for name, starts in STARTS.items() for start in starts]
 
