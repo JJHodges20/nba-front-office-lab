@@ -1,0 +1,83 @@
+# Player archetypes: the roles a player can fill, and the rule for each.
+#
+# A player's score for an archetype is the weakest of their percentiles on its measures,
+# among the players the archetype is open to, in that season. Being strong on one
+# measure and ordinary on another is not the role: both are needed. A player fills a
+# role from the cut-off up; the cut-off is a convention, and the score is kept beside it.
+#
+# Nothing here is fitted. Change a rule, raise the version, rebuild.
+
+version: 1
+
+# Players with fewer minutes in a season are given no role: too little to go on.
+min_minutes: 500
+
+# The score from which a player fills a role: in the top third on every measure.
+fills_at: 67
+
+archetypes:
+  - key: primary_creator
+    name: Primary Creator
+    description: High-volume initiator who creates efficient offense for self and teammates.
+    measures: [usage_pct, assist_pct]
+    fills_at: 85
+    note: >-
+      Uses many of the team's plays and assists many of its baskets. About one player a
+      team clears this line. Efficiency is not part of the rule: see the player's impact.
+
+  - key: secondary_creator
+    name: Secondary Creator
+    description: Can run offense without needing full-time primary usage.
+    measures: [usage_pct, assist_pct]
+    fills_below: 85
+    note: The same measures as a primary creator, a tier down.
+
+  - key: floor_spacer
+    name: Floor Spacer
+    description: Creates spacing through off-ball shooting and movement.
+    measures: [fg3a_per_100, fg3_pct_regressed]
+    note: >-
+      The roadmap's movement shooter. The lab sees how often and how well a player
+      shoots threes, not whether the shot came off movement or standing still.
+
+  - key: perimeter_defender
+    name: Perimeter Defender
+    description: Defends lead guards and initiators at the perimeter.
+    among: guards
+    measures: [stl_per_100, impact_defense]
+    note: >-
+      The roadmap's point-of-attack defender, by proxy: steals and the value model's
+      defensive impact, among guards. Who a player guarded is not in the data.
+
+  - key: switchable_wing
+    name: Switchable Wing
+    description: Multi-position defender with useful offensive connectivity.
+    among: wings
+    measures: [stocks_per_100, impact_defense]
+    note: >-
+      Wing size with steals, blocks and defensive impact. Switching itself is not
+      measured, and neither is the offensive half of the description.
+
+  - key: rim_protector
+    name: Rim Protector
+    description: Deters and contests shots near the basket.
+    among: bigs
+    measures: [blk_per_100, impact_defense]
+    note: Blocks and defensive impact among big men. Shots deterred are not counted.
+
+  - key: stretch_big
+    name: Stretch Big
+    description: Provides frontcourt size while preserving floor spacing.
+    among: bigs
+    measures: [fg3a_per_100, fg3_pct_regressed]
+    note: Three-point volume and accuracy, among big men rather than the whole league.
+
+  - key: connector
+    name: Connector
+    description: Low-usage player who passes, screens, cuts, and maintains flow.
+    among: low_usage
+    measures: [ast_per_tov, ts_pct]
+    note: >-
+      Among players who use few plays: assists per turnover, and efficiency. Screens and
+      cuts are not in the data, and of all the roles this one carries over least from
+      one season to the next.

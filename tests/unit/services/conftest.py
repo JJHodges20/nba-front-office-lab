@@ -70,3 +70,10 @@ def scratch_lab(contract_template: Path, tmp_path: Path) -> Iterator[Lab]:
     shutil.copytree(contract_template, target)
     with Lab(load_settings(target)) as opened:
         yield opened
+
+
+@pytest.fixture(scope="session")
+def value_lab(value_home: Path) -> Iterator[Lab]:
+    """The invented league valued by planted weights. Read from it; never write to it."""
+    with Lab(load_settings(value_home)) as opened:
+        yield opened

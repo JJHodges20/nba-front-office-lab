@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from front_office.services.league import LeagueService
     from front_office.services.players import PlayerService
     from front_office.services.teams import TeamService
+    from front_office.services.value import ValueService
 
 
 class LabNotBuilt(RuntimeError):
@@ -191,3 +192,9 @@ class Lab:
         from front_office.services.benchmarks import BenchmarkService
 
         return BenchmarkService(self)
+
+    @property
+    def value(self) -> ValueService:
+        from front_office.services.value import ValueService
+
+        return ValueService(self)

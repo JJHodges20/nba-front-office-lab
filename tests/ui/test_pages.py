@@ -14,12 +14,22 @@ from streamlit.testing.v1 import AppTest
 
 from front_office.config import load_settings
 from front_office.services import DEFAULT_QUALIFICATION, Lab, floor, relationship
-from tests.helpers import ABDELNABY, BOS, BROWN, NYK, PRITCHARD, TATUM, WHITE
+from tests.helpers import ABDELNABY, BOS, BROWN, NYK, PRITCHARD, TATUM, TOWNS, WHITE
 from tests.ui.conftest import TIMEOUT, drawn, figures, texts
 from wb import state
 from wb.views import builder as builder_view
 
-PAGES = ("league", "benchmarks", "players", "teams", "contracts", "lab", "builder", "health")
+PAGES = (
+    "league",
+    "benchmarks",
+    "players",
+    "value",
+    "teams",
+    "contracts",
+    "lab",
+    "builder",
+    "health",
+)
 STATES = {
     "default": {},
     "team": {state.TEAM: BOS},
@@ -180,6 +190,38 @@ class TestPlayers:
         opened = page(plain_home, "players", **session)
         assert "Choose two or three players" not in texts(opened)
         assert "Nobody is ranked" not in texts(opened)
+
+    def test_modeled_numbers_are_announced_only_where_there_are_any(
+        self, page, plain_home: Path
+    ) -> None:
+        def tags(**session: object) -> str:
+            return texts(page(plain_home, "players", **session))
+
+        assert "Modeled" in tags()
+        assert "Modeled" not in tags(**{state.SPAN: "Last 10 games"})
+        assert "Modeled" not in tags(**{state.PHASE: "playoffs"})
+        assert "Derived" in tags(**{state.PHASE: "playoffs"})
+
+    def test_the_listing_names_each_players_main_role(self, page, plain_home: Path) -> None:
+        opened = page(plain_home, "players", players_qualified_only=False)
+        listing = opened.dataframe[0].value
+        with Lab(load_settings(plain_home)) as lab:
+            filled = lab.value.roles("2025-26")
+        assert list(listing.columns[:5]) == ["player_name", "team", "position", "age", "role"]
+        named = listing.set_index("player_name")["role"]
+        assert named["Jayson Tatum"] == "Primary Creator"
+        assert pd.isna(named["Karl-Anthony Towns"])
+        assert named.notna().sum() == len(filled)
+
+    def test_the_role_is_shown_with_the_overview_only(self, page, plain_home: Path) -> None:
+        opened = page(plain_home, "players", players_columns="Scoring")
+        assert "role" not in opened.dataframe[0].value.columns
+
+    def test_a_profile_names_every_role_the_player_fills(self, page, plain_home: Path) -> None:
+        opened = page(plain_home, "players", **{state.PLAYER: TATUM})
+        assert "Roles filled in 2025-26: Primary Creator, Perimeter Defender." in texts(opened)
+        without = page(plain_home, "players", **{state.PLAYER: TOWNS})
+        assert "Karl-Anthony Towns" in texts(without) and "Roles filled" not in texts(without)
 
     def test_with_contracts_the_listing_carries_salaries(
         self, page, contract_template: Path
@@ -607,14 +649,15 @@ class TestLab:
         glossary = next(
             frame.value for frame in opened.dataframe if "Definition" in frame.value.columns
         )
-        assert len(glossary) == 92
+        assert len(glossary) == 113
         assert set(glossary["Group"]) == {
             "Player metrics",
             "Team metrics",
             "Roster indicators",
             "Benchmark measures",
+            "Player value",
         }
-        assert "92 metrics." in texts(opened)
+        assert "113 metrics." in texts(opened)
 
     def test_the_glossary_can_be_searched(self, page, plain_home: Path) -> None:
         opened = page(plain_home, "lab", lab_glossary_search="true shooting")
@@ -950,8 +993,8 @@ class TestHealth:
         frames = [frame.value for frame in opened.dataframe]
         checks = next(frame for frame in frames if "Requires" in frame.columns)
         tables = next(frame for frame in frames if "Domain" in frame.columns)
-        assert len(checks) == 52 and set(checks["Result"]) == {"Passed", "Warning", "Error"}
+        assert len(checks) == 54 and set(checks["Result"]) == {"Passed", "Warning", "Error"}
         assert checks["Result"].iloc[0] != "Passed"
-        assert len(tables) == 20
+        assert len(tables) == 21
         assert tables.set_index("Table").at["team_seasons", "Rows"] == 89
         assert "No dataset slice is failing" in texts(opened)

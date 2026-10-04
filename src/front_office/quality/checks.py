@@ -663,6 +663,22 @@ def _average_minute_has_no_impact(tables: Tables) -> tuple[int, pd.DataFrame]:
     return len(mean), mean[off].rename_axis("season").reset_index()
 
 
+def _one_primary_archetype(tables: Tables) -> tuple[int, pd.DataFrame]:
+    roles = tables["player_archetypes"]
+    keys = ["player_id", "season"]
+    primary = roles["is_primary"].astype(bool)
+    counts = primary.groupby([roles[key] for key in keys]).sum().rename("primary_roles")
+    filled = roles["fills"].astype(bool).groupby([roles[key] for key in keys]).sum()
+    # A player who fills a role has exactly one primary role; one who fills none has none.
+    wrong = counts != (filled > 0).astype(int)
+    unfilled = roles[primary & ~roles["fills"].astype(bool)]
+    failing = counts[wrong].reset_index()
+    if not unfilled.empty:
+        extra = unfilled[keys].assign(primary_roles=1).drop_duplicates()
+        failing = pd.concat([failing, extra], ignore_index=True).drop_duplicates(keys)
+    return len(counts), failing
+
+
 E, W = Severity.ERROR, Severity.WARNING
 
 _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
@@ -879,6 +895,14 @@ _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
         "Every player's regular season has an impact, once a value model has been fitted.",
         E,
         _every_season_is_valued,
+    ),
+    Check(
+        "one_primary_archetype",
+        "player_archetypes",
+        "A player who fills any role in a season has exactly one primary role, and it is "
+        "one of the roles filled.",
+        E,
+        _one_primary_archetype,
     ),
     Check(
         "average_minute_has_no_impact",

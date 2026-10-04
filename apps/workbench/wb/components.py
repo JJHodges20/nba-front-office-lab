@@ -17,6 +17,7 @@ from wb.theme import Palette, palette
 MEASURED = "measured"
 DERIVED = "derived"
 ESTIMATE = "estimate"
+MODELED = "modeled"
 ASSUMPTION = "assumption"
 
 # What each kind of number is, how it is tagged, and what the tag means. Colour never
@@ -42,6 +43,14 @@ PROVENANCE = {
         "Estimated by the lab. Ratings and pace over a span of games rest on possessions "
         "estimated from box scores, typically within a quarter of a point of the league's "
         "own figure over a full season and noisier over a few games.",
+    ),
+    MODELED: (
+        "Modeled",
+        ":material/model_training:",
+        "green",
+        "Estimated by a model fitted to the lab's own data and tested on seasons it had "
+        "not seen: an estimate with error, never a count. What the model is and how it "
+        "did is under Player Value, The model.",
     ),
     ASSUMPTION: (
         "Your assumption",
@@ -121,9 +130,16 @@ def source_word(source: str, state: str) -> str:
     return STATES[state][0]
 
 
+ORIGINS = {
+    Provenance.MEASURED: "Measured by the league.",
+    Provenance.DERIVED: "Derived by the lab.",
+    Provenance.MODELED: "Estimated by the value model.",
+}
+
+
 def origin(kind: Provenance) -> str:
     """How a metric's provenance is worded in a tooltip."""
-    return "Measured by the league." if kind is Provenance.MEASURED else "Derived by the lab."
+    return ORIGINS.get(kind, ORIGINS[Provenance.DERIVED])
 
 
 @dataclass(frozen=True, slots=True)

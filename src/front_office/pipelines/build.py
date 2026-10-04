@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 import pandas as pd
 
 from front_office import __version__
+from front_office.config.archetypes import load_archetypes
 from front_office.config.models import load_value_model
 from front_office.config.season_rules import load_all_season_rules
 from front_office.config.settings import Settings
@@ -61,7 +62,12 @@ def build_database(
     started = now()
     store = RawStore(settings.raw_dir)
     season_rules = list(load_all_season_rules(settings.season_rules_dir).values())
-    data = check_store(store, season_rules, load_value_model(settings.config_dir))
+    data = check_store(
+        store,
+        season_rules,
+        load_value_model(settings.config_dir),
+        load_archetypes(settings.config_dir),
+    )
 
     frames = dict(data.tables.frames)
     frames[BUILD_ISSUES.name] = issues_frame(data.tables.issues)

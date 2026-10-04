@@ -1,8 +1,9 @@
-"""Config layer: settings, season rules, eras and models read from ``configs/``.
+"""Config layer: settings, season rules, eras, archetypes and models read from ``configs/``.
 
 Depends only on the domain layer. This is the only place YAML is parsed.
 """
 
+from front_office.config.archetypes import archetypes_path, load_archetypes
 from front_office.config.eras import eras_path, load_eras
 from front_office.config.models import (
     load_value_model,
@@ -28,10 +29,12 @@ __all__ = [
     "ConfigError",
     "SeasonRulesNotFound",
     "Settings",
+    "archetypes_path",
     "configured_seasons",
     "eras_path",
     "find_project_root",
     "load_all_season_rules",
+    "load_archetypes",
     "load_eras",
     "load_season_rules",
     "load_settings",

@@ -137,6 +137,33 @@ class TestWhatIsFittedOn:
         keys = {(row.season, row.team_id) for row in exact_model.backtest}
         assert len(keys) == len(exact_model.backtest)
 
+    def test_a_season_is_predicted_without_its_own_results(
+        self, noisy_model: ValueModel, spec: ValueSpec
+    ) -> None:
+        # Hand the final season's results to the wrong teams. What was predicted for that
+        # season cannot move: the prediction was made before the results were in.
+        league = planted_league(spec, noise=1.5, seed=3, teams=30, seasons=14)
+        last = league.years[-1]
+        teams = list(league.ratings[last])
+        swapped = [league.ratings[last][team] for team in reversed(teams)]
+        league.ratings[last] = dict(zip(teams, swapped, strict=True))
+        again = fit_value_model(league.tables(), spec, revision=1, fitted_at=FITTED_AT)
+
+        def rows(model: ValueModel) -> pd.DataFrame:
+            frame = pd.DataFrame([row.model_dump() for row in model.backtest])
+            return frame.set_index(["season", "team_id"]).sort_index()
+
+        before, after = rows(noisy_model), rows(again)
+        final = before.index.get_level_values("season") == Season(last).label
+        assert final.sum() == 30
+        for side in ("predicted_offense", "predicted_defense"):
+            assert after[side].tolist() == pytest.approx(before[side].tolist(), abs=EXACT)
+        # The results themselves did change, and so did what the model missed by.
+        moved = (after.loc[final, "actual_offense"] - before.loc[final, "actual_offense"]).abs()
+        assert moved.max() > 1 and (after.loc[~final, "actual_offense"]).equals(
+            before.loc[~final, "actual_offense"]
+        )
+
     def test_a_season_whose_postseason_is_undecided_is_left_out(self, spec: ValueSpec) -> None:
         league = planted_league(spec)
         league.unfinished = {league.years[-1]}

@@ -98,7 +98,7 @@ def test_metrics_prints_the_glossary() -> None:
 def test_metrics_write_creates_the_document(project: Path) -> None:
     result = runner.invoke(app, ["metrics", "--write"])
     assert result.exit_code == 0, result.output
-    assert "92 metrics" in result.output
+    assert "113 metrics" in result.output
     written = (project / "docs" / "METRICS.md").read_text(encoding="utf-8")
     assert written.startswith("# Metric Glossary")
     assert "\r" not in written
@@ -349,6 +349,18 @@ class TestDatabaseCommands:
         assert "The build loaded with problems" in result.output
         assert "note  team_games [2012-13]" in result.output
         assert (project / "data" / "front_office.sqlite").is_file()
+
+    @pytest.mark.parametrize("command", ["build", "check"])
+    def test_a_project_without_its_archetypes_is_told_not_shown_a_traceback(
+        self, project: Path, command: str
+    ) -> None:
+        (project / "configs" / "archetypes.yaml").unlink()
+        result = runner.invoke(app, [command])
+        assert result.exit_code == 1
+        # The console folds a long path at its width, so compare without the line breaks.
+        said = " ".join(result.output.split())
+        assert "Error: configuration file not found" in said and "Traceback" not in said
+        assert "archetypes.yaml" in said.replace(" ", "")
 
     @pytest.fixture
     def prebuilt(self, project: Path, built_template) -> None:
@@ -711,4 +723,36 @@ class TestValueCommands:
 
     def test_value_alone_lists_its_commands(self) -> None:
         result = runner.invoke(app, ["value"])
-        assert "fit" in result.output and "show" in result.output
+        assert "fit" in result.output and "show" in result.output and "report" in result.output
+
+    def test_report_prints_the_write_up(self, project: Path, built_template) -> None:
+        (project / "data").mkdir(exist_ok=True)
+        for path in (built_template[0] / "data").glob("front_office.sqlite*"):
+            shutil.copy(path, project / "data" / path.name)
+        result = runner.invoke(app, ["value", "report"])
+        assert result.exit_code == 0, result.output
+        assert result.output.startswith("# What a Player Is Worth")
+        assert "## The test" in result.output and "## What it cannot tell you" in result.output
+        assert not (project / "docs" / "research" / "PLAYER_VALUE.md").exists()
+
+    def test_report_write_creates_the_document(self, project: Path, built_template) -> None:
+        (project / "data").mkdir(exist_ok=True)
+        for path in (built_template[0] / "data").glob("front_office.sqlite*"):
+            shutil.copy(path, project / "data" / path.name)
+        result = runner.invoke(app, ["value", "report", "--write"])
+        assert result.exit_code == 0, result.output
+        written = (project / "docs" / "research" / "PLAYER_VALUE.md").read_text(encoding="utf-8")
+        assert written.startswith("# What a Player Is Worth") and "\r" not in written
+        assert "of the value model)" in " ".join(result.output.split())
+
+    def test_report_before_anything_is_built_creates_nothing(self, project: Path) -> None:
+        result = runner.invoke(app, ["value", "report"])
+        assert result.exit_code == 1
+        assert "no data has been built yet; run: fol refresh" in result.output
+        assert not (project / "data" / "front_office.sqlite").exists()
+
+    def test_report_without_a_model_says_how_to_get_one(self, league_lab: None) -> None:
+        result = runner.invoke(app, ["value", "report"])
+        assert result.exit_code == 1
+        assert "no player values to report" in " ".join(result.output.split())
+        assert "fol value fit --write, then fol build" in " ".join(result.output.split())

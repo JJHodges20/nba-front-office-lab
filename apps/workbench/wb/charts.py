@@ -226,6 +226,7 @@ def scatter(
     y_reference: float | None = None,
     reference_label: str = "",
     reverse_y: bool = False,
+    trend: tuple[float, float] | None = None,
     height: int = 480,
 ) -> go.Figure:
     """Two metrics against each other, one mark per row of ``frame``.
@@ -234,10 +235,25 @@ def scatter(
     shown under it. ``label`` writes a column's text beside every mark. ``group`` colours
     marks by a column with at most three values. ``highlight`` lists index values that
     are the subject: with no ``group`` they take the accent and everything else recedes
-    to gray; with one they are drawn larger.
+    to gray; with one they are drawn larger. ``trend`` is the ``(intercept, slope)`` of
+    a straight line the marks are read against, drawn as a hairline across the plot and
+    named by ``reference_label``.
     """
     figure = _base(palette, height=height, legend=group is not None)
     _reference_line(figure, palette, x=x_reference, y=y_reference)
+    if trend is not None and len(frame):
+        intercept, slope = trend
+        ends = [float(frame[x].min()), float(frame[x].max())]
+        figure.add_trace(
+            go.Scatter(
+                x=ends,
+                y=[intercept + slope * end for end in ends],
+                mode="lines",
+                line={"color": palette.axis, "width": HAIRLINE},
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
     subject = frame.index.isin(list(highlight))
     sides = pd.Series("top center", index=frame.index)
     if label:
@@ -294,7 +310,8 @@ def scatter(
     figure.update_yaxes(title_text=y_title, tickformat=y_tickformat)
     if reverse_y:
         figure.update_yaxes(autorange="reversed")
-    if reference_label and (x_reference is not None or y_reference is not None):
+    referenced = x_reference is not None or y_reference is not None or trend is not None
+    if reference_label and referenced:
         figure.update_layout(margin={"t": 30})
         _note(
             figure, palette, reference_label, x=1, y=1, xref="paper", yref="paper",

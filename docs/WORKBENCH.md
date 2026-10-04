@@ -37,8 +37,9 @@ last fetched, whether a contract file has been supplied, and which build is on s
 
 - **Tags under the title** say what kinds of number the page holds.
   *Measured*: published by the league and shown unchanged. *Derived*: computed by the
-  lab with a stated formula. *Estimate*: estimated by the lab. *Your assumption*:
-  something you entered. There are no modeled values in this version.
+  lab with a stated formula. *Estimate*: estimated by the lab. *Modeled*: produced by a
+  model fitted to the lab's own data and tested on seasons it had not seen - an estimate
+  with error, never a count. *Your assumption*: something you entered.
 - **Hover a column heading or a figure's question mark** for what a metric is and where
   it comes from. Every definition is also in the Analytics Lab's glossary and in
   [METRICS.md](METRICS.md).
@@ -94,7 +95,45 @@ something this season. The same research as a document is
 
 **Player Explorer.** Every player of a season by category of metric. A player's profile:
 percentile bars, form over trailing games, every season, game log, on/off ratings,
-contract. Up to three players side by side.
+contract. Up to three players side by side. For a whole regular season the *Value*
+columns carry the value model's impact and wins above replacement beside the statistics,
+and the *Role* column names the main role a player fills by the rules on the Player
+Value page - a rule, not a measurement, and empty for a player who fills none.
+
+**Player Value.** What the value model makes of every player, and what the model rests
+on. Value is estimated for whole regular seasons, so the phase and the comparison
+window do not narrow this page.
+
+- *Season*: everyone who played in the season chosen in the sidebar, by wins above
+  replacement, impact, or impact at either end. **Impact** is the points per 100
+  possessions a team's net rating gains with the player on the court, against the
+  league's average minute. **Wins above replacement** is impact over a replacement
+  player, for the minutes played. Select a row for that player's breakdown: where the
+  impact comes from, part by part, and each season set beside what the model expected
+  going into it. *Reliability* is how much of the estimate rests on the player's own
+  numbers; the rest is what the model assumes of anyone used that many minutes a game.
+- *Projections*: what the model expects in the season still to be played, from up to
+  three seasons before it and age, with a projected share of team minutes.
+- *Roles*: the archetypes, as rules. A player's score for a role is the weakest of their
+  percentiles on the role's measures, among the players the role is open to, in that
+  season - strong on one measure and ordinary on another is not the role. A player fills
+  a role from its cut-off up; the cut-off is a convention, and the rules are in
+  `configs/archetypes.yaml` to be read and changed. Beside each role: how many players
+  it scored and how many fill it this season, and over every season on record how often
+  a player who filled it filled it again the next season, against how often anyone did.
+  Pick a role for who fills it, highest score first.
+- *Value for money*: salaries from your contract file against the wins they pay for. The
+  price of a win is read off the contracts on file - a straight line through salary and
+  wins - so a surplus says a player is paid less than *those* contracts pay for the same
+  wins. With few contracts on file the line is rough, and it says how many it rests on.
+  The season still to be played is judged on its projection; later seasons of a contract
+  are not valued.
+- *The model*: how it did on seasons it had not seen, against simpler methods; what
+  each part adds when it is left out; every weight with its interval; every team-season
+  of the test, predicted against actual; and what the model cannot tell you.
+
+The same as a document: [research/PLAYER_VALUE.md](research/PLAYER_VALUE.md). Why it is
+built this way: [decisions/0010-player-value.md](decisions/0010-player-value.md).
 
 **Team Explorer.** One team: record and ratings with league ranks, the four factors at
 both ends, form over the season, the game log, what each player did for this team, every
@@ -119,6 +158,8 @@ what is held of each dataset, and any fetch that is failing.
 
 ## What it does not do yet
 
-No value scores, no fit analysis, no optimiser, no forecasts. Those are later roadmap
-stages. The benchmarks give historical frequencies; nothing in the workbench presents
-one as a prediction.
+No fit analysis, no optimiser, no forecast of a team's season. Those are later roadmap
+stages. The benchmarks give historical frequencies, and player value is an estimate of
+what a player adds; nothing in the workbench presents either as a prediction of how a
+team will do. A role is a rule applied to a player's statistics, not a measurement of how
+they play, and the page says so.

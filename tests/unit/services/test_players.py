@@ -24,6 +24,8 @@ from front_office.services import (
     Qualification,
     Window,
 )
+from front_office.services.players import PLAYER_AND_VALUE_METRICS
+from tests.helpers import TOWNS
 
 BOS, NYK = 1610612738, 1610612752
 TATUM, BROWN, VUCEVIC, ABDELNABY = 1628369, 1627759, 202696, 76001
@@ -98,7 +100,9 @@ class TestTable:
         assert players.index.name == "player_id" and players.index.is_unique
         assert len(players) == 41
         assert set(PLAYER_METRICS.keys) <= set(players.columns)
-        assert table.metrics is PLAYER_METRICS
+        # A whole regular season carries what the value model makes of it as well.
+        assert table.metrics is PLAYER_AND_VALUE_METRICS
+        assert set(table.metrics.keys) <= set(players.columns)
         assert players["player_name"].is_monotonic_increasing
         assert table.percentiles.index.equals(players.index)
         assert (table.season, table.season_type) == ("2025-26", "regular")
@@ -395,3 +399,81 @@ class TestCompare:
     def test_metric_lookup(self, lab: Lab) -> None:
         assert lab.players.metric("ts_pct").label == "TS%"
         assert lab.players.metrics is PLAYER_METRICS
+
+
+class TestValueInThePlayerViews:
+    """Where a whole regular season has been valued, the player views carry the estimates."""
+
+    def test_the_season_table_holds_the_value_services_numbers(self, lab: Lab, table) -> None:
+        valued = lab.value.season("2025-26")
+        for key in ("impact", "impact_offense", "impact_defense", "wins_added", "reliability"):
+            assert (
+                table.players[key].to_dict() == valued[key].reindex(table.players.index).to_dict()
+            )
+        assert [spec.key for spec in table.metrics.in_category("Value")] == [
+            "impact", "impact_offense", "impact_defense", "wins_added", "minutes_share",
+            "reliability",
+        ]  # fmt: skip
+
+    def test_value_is_ranked_like_any_other_metric(self, table: PlayerTable) -> None:
+        qualified = table.players[table.players["is_qualified"]]
+        best = qualified["impact"].idxmax()
+        assert table.percentiles.loc[best, "impact"] == table.percentiles["impact"].max()
+        assert table.percentiles.loc[~table.players["is_qualified"], "impact"].isna().all()
+
+    @pytest.mark.parametrize(
+        "view",
+        [
+            {"season_type": "playoffs"},
+            {"window": Window(last_games=10)},
+        ],
+        ids=["playoffs", "a span of games"],
+    )
+    def test_only_a_whole_regular_season_is_valued(self, lab: Lab, view: dict) -> None:
+        narrowed = lab.players.table("2025-26", **view)
+        assert "impact" not in narrowed.players.columns
+        assert "impact" not in narrowed.metrics
+
+    def test_a_profile_carries_the_players_value_history(self, lab: Lab) -> None:
+        profile = lab.players.profile(TATUM)
+        pd.testing.assert_frame_equal(profile.value, lab.value.player(TATUM))
+        assert profile.metrics is PLAYER_AND_VALUE_METRICS
+        regular = profile.seasons[profile.seasons["season_type"] == "regular"].iloc[0]
+        playoffs = profile.seasons[profile.seasons["season_type"] == "playoffs"]
+        assert regular["impact"] == profile.value.set_index("season").at["2025-26", "impact"]
+        assert playoffs["impact"].isna().all() and playoffs["wins_added"].isna().all()
+        assert len(profile.seasons) == len(lab.read("player_seasons", {"player_id": TATUM}))
+
+    def test_a_player_who_never_played_has_no_value(self, lab: Lab) -> None:
+        profile = lab.players.profile(ABDELNABY)
+        assert profile.value.empty and profile.seasons.empty
+
+
+class TestRolesInThePlayerViews:
+    def test_the_table_names_each_players_main_role_and_every_role(self, lab: Lab, table) -> None:
+        filled = lab.value.roles("2025-26")
+        players = table.players
+        assert players.loc[TATUM, ["role", "roles"]].tolist() == filled.loc[TATUM].tolist()
+        assert players.loc[TATUM, "role"] == "Primary Creator"
+        with_roles = players[players["role"].notna()]
+        assert set(with_roles.index) == set(filled.index)
+        assert with_roles["roles"].to_dict() == filled["roles"].to_dict()
+        assert pd.isna(players.loc[TOWNS, "role"]) and pd.isna(players.loc[TOWNS, "roles"])
+
+    def test_a_role_is_not_a_metric(self, table: PlayerTable) -> None:
+        assert "role" not in table.metrics and "roles" not in table.metrics
+        assert "role" not in table.percentiles.columns
+
+    def test_a_role_is_the_seasons_whatever_part_of_it_is_looked_at(self, lab: Lab) -> None:
+        # Roles are given for a whole regular season. A span of games or the playoffs
+        # shows the same player in the same role.
+        playoffs = lab.players.table("2025-26", season_type="playoffs").players
+        recent = lab.players.table("2025-26", window=Window(last_games=10)).players
+        assert playoffs.loc[TATUM, "role"] == recent.loc[TATUM, "role"] == "Primary Creator"
+
+    def test_on_the_invented_league_too(self, value_lab: Lab) -> None:
+        table = value_lab.players.table("2006-07")
+        filled = value_lab.value.roles("2006-07")
+        assert len(filled) > 20
+        assert table.players["role"].dropna().to_dict() == filled["role"].to_dict()
+        assert table.players["roles"].dropna().to_dict() == filled["roles"].to_dict()

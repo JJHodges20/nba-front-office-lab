@@ -8,12 +8,14 @@ from front_office.analytics.rosters import ROSTER_METRICS
 from front_office.analytics.teams import TEAM_METRICS
 from front_office.domain.glossary import render_metric_glossary
 from front_office.domain.metrics import MetricCatalog
+from front_office.modeling.value.catalog import VALUE_METRICS
 
 METRIC_CATALOGS: dict[str, MetricCatalog] = {
     "Player metrics": PLAYER_METRICS,
     "Team metrics": TEAM_METRICS,
     "Roster indicators": ROSTER_METRICS,
     "Benchmark measures": RESEARCH_METRICS,
+    "Player value": VALUE_METRICS,
 }
 
 

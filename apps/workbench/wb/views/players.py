@@ -7,7 +7,7 @@ import streamlit as st
 
 from front_office.services import DEFAULT_QUALIFICATION, PlayerTable, Qualification
 from wb import charts, components, data, formats, state
-from wb.components import DERIVED, EMPTY_CELL, MEASURED, Figure
+from wb.components import DERIVED, EMPTY_CELL, MEASURED, MODELED, Figure
 from wb.state import Filters
 
 SPAN_QUALIFICATION = Qualification(min_games=3, min_minutes=30)
@@ -23,7 +23,11 @@ OVERVIEW = (
     "ts_pct",
     "usage_pct",
     "net_rating",
+    "impact",
+    "wins_added",
 )
+VALUE = ("impact", "wins_added")
+"""The value model's estimates, shown beside the statistics where a season has them."""
 HEADLINES = {
     "pts_per_game": "Points per game",
     "reb_per_game": "Rebounds per game",
@@ -48,6 +52,7 @@ PROFILE = (
     "def_rating",
     "net_rating",
     "on_off_net",
+    "impact",
 )
 TRENDS = ("pts_per_game", "ts_pct", "minutes_per_game", "reb_per_game", "ast_per_game")
 POSITIONS = ("All", "Guard", "Forward", "Center")
@@ -60,7 +65,7 @@ SUBJECT = "players_subject"
 
 def render() -> None:
     filters = state.current()
-    components.header("Player Explorer", filters.scope, kinds=[MEASURED, DERIVED])
+    components.header("Player Explorer", filters.scope, kinds=_kinds(filters))
     if not filters.has_players:
         components.empty(
             f"No player statistics for {filters.season}",
@@ -93,6 +98,13 @@ def render() -> None:
         _profile(filters, table)
     with compare:
         _compare(filters, table, qualification)
+
+
+def _kinds(filters: Filters) -> list[str]:
+    """What kinds of number the page holds: the value model's too, for a whole season."""
+    whole_season = filters.is_regular_season and filters.window.is_full_season
+    valued = whole_season and filters.season in data.value_status(filters.build).seasons
+    return [MEASURED, DERIVED, MODELED] if valued else [MEASURED, DERIVED]
 
 
 def _follow_the_subject(filters: Filters) -> None:
@@ -173,7 +185,8 @@ def _listing(filters: Filters, table: PlayerTable, position: str, qualified_only
     else:
         keys = [spec.key for spec in catalog.in_category(category)]
     money = [column for column in CONTRACT if filters.payroll_season and category == "Overview"]
-    shown = players[[*IDENTITY, *keys, *money]].sort_values(
+    role = ["role"] if category == "Overview" and players["role"].notna().any() else []
+    shown = players[[*IDENTITY, *role, *keys, *money]].sort_values(
         "pts_per_game" if "pts_per_game" in keys else keys[0], ascending=False
     )
 
@@ -199,6 +212,11 @@ def _listing(filters: Filters, table: PlayerTable, position: str, qualified_only
             "team": "Team",
             "position": "Pos",
             "age": "Age",
+            "role": st.column_config.Column(
+                "Role",
+                help="The main role the player fills this season, by the rules on the Player "
+                "Value page. Empty for a player who fills none. A rule, not a measurement.",
+            ),
             "salary": st.column_config.Column(
                 "Salary", help=f"Salary in {filters.payroll_season}, from your contract file."
             ),
@@ -255,6 +273,8 @@ def _profile(filters: Filters, table: PlayerTable) -> None:
     else:
         row = table.players.loc[filters.player_id]
         ranks = table.percentiles.loc[filters.player_id]
+        if not formats.is_missing(row["roles"]):
+            st.caption(f"Roles filled in {filters.season}: {row['roles']}.")
         _headline(row, ranks, catalog)
         left, right = st.columns([3, 2], gap="large")
         with left:
@@ -412,7 +432,15 @@ def _seasons(profile) -> None:  # type: ignore[no-untyped-def]
             **components.metric_columns(catalog, keys),
         },
     )
-    components.export(seasons, f"seasons_{profile.player['player_id']}", key="player_seasons_csv")
+    with st.container(horizontal=True, vertical_alignment="center"):
+        components.export(
+            seasons, f"seasons_{profile.player['player_id']}", key="player_seasons_csv"
+        )
+        if seasons[list(VALUE)].notna().any().any():
+            st.caption(
+                "IMP and WAR are the value model's estimates, for regular seasons. The "
+                "Player Value page shows where they come from."
+            )
 
 
 def _game_log(filters: Filters) -> None:

@@ -133,6 +133,35 @@ class TestClicks:
         assert chosen(opened).player_id == rotation.index[0]
         assert chosen(opened).team_id == BOS
 
+    def test_a_value_row_makes_that_player_the_subject(self, page, click, plain_home: Path) -> None:
+        click("value_table", row=1)
+        opened = page(plain_home, "value")
+        with Lab(load_settings(plain_home)) as lab:
+            season = lab.value.season("2025-26")
+        assert chosen(opened).player_id == season.index[1]
+        assert season["player_name"].iloc[1] in [heading.value for heading in opened.subheader]
+
+    def test_a_row_of_a_role_makes_that_player_the_subject(
+        self, page, click, plain_home: Path
+    ) -> None:
+        click("value_role_table_floor_spacer", row=0)
+        opened = page(plain_home, "value", value_role="floor_spacer")
+        with Lab(load_settings(plain_home)) as lab:
+            players = lab.value.role_players("2025-26", "floor_spacer")
+        assert chosen(opened).player_id == players.index[0]
+        assert players["player_name"].iloc[0] == "Miles McBride"
+        assert "Miles McBride" in [heading.value for heading in opened.subheader]
+
+    def test_the_team_filter_does_not_shift_which_row_was_clicked(
+        self, page, click, plain_home: Path
+    ) -> None:
+        click("value_role_table_floor_spacer", row=0)
+        opened = page(plain_home, "value", value_role="floor_spacer", **{state.TEAM: BOS})
+        with Lab(load_settings(plain_home)) as lab:
+            players = lab.value.role_players("2025-26", "floor_spacer")
+        first = players[players["team_id"] == BOS].index[0]
+        assert chosen(opened).player_id == first != players.index[0]
+
     def test_a_contract_row_makes_that_player_the_subject(
         self, page, click, contract_template: Path
     ) -> None:

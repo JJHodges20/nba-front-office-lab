@@ -45,11 +45,12 @@ def test_every_state_and_kind_has_a_word_an_icon_and_a_colour() -> None:
         components.MEASURED,
         components.DERIVED,
         components.ESTIMATE,
+        components.MODELED,
         components.ASSUMPTION,
     )
     assert set(components.PROVENANCE) == set(kinds)
     words = [components.PROVENANCE[kind][0] for kind in kinds]
-    assert words == ["Measured", "Derived", "Estimate", "Your assumption"]
+    assert words == ["Measured", "Derived", "Estimate", "Modeled", "Your assumption"]
     assert len({components.PROVENANCE[kind][2] for kind in kinds}) == len(kinds)
 
 
@@ -60,6 +61,20 @@ def test_a_column_heading_says_what_the_metric_is_and_where_it_comes_from() -> N
         "Offensive rating. Points per 100 possessions. Measured by the league."
     )
     assert settings["efg_pct"]["help"].endswith("Derived by the lab.")
+
+
+def test_a_modeled_metric_says_it_is_an_estimate() -> None:
+    from front_office.domain.schema import Provenance
+    from front_office.modeling.value.catalog import VALUE_METRICS
+
+    settings = components.metric_columns(VALUE_METRICS, ["impact", "minutes_share"])
+    assert settings["impact"]["label"] == "IMP"
+    assert settings["impact"]["help"].endswith("Estimated by the value model.")
+    assert settings["minutes_share"]["help"].endswith("Derived by the lab.")
+    assert components.origin(Provenance.MEASURED) == "Measured by the league."
+    word, icon, _, meaning = components.PROVENANCE[components.MODELED]
+    assert word == "Modeled" and icon.startswith(":material/")
+    assert "an estimate with error, never a count" in meaning
 
 
 def test_an_estimated_column_is_marked_and_says_so() -> None:

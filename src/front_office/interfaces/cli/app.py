@@ -53,10 +53,12 @@ from front_office.pipelines.value import FIT_COMMAND, ValueFitError, fit_value, 
 from front_office.services import Lab, LabNotBuilt
 from front_office.services.benchmark_report import benchmark_report
 from front_office.services.glossary import METRIC_CATALOGS, metric_glossary
+from front_office.services.value_report import NoValueModel, value_report
 
 DATA_DICTIONARY = "docs/DATA_DICTIONARY.md"
 METRIC_GLOSSARY = "docs/METRICS.md"
 BENCHMARK_REPORT = "docs/research/BENCHMARKS.md"
+VALUE_REPORT = "docs/research/PLAYER_VALUE.md"
 WORKBENCH = "apps/workbench/app.py"
 DEFAULT_PORT = 8501
 STARTUP_SECONDS = 30
@@ -344,7 +346,10 @@ def check() -> None:
         settings = load_settings()
     except ConfigError as error:
         raise _fail(error) from error
-    report = check_raw_data(settings)
+    try:
+        report = check_raw_data(settings)
+    except ConfigError as error:
+        raise _fail(error) from error
     _print_data_report(report)
     if not report.ok:
         raise typer.Exit(code=1)
@@ -398,7 +403,10 @@ def build(
 
 
 def _build(settings: Settings, *, force: bool) -> None:
-    report = build_database(settings, force=force)
+    try:
+        report = build_database(settings, force=force)
+    except ConfigError as error:
+        raise _fail(error) from error
     _print_data_report(report.data)
     if not report.loaded:
         raise _fail(RuntimeError(report.refused_because))
@@ -596,6 +604,33 @@ def value_show() -> None:
         raise typer.Exit(code=1)
     _say(f"Revision {model.revision}, fitted {model.fitted_at:%Y-%m-%d %H:%M} UTC.")
     _print_value_model(model)
+
+
+@value_app.command("report")
+def value_report_command(
+    write: Annotated[
+        bool, typer.Option("--write", help=f"Write {VALUE_REPORT} instead of printing.")
+    ] = False,
+) -> None:
+    """Write up the value model: what it estimates, how it was tested, what it found."""
+    try:
+        settings = load_settings()
+        # Opening the lab creates the database; asking a question should not.
+        if not database_status(settings).exists:
+            raise LabNotBuilt
+        with Lab(settings) as lab:
+            lab.require_built()
+            document = value_report(lab)
+            revision = lab.value.status().revision
+    except (ConfigError, LabNotBuilt, NoValueModel) as error:
+        raise _fail(error) from error
+    if not write:
+        typer.echo(document, nl=False)
+        return
+    target = settings.project_root / VALUE_REPORT
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(document, encoding="utf-8", newline="\n")
+    _say(f"Wrote {target} (revision {revision} of the value model)")
 
 
 def _print_value_model(model: ValueModel) -> None:

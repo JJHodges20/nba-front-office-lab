@@ -210,6 +210,7 @@ class TestGlossary:
             "Team metrics",
             "Roster indicators",
             "Benchmark measures",
+            "Player value",
         ]
         document = metric_glossary()
         for catalog in METRIC_CATALOGS.values():

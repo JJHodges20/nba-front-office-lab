@@ -9,7 +9,7 @@ import pytest
 
 from front_office.config import Settings
 from front_office.domain.tables import ALL_TABLES
-from front_office.services import Gap, Lab, LabNotBuilt, SourceStatus
+from front_office.services import Gap, Lab, LabNotBuilt, SourceStatus, ValueStatus
 from front_office.services.health import (
     ABSENT,
     FAILING,
@@ -19,6 +19,7 @@ from front_office.services.health import (
     WARNING,
     _detail_gap,
     _missing_between,
+    _value_gaps,
     describe_age,
 )
 
@@ -194,9 +195,9 @@ class TestIssuesAndChecks:
 
     def test_checks_list_failures_first_errors_before_warnings(self, lab: Lab) -> None:
         checks = lab.health.checks()
-        assert len(checks) == 52
+        assert len(checks) == 54
         failed = checks[~checks["passed"]]
-        assert checks["passed"].tolist() == [False] * len(failed) + [True] * (52 - len(failed))
+        assert checks["passed"].tolist() == [False] * len(failed) + [True] * (54 - len(failed))
         assert failed["severity"].tolist() == sorted(failed["severity"].tolist())
         assert "error" in set(failed["severity"]) and "warning" in set(failed["severity"])
 
@@ -252,6 +253,64 @@ class TestGaps:
         assert _detail_gap(history, history) is None
         assert _detail_gap(history, []) is None
         assert _detail_gap([], []) is None
+
+    def value(self, **changes: object) -> ValueStatus:
+        current = {
+            "revision": 2,
+            "fitted_at": datetime(2026, 10, 1),
+            "fitted_through": "2025-26",
+            "applied_revision": "r2",
+            "seasons": ("2025-26",),
+            "upcoming": "2026-27",
+            "finished_since": (),
+        }
+        return ValueStatus(**{**current, **changes})
+
+    def test_a_current_value_model_is_no_gap(self, lab: Lab) -> None:
+        assert _value_gaps(self.value()) == []
+        assert "Player value" not in {gap.area for gap in lab.health.gaps(today=TODAY)}
+
+    def test_no_value_model_at_all_is_a_gap(self) -> None:
+        missing = self.value(
+            revision=None, fitted_at=None, fitted_through=None, applied_revision=None, seasons=()
+        )
+        (gap,) = _value_gaps(missing)
+        assert (gap.area, gap.severity) == ("Player value", WARNING)
+        assert gap.message == (
+            "No value model has been fitted, so players have no value. Run: fol value fit "
+            "--write, then fol build."
+        )
+
+    def test_a_model_the_database_was_not_built_with_needs_a_build(self) -> None:
+        (never,) = _value_gaps(self.value(applied_revision=None, seasons=()))
+        assert never.message == (
+            "A value model is on file but the database was built without it. Run: fol build"
+        )
+        (older,) = _value_gaps(self.value(applied_revision="r1"))
+        assert older.message == (
+            "The value model on file is revision 2; the database was built with r1. Run: fol build"
+        )
+
+    @pytest.mark.parametrize(
+        ("finished", "span"),
+        [(("2026-27",), "2026-27"), (("2026-27", "2027-28", "2028-29"), "2026-27 to 2028-29")],
+    )
+    def test_seasons_finished_since_the_fit_ask_for_a_new_one(
+        self, finished: tuple[str, ...], span: str
+    ) -> None:
+        (gap,) = _value_gaps(self.value(finished_since=finished))
+        assert gap.message == (
+            f"The value model was fitted on seasons to 2025-26; {span} finished since. "
+            "Run: fol value fit --write, then fol build."
+        )
+
+    def test_a_stale_model_that_also_needs_a_build_says_both(self) -> None:
+        gaps = _value_gaps(self.value(applied_revision="r1", finished_since=("2026-27",)))
+        assert len(gaps) == 2 and all(gap.area == "Player value" for gap in gaps)
+
+    def test_values_built_with_a_model_no_longer_on_file_are_not_a_gap(self) -> None:
+        orphaned = self.value(revision=None, fitted_at=None, fitted_through=None)
+        assert _value_gaps(orphaned) == []
 
     def test_with_contracts_the_gap_is_the_seasons_without_a_cap(self, contract_lab) -> None:
         gaps = {gap.area: gap for gap in contract_lab.health.gaps(today=TODAY)}

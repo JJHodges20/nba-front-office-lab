@@ -243,6 +243,30 @@ class TestScatter:
         assert [trace.marker.color for trace in figure.data] == list(LIGHT.series[:3])
         assert figure.layout.showlegend
 
+    def test_a_trend_is_a_hairline_across_the_marks_drawn_beneath_them(self) -> None:
+        figure = scatter(LIGHT, trend=(1.0, 2.0), reference_label="The line")
+        line, marks = figure.data
+        assert line.mode == "lines" and line.hoverinfo == "skip" and not line.showlegend
+        assert list(line.x) == [1.0, 4.0] and list(line.y) == [3.0, 9.0]
+        assert (line.line.color, line.line.width) == (LIGHT.axis, charts.HAIRLINE)
+        assert marks.mode == "markers" and len(marks.x) == 4
+        notes = [note.text for note in figure.layout.annotations]
+        assert notes == ["The line"]
+
+    def test_a_trend_keeps_its_place_beneath_a_highlight(self) -> None:
+        line, rest, chosen = scatter(LIGHT, trend=(0.0, 1.0), highlight=[20]).data
+        assert line.mode == "lines" and list(line.x) == list(line.y)
+        assert (len(rest.x), len(chosen.x)) == (3, 1)
+
+    def test_no_trend_no_line_and_no_data_no_line(self) -> None:
+        assert [trace.mode for trace in scatter(LIGHT).data] == ["markers"]
+        assert not scatter(LIGHT, reference_label="Unanchored").layout.annotations
+        empty = charts.scatter(
+            FRAME.iloc[0:0], x="x", y="y", name="name", palette=LIGHT, x_title="X", y_title="Y",
+            trend=(0.0, 1.0),
+        )  # fmt: skip
+        assert [trace.mode for trace in empty.data] == ["markers"]
+
     def test_more_groups_than_a_scatter_can_tell_apart_is_an_error(self) -> None:
         frame = FRAME.assign(group=["a", "b", "c", "d"])
         with pytest.raises(ValueError, match="3 groups apart, not 4"):

@@ -39,6 +39,8 @@ STARTS: dict[str, dict[str, dict[str, object]]] = {
     },
     # Brown played 71 games, so every trailing span has a form chart to draw.
     "players": {"open": {}, "player": {state.PLAYER: BROWN}},
+    # A chosen player adds the breakdown of that player's impact under the season's table.
+    "value": {"open": {}, "player": {state.PLAYER: TATUM}},
     "teams": {"open": {}, "team": {state.TEAM: BOS}},
     "contracts": {"open": {}, "team": {state.TEAM: BOS}},
     "lab": {"players": {}, "teams": {"lab_subject": "Teams"}},

@@ -2,7 +2,7 @@
 
 Combines repositories with analytics and hands back display-ready results. The user
 interface depends on this layer only. May import: domain, config, storage, analytics,
-quality.
+quality, modeling.
 """
 
 from front_office.analytics.comparison import Qualification
@@ -36,6 +36,7 @@ from front_office.services.players import (
     PlayerTable,
 )
 from front_office.services.teams import TeamProfile, TeamService, TeamTable
+from front_office.services.value import ModelCard, ValueForMoney, ValueService, ValueStatus
 from front_office.services.window import Window
 from front_office.storage import RosterNotFound
 
@@ -57,6 +58,7 @@ __all__ = [
     "LabStatus",
     "LeagueService",
     "Measure",
+    "ModelCard",
     "PlayerProfile",
     "PlayerService",
     "PlayerTable",
@@ -71,6 +73,9 @@ __all__ = [
     "TeamProfile",
     "TeamService",
     "TeamTable",
+    "ValueForMoney",
+    "ValueService",
+    "ValueStatus",
     "Window",
     "floor",
     "metric_glossary",

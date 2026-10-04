@@ -8,18 +8,28 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from front_office.config import Settings, load_value_model, value_model_path, value_spec_path
+from front_office.config import (
+    Settings,
+    archetypes_path,
+    load_archetypes,
+    load_value_model,
+    value_model_path,
+    value_spec_path,
+)
+from front_office.domain.archetypes import Archetype, ArchetypeSet
 from front_office.domain.schema import validate_frame
-from front_office.domain.tables.value import PLAYER_VALUE_SCORES
+from front_office.domain.tables.value import PLAYER_ARCHETYPES, PLAYER_VALUE_SCORES
 from front_office.domain.value_model import ValueModel, ValueSpec
 from front_office.pipelines.build import build_database
 from front_office.pipelines.check import CHECKED_TABLES, check_store
 from front_office.pipelines.normalize import IssueSeverity, NormalizedTables
 from front_office.pipelines.value import (
+    ARCHETYPES,
     FIT_COMMAND,
     TABLE,
     FitReport,
     ValueFitError,
+    add_archetype_tables,
     add_value_tables,
     fit_value,
     write_value_model,
@@ -273,3 +283,102 @@ def test_a_fit_report_without_a_previous_model_is_a_change() -> None:
     assert not FitReport(model.model_copy(update={"revision": 2}), model).changed
     other = model.model_copy(update={"replacement_level": -1.0})
     assert FitReport(other, model).changed
+
+
+@pytest.fixture(scope="module")
+def shipped_roles(repo_root: Path) -> ArchetypeSet:
+    return load_archetypes(repo_root / "configs")
+
+
+class TestRoles:
+    def test_every_role_is_scored_once_the_players_are_valued(
+        self, league_tables: NormalizedTables, shipped_roles: ArchetypeSet
+    ) -> None:
+        add_value_tables(league_tables, planted_model(SPEC))
+        add_archetype_tables(league_tables, shipped_roles)
+        roles = league_tables[ARCHETYPES]
+        assert validate_frame(roles, PLAYER_ARCHETYPES) == []
+        assert set(roles["archetype"]) == set(shipped_roles.keys)
+        assert set(roles["archetype_version"]) == {"v1"}
+        assert league_tables.issues == []
+
+    def test_without_definitions_the_table_is_empty_and_nothing_is_said(
+        self, league_tables: NormalizedTables
+    ) -> None:
+        add_value_tables(league_tables, planted_model(SPEC))
+        add_archetype_tables(league_tables, None)
+        assert league_tables[ARCHETYPES].empty
+        assert list(league_tables[ARCHETYPES].columns) == list(PLAYER_ARCHETYPES.column_names)
+        assert league_tables.issues == []
+
+    def test_roles_that_need_the_value_model_say_so_when_there_is_none(
+        self, league_tables: NormalizedTables, shipped_roles: ArchetypeSet
+    ) -> None:
+        add_value_tables(league_tables, None)
+        add_archetype_tables(league_tables, shipped_roles)
+        roles = league_tables[ARCHETYPES]
+        defensive = {"perimeter_defender", "switchable_wing", "rim_protector"}
+        assert set(roles["archetype"]) == set(shipped_roles.keys) - defensive
+        note = league_tables.notes[-1]
+        assert (note.table, note.scope) == (ARCHETYPES, "all seasons")
+        assert note.message == (
+            "nobody could be scored as Perimeter Defender, Switchable Wing, Rim Protector: "
+            "a measure these roles need is missing for every player. The defensive roles "
+            "need the value model. Run: fol value fit --write"
+        )
+        assert league_tables.errors == []
+
+    def test_an_empty_league_has_nobody_to_score_and_nothing_to_explain(
+        self, league_tables: NormalizedTables, shipped_roles: ArchetypeSet
+    ) -> None:
+        for name in ("player_seasons", "players"):
+            league_tables.frames[name] = league_tables.frames[name].iloc[0:0]
+        add_value_tables(league_tables, None)
+        before = list(league_tables.issues)
+        add_archetype_tables(league_tables, shipped_roles)
+        assert league_tables[ARCHETYPES].empty and league_tables.issues == before
+
+    def test_a_rule_the_lab_cannot_compute_is_an_error_not_a_crash(
+        self, league_tables: NormalizedTables
+    ) -> None:
+        role = Archetype(key="hustler", name="Hustler", description="Dives.", measures=("dives",))
+        unknown = ArchetypeSet(version=1, min_minutes=500, fills_at=67, archetypes=(role,))
+        add_value_tables(league_tables, planted_model(SPEC))
+        add_archetype_tables(league_tables, unknown)
+        assert league_tables[ARCHETYPES].empty
+        (issue,) = league_tables.errors
+        assert issue.table == ARCHETYPES
+        assert "archetype 'hustler' uses unknown measures ['dives']" in issue.message
+
+    def test_the_fixture_store_is_given_roles_by_the_shipped_rules(
+        self, built_readonly: Settings, first_build_report
+    ) -> None:
+        with Database(built_readonly.database_path) as database:
+            roles = Warehouse(database).read(ARCHETYPES)
+        assert set(roles["season"]) == {"2025-26"} and set(roles["archetype_version"]) == {"v1"}
+        assert len(roles) > 100 and roles["fills"].sum() > 10
+        checks = {check.check: check for check in first_build_report.data.checks}
+        result = checks[f"{ARCHETYPES}.one_primary_archetype"]
+        scored = roles[["player_id", "season"]].drop_duplicates()
+        assert result.passed and result.examined == len(scored)
+        assert checks[f"{ARCHETYPES}.player_id_exists"].passed
+        assert not [
+            issue for issue in first_build_report.data.tables.issues if issue.table == ARCHETYPES
+        ]
+
+    def test_check_store_takes_the_rules_it_is_given(
+        self, fixture_store: RawStore, shipped_roles: ArchetypeSet
+    ) -> None:
+        assert check_store(fixture_store).tables[ARCHETYPES].empty
+        scored = check_store(fixture_store, archetypes=shipped_roles)
+        assert not scored.tables[ARCHETYPES].empty
+
+    def test_a_build_reads_the_rules_from_the_project(self, built_lab: Settings) -> None:
+        path = archetypes_path(built_lab.config_dir)
+        text = path.read_text(encoding="utf-8")
+        assert text.count("version: 1") == 1
+        path.write_text(text.replace("version: 1", "version: 2"), encoding="utf-8")
+        report = build_database(built_lab)
+        assert report.loaded
+        with Database(built_lab.database_path) as database:
+            assert set(Warehouse(database).read(ARCHETYPES)["archetype_version"]) == {"v2"}

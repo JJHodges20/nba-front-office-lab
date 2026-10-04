@@ -45,6 +45,7 @@ measured statistics, modeled estimates and user assumptions visibly apart.
 | [`contracts`](#contracts) | contracts | One row per player per team per run of consecutive seasons. | V1 |
 | [`contract_years`](#contract_years) | contracts | One row per contract per season. | V1 |
 | [`player_value_scores`](#player_value_scores) | player_value | One row per player per season. | V3 |
+| [`player_archetypes`](#player_archetypes) | player_value | One row per player per season per archetype the player is open to. | V3 |
 | [`custom_rosters`](#custom_rosters) | user_rosters | One row per roster. | V1 |
 | [`roster_players`](#roster_players) | user_rosters | One row per player per roster. | V1 |
 | [`fetch_log`](#fetch_log) | operations | One row per fetch attempt. | V1 |
@@ -477,6 +478,24 @@ The value model's estimate of each player in each regular season: what the seaso
 | `projected_share` | float | no | modeled | fraction | Share of team minutes expected going into the season. |
 | `projected_wins` | float | no | modeled | wins | Wins over a replacement player expected going into the season, over 82 games. |
 
+### player_archetypes
+
+Each player's score for each role in each regular season, by the rules in configs/archetypes.yaml: the weakest of the player's percentiles on the role's measures, among the players the role is open to. A rule, not a measurement.
+
+- **Grain:** One row per player per season per archetype the player is open to.
+- **Primary key:** `player_id`, `season`, `archetype`
+- **Indexes:** `season`, `archetype`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `player_id` | integer | yes | identifier |  | Player id. References `players.player_id`. |
+| `season` | string | yes | identifier |  | Season label, e.g. 2025-26. |
+| `archetype` | string | yes | identifier |  | Key of the archetype, as configured. |
+| `score` | float | yes | modeled | percentile | The weakest of the player's percentiles on the archetype's measures. |
+| `fills` | boolean | yes | modeled |  | Whether the score reaches the archetype's cut-off, a convention set in configuration. |
+| `is_primary` | boolean | yes | modeled |  | Whether, of the roles the player fills that season, this has the highest score. |
+| `archetype_version` | string | yes | operational |  | Version of the archetype definitions that produced the row. |
+
 ### custom_rosters
 
 Rosters assembled by the user in the Team Builder.
@@ -608,7 +627,6 @@ Called for by the roadmap; each gets a contract in the milestone that builds it.
 
 | Table | Domain | Purpose | Milestone |
 | --- | --- | --- | --- |
-| `player_archetypes` | player_value | Role classification outputs. | 9 |
 | `lineups` | lineups | Five-player lineup identities. | 10 |
 | `lineup_stats` | lineups | Minutes and performance for lineups. | 10 |
 | `model_predictions` | modeling | Versioned postseason probability outputs. | 12 |

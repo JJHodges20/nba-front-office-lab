@@ -55,6 +55,14 @@ class TestHistory:
         assert known.loc[2003, "age"] == 27  # from 2001, two seasons on
         assert known.loc[2006, "age"] == 30
 
+    def test_the_newest_age_on_record_is_believed_over_an_older_one(self) -> None:
+        # Ages as published do not always move a year a season.
+        features = ages_of((7, 2001, 25), (7, 2002, 29))
+        played = played_of((7, 2001, 1, 0.2), (7, 2002, 1, 0.6))
+        known = history(features, season_shares(played)).set_index("target")
+        assert known.loc[2003, "age"] == 30 and known.loc[2004, "age"] == 31
+        assert known.loc[2002, "age"] == 26  # only 2001 is behind it
+
     def test_a_player_who_never_played_a_minute_has_no_history(self) -> None:
         features = ages_of((7, 2003, 27), (8, 2003, 22))
         known = history(features, season_shares(played_of((7, 2003, 1, 0.4), (8, 2003, 1, 0.0))))

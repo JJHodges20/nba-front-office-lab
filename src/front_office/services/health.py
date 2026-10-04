@@ -15,6 +15,7 @@ from front_office.domain.datasets import CONTRACT_FILE, DATASET_SPECS, NBA_STATS
 from front_office.domain.seasons import Season
 from front_office.domain.tables import ALL_TABLES
 from front_office.services.lab import Lab
+from front_office.services.value import ValueStatus
 
 OK = "ok"
 STALE = "stale"
@@ -282,6 +283,9 @@ class HealthService:
             if detail is not None:
                 gaps.append(detail)
 
+        if status.player_seasons:
+            gaps.extend(_value_gaps(self._lab.value.status()))
+
         current = Season.league_year_on(day).label
         if team_seasons and team_seasons[-1] < current:
             gaps.append(
@@ -294,6 +298,50 @@ class HealthService:
             )
         order = {WARNING: 0, INFO: 1}
         return tuple(sorted(gaps, key=lambda gap: order[gap.severity]))
+
+
+def _value_gaps(value: ValueStatus) -> list[Gap]:
+    """What stands between the lab and current player values."""
+    area = "Player value"
+    if not value.is_fitted and not value.is_available:
+        return [
+            Gap(
+                area,
+                WARNING,
+                "No value model has been fitted, so players have no value. Run: fol value "
+                "fit --write, then fol build.",
+            )
+        ]
+    gaps = []
+    if value.is_fitted and value.applied_revision is None:
+        gaps.append(
+            Gap(
+                area,
+                WARNING,
+                "A value model is on file but the database was built without it. Run: fol build",
+            )
+        )
+    elif value.needs_build:
+        gaps.append(
+            Gap(
+                area,
+                WARNING,
+                f"The value model on file is revision {value.revision}; the database was "
+                f"built with {value.applied_revision}. Run: fol build",
+            )
+        )
+    if value.finished_since:
+        seasons = value.finished_since
+        span = seasons[0] if len(seasons) == 1 else f"{seasons[0]} to {seasons[-1]}"
+        gaps.append(
+            Gap(
+                area,
+                WARNING,
+                f"The value model was fitted on seasons to {value.fitted_through}; {span} "
+                "finished since. Run: fol value fit --write, then fol build.",
+            )
+        )
+    return gaps
 
 
 def _detail_gap(player_seasons: list[str], detail_seasons: list[str]) -> Gap | None:

@@ -192,8 +192,10 @@ class SyntheticLeague:
                         "off_rating": line.off_rating,
                         "def_rating": line.def_rating,
                         "net_rating": net,
-                        "usage_pct": 0.2,
-                        "assist_pct": 0.1,
+                        # Not features of the value model: spread out so that the roles
+                        # built on them have someone to fill them.
+                        "usage_pct": 0.12 + (line.player_id * 7 % 20) / 100,
+                        "assist_pct": 0.05 + (line.player_id * 11 % 30) / 100,
                         "oreb_pct": 0.05,
                         "dreb_pct": 0.15,
                         "reb_pct": 0.1,

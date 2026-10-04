@@ -23,6 +23,7 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe db                        # row counts and the last build's result
 .\.venv\Scripts\fol.exe value show                # the fitted player value model and its evidence
 .\.venv\Scripts\fol.exe value fit --write         # fit it again on the built database (then: fol build)
+.\.venv\Scripts\fol.exe value report --write      # regenerate docs/research/PLAYER_VALUE.md
 .\.venv\Scripts\fol.exe ui --no-browser           # the workbench at http://localhost:8501 (Ctrl+C stops it)
 .\.venv\Scripts\python.exe scripts\make_fixtures.py   # rebuild tests/fixtures/raw from data/raw
 ```
@@ -65,10 +66,11 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   interval, never a current team's chance (`docs/decisions/0009-benchmarks.md`).
 - **No thresholds.** Report how often, for how many, with what uncertainty. A band is a
   way of grouping; nothing "needs" a figure. Compare teams within their own season.
-- **Generated documents are not edited.** `docs/DATA_DICTIONARY.md`, `docs/METRICS.md`
-  and `docs/research/BENCHMARKS.md` come from `fol dictionary|metrics|benchmarks --write`.
-  The first two are checked by tests; the third depends on the database, so regenerate
-  it at a milestone gate after the data or the research code changes.
+- **Generated documents are not edited.** `docs/DATA_DICTIONARY.md`, `docs/METRICS.md`,
+  `docs/research/BENCHMARKS.md` and `docs/research/PLAYER_VALUE.md` come from
+  `fol dictionary|metrics|benchmarks --write` and `fol value report --write`. The first
+  two are checked by tests; the research documents depend on the database, so regenerate
+  them at a milestone gate after the data, the model or the research code changes.
 - **A model is fitted on request and applied by every build.** `fol value fit --write`
   writes `configs/models/player_value.json`; `fol build` applies it and never fits. Do
   not edit that file, and do not fit inside a build, a service or a page. Changing
@@ -80,6 +82,12 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   the difference is clear of zero. Record what was tried and left out in the decision.
 - **Modeled values are estimates on screen too**: impact, projections and wins carry
   the modeled tag, and a weight is shown with its interval or not at all.
+- **Archetypes are rules, not findings.** They live in `configs/archetypes.yaml`; a
+  player's score for a role is the weakest of their percentiles on its measures, among
+  the group the role is open to, within the season. To change one: edit the file, raise
+  `version`, `fol build`. Nothing about a role is fitted; what is measured is how often
+  it carries over to the next season, and that is shown beside every role. The
+  defensive roles need the fitted value model (`docs/decisions/0011-archetypes.md`).
 - **Source quirks get a rule, a note and a test.** Never repair data silently inside a
   normaliser (`docs/decisions/0003-source-quirks.md`).
 - **Rebuilt versus kept tables.** Every build drops and rewrites the league tables and
@@ -105,8 +113,9 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   series caps) are tested in `tests/ui/test_charts.py`; do not work around them in a page.
 - **Colours live in `wb/theme.py`.** `.streamlit/config.toml` repeats them and a test
   keeps the two in step. A new colour has to pass `tests/ui/test_theme.py`.
-- **Every figure says what it is**: measured, derived, estimate or the user's assumption.
-  Estimates over a span carry "≈". Missing is a dash and an explanation, never a zero.
+- **Every figure says what it is**: measured, derived, estimate, modeled or the user's
+  assumption. Estimates over a span carry "≈". Missing is a dash and an explanation,
+  never a zero. A page that shows a modeled value lists the Modeled tag in its header.
 - **Cache on the build id.** Accessors in `wb/data.py` take `build` first. Rosters are
   never cached.
 - **Text is gender-neutral**: "they", "the player", never "he".
@@ -138,7 +147,8 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
 - The fixture store holds one season of players for two teams, so nothing can be fitted
   on it. `tests/league.py` invents a league of many seasons whose team ratings a test
   plants; `tests/value_reference.py` computes the value model on it with plain loops, as
-  an independent answer; `tests/synthetic_lab.py` loads it into a database.
+  an independent answer; `tests/synthetic_lab.py` loads it into a database. Its usage and
+  assist figures are spread out so that every archetype has someone to fill it.
 - stats.nba.com adds and drops response columns between seasons: select by name, list
   what you need in `required=`, never index by position.
 - When patching files from a shell heredoc, backslashes get mangled. Use the editor

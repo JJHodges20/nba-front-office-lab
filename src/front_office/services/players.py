@@ -16,11 +16,20 @@ from front_office.analytics import players as analytics
 from front_office.analytics.comparison import Qualification
 from front_office.domain.metrics import MetricCatalog, MetricSpec
 from front_office.domain.seasons import SeasonType
+from front_office.modeling.value.catalog import SEASON_KEYS as VALUE_KEYS
+from front_office.modeling.value.catalog import VALUE_METRICS
 from front_office.services.contracts import SALARY_COLUMNS as _CONTRACT_COLUMNS
 from front_office.services.lab import Lab
+from front_office.services.value import ROLE_COLUMNS
 from front_office.services.window import Window
 
 DEFAULT_QUALIFICATION = Qualification(min_games=20, min_minutes=300)
+REGULAR = SeasonType.REGULAR.value
+
+PLAYER_AND_VALUE_METRICS = MetricCatalog(
+    (*analytics.PLAYER_METRICS, *(VALUE_METRICS[key] for key in VALUE_KEYS))
+)
+"""A player's season with what the value model makes of it: the regular season only."""
 
 _BIO_COLUMNS = ("position", "height_inches", "weight_lbs", "birth_date", "country", "college")
 
@@ -63,7 +72,8 @@ class PlayerTable:
     percentiles: pd.DataFrame
     """Same index; one column per metric, 0-100 with higher always better."""
     metrics: MetricCatalog
-    """The metrics available in this view. A narrowed window has box-score metrics only."""
+    """The metrics available in this view. A narrowed window has box-score metrics only,
+    and value is estimated for whole regular seasons only."""
 
     @property
     def qualified_count(self) -> int:
@@ -79,7 +89,10 @@ class PlayerProfile:
     """One row per team stint with on-court and off-court ratings."""
     contract_years: pd.DataFrame
     contract: dict | None
-    metrics: MetricCatalog = field(default=analytics.PLAYER_METRICS)
+    value: pd.DataFrame
+    """The value model's estimates season by season, oldest first, ending with the
+    projection into the season still to be played. Empty if nothing has been valued."""
+    metrics: MetricCatalog = field(default=PLAYER_AND_VALUE_METRICS)
 
 
 class PlayerService:
@@ -131,7 +144,17 @@ class PlayerService:
                 tuple(spec for spec in catalog if spec.key in analytics.BOX_METRIC_KEYS)
             )
 
+        if window.is_full_season and season_type == REGULAR:
+            valued = self._lab.read("player_value_scores", {"season": season})
+            valued = valued[valued["impact"].notna()].set_index("player_id")
+            if not valued.empty:
+                metrics = metrics.join(valued[list(VALUE_KEYS)])
+                catalog = PLAYER_AND_VALUE_METRICS
+
         players = self._with_identity(metrics, season)
+        filled = self._lab.value.roles(season)
+        for column in ROLE_COLUMNS:
+            players[column] = filled[column].reindex(players.index)
         players = self._with_contracts(players, payroll_season)
         players["is_qualified"] = qualification.mask(players)
         group = players["position_group"] if by_position else None
@@ -185,6 +208,10 @@ class PlayerService:
         lengths = self._lab.read("team_seasons").groupby("season")["games_played"].max()
         lines = analytics.player_season_metrics(seasons, on_off, lengths)
         lines.insert(4, "team", lines["team_id"].map(teams["abbreviation"]))
+        value = self._lab.value.player(int(player_id))
+        # Value is estimated for the regular season; a playoff line has none.
+        estimates = value.loc[value["impact"].notna(), ["season", *VALUE_KEYS]]
+        lines = lines.merge(estimates.assign(season_type=REGULAR), how="left")
         lines = lines.sort_values(["season", "season_type"], ascending=[False, False])
 
         stints = on_off.copy()
@@ -200,6 +227,7 @@ class PlayerService:
             on_off=stints.sort_values("season", ascending=False).reset_index(drop=True),
             contract_years=years,
             contract=None if contracts.empty else contracts.iloc[0].to_dict(),
+            value=value,
         )
 
     def game_log(self, player_id: int, season: str, season_type: str = "regular") -> pd.DataFrame:
@@ -309,6 +337,7 @@ def _ordered_columns(players: pd.DataFrame, catalog: MetricCatalog) -> list[str]
         "team_count",
         "position",
         "position_group",
+        *ROLE_COLUMNS,
         "age",
         "height_inches",
         "weight_lbs",

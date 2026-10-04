@@ -208,6 +208,40 @@ within-season concordance with intervals from resampling seasons. Nothing is fit
 see `docs/decisions/0009-benchmarks.md`. The document is generated from the database
 and is never edited by hand.
 
+## Player value
+
+```
+fol value fit --write:  database -> modeling.value.fit_value_model
+                        -> configs/models/player_value.json
+fol build:              league tables + that file -> modeling.value.score_players
+                        -> player_value_scores
+                        + configs/archetypes.yaml -> modeling.archetypes.assign_archetypes
+                        -> player_archetypes
+fol value report:       the file + the database -> docs/research/PLAYER_VALUE.md
+```
+
+`modeling/value` holds the model. `features.py` turns a season into rates per 100
+possessions against the league; `pooling.py` pools earlier seasons by minutes;
+`design.py` defines the terms an estimate is a weighted sum of, once, for fitting and
+scoring alike; `estimate.py` fits the weights to team results and tests them one season
+at a time against simpler methods; `scoring.py` applies a fitted model; `availability.py`
+projects minutes; `wins.py` and `market.py` turn impact into wins and wins into money.
+
+The specification (`configs/models/player_value.yaml`) is edited by people. The fitted
+model (`configs/models/player_value.json`) is written by `fol value fit --write` and
+carries its weights with their intervals and every piece of evidence for them. A build
+applies it and never fits one, so values change only when someone fits the model again.
+Tests of fitting use an invented league with planted weights (`tests/league.py`) and a
+loop-based reference that shares no code with the model (`tests/value_reference.py`).
+See `docs/decisions/0010-player-value.md`.
+
+`modeling/archetypes.py` scores every player against the roles defined in
+`configs/archetypes.yaml` (`domain/archetypes.py` validates them, `config/archetypes.py`
+loads them): the measures, the groups a role can be open to, the weakest-percentile
+score within a season, and how well each role carries over between seasons. Nothing in
+it is fitted, and the build applies the rules after the value model because the
+defensive roles use its defensive impact. See `docs/decisions/0011-archetypes.md`.
+
 ## Conventions
 
 - Season labels use both years: `2025-26`. Parse with `Season.parse`.

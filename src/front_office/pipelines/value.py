@@ -1,4 +1,5 @@
-"""The player value model in the pipeline: applied by every build, fitted on request.
+"""Player value in the pipeline: the model applied by every build and fitted on request,
+and the archetypes scored from what it produces.
 
 A build *applies* the fitted model it finds in ``configs/models`` and never fits one, so
 the same raw store and the same model file always give the same values. Fitting is a
@@ -15,10 +16,12 @@ from pathlib import Path
 
 from front_office.config.models import load_value_model, load_value_spec, save_value_model
 from front_office.config.settings import Settings
+from front_office.domain.archetypes import ArchetypeSet
 from front_office.domain.schema import ContractViolationError, conform_frame
 from front_office.domain.seasons import Season
-from front_office.domain.tables.value import PLAYER_VALUE_SCORES
+from front_office.domain.tables.value import PLAYER_ARCHETYPES, PLAYER_VALUE_SCORES
 from front_office.domain.value_model import ValueModel
+from front_office.modeling.archetypes import UnknownDefinition, assign_archetypes
 from front_office.modeling.value import (
     ModelMismatch,
     NotEnoughData,
@@ -34,6 +37,7 @@ from front_office.pipelines.normalize import (
 from front_office.storage import Database, StorageError, Warehouse
 
 TABLE = PLAYER_VALUE_SCORES.name
+ARCHETYPES = PLAYER_ARCHETYPES.name
 FIT_COMMAND = "fol value fit --write"
 FITTED_FROM = ("player_seasons", "player_game_logs", "team_seasons")
 
@@ -71,6 +75,37 @@ def add_value_tables(tables: NormalizedTables, model: ValueModel | None) -> None
                 f"{_listed(newer)} finished since and "
                 f"{'is' if len(newer) == 1 else 'are'} valued with the old weights. "
                 f"Run: {FIT_COMMAND}",
+                IssueSeverity.NOTE,
+            )
+        )
+
+
+def add_archetype_tables(tables: NormalizedTables, spec: ArchetypeSet | None) -> None:
+    """Score every player against every archetype, adding the table.
+
+    Called after :func:`add_value_tables`: two of the defensive roles lean on the value
+    model's defensive impact, and where no season has been valued they score nobody. A
+    note says so. With no definitions at all the table is simply empty.
+    """
+    frames = tables.frames
+    frames[ARCHETYPES] = PLAYER_ARCHETYPES.empty_frame()
+    if spec is None:
+        return
+    try:
+        frames[ARCHETYPES] = conform_frame(assign_archetypes(frames, spec), PLAYER_ARCHETYPES)
+    except (UnknownDefinition, ContractViolationError) as error:
+        tables.issues.append(BuildIssue(ALL_SEASONS, ARCHETYPES, str(error)))
+        return
+    scored = set(frames[ARCHETYPES]["archetype"])
+    unscored = [archetype.name for archetype in spec if archetype.key not in scored]
+    if unscored and not frames["player_seasons"].empty:
+        tables.issues.append(
+            BuildIssue(
+                ALL_SEASONS,
+                ARCHETYPES,
+                f"nobody could be scored as {', '.join(unscored)}: a measure these roles "
+                "need is missing for every player. The defensive roles need the value "
+                f"model. Run: {FIT_COMMAND}",
                 IssueSeverity.NOTE,
             )
         )

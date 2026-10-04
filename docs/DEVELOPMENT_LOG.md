@@ -3,6 +3,164 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone 9 - Player value engine (2026-10-04)
+
+**Built**
+
+- Thirty seasons of players. `player_history_start` in the settings; player season lines
+  (totals and advanced) for every season since 1996-97 through the rate-limited provider,
+  with game logs and rosters still kept for recent seasons only; and
+  `analytics/players.py::team_minutes`, which splits a traded player's published minutes
+  between teams by the logged minutes.
+- A `modeling` layer, importing `domain` and `analytics` only. `modeling/value`:
+  `features.py` (fifteen features in eight components, per 100 on-court possessions and
+  against the league), `pooling.py` (earlier seasons pooled by minutes at weights 1, ½
+  and ¼; reliability against 750 minutes of ballast), `design.py` (the terms an estimate
+  is a weighted sum of, defined once for fitting and scoring), `estimate.py` (offense and
+  defense fitted separately by least squares to the teams' relative ratings, every
+  player's estimate built from earlier seasons only; an expanding-window test from
+  2006-07 against six simpler methods; one ablation per component; intervals from
+  resampling whole seasons), `scoring.py` (season impact centred so the league's average
+  minute is zero, the projection into the next season, wins above replacement),
+  `availability.py` (projected share of team minutes from three seasons and age, tested
+  against "the same as last season"), `wins.py` (wins per point of net rating from the
+  standings, by season), `market.py` (a line through salary and wins; surplus value) and
+  `catalog.py` (the value metrics).
+- `domain/value_model.py`: the specification and the fitted model as frozen pydantic
+  models - every weight with its interval, the test, the baselines, the ablations, the
+  backtest, replacement level, projected minutes. `configs/models/player_value.yaml` is
+  edited by people; `configs/models/player_value.json` is written by
+  `fol value fit --write` and read by every build. `fol value show`, and
+  `fol value report --write` for [research/PLAYER_VALUE.md](research/PLAYER_VALUE.md).
+- `modeling/archetypes.py` and `configs/archetypes.yaml`: eight roles as rules - the
+  weakest percentile on a role's measures among the players it is open to, within the
+  season - the `player_archetypes` table, and how well each role carries over from one
+  season to the next.
+- `pipelines/value.py`: a build applies the model on file and the rules and never fits;
+  it notes when there is no model, when seasons have finished since it was fitted, and
+  when roles cannot be scored.
+- `services/value.py` - `ValueService`: status, a season's players with their ranks,
+  projections, a player's history, the parts of a season's impact, roles, who fills a
+  role, the role summary with persistence, value for money, the model card - and
+  `services/value_report.py`. Value columns and roles in the player views; value gaps in
+  Data Health; the glossary grows to 113 metrics.
+- The **Player Value** page: Season, Projections, Roles, Value for money, The model. The
+  Modeled tag. A role column and "Roles filled" on the Player Explorer. `charts.scatter`
+  draws a trend line.
+- Quality checks, 54 from 45: three on player lines against the game logs and the team's
+  totals, within tolerances the source's own rounding allows (the exact comparisons are
+  now warnings), three on the value table (the parts add up to the impact, every regular
+  season is valued, the minutes-weighted average impact is zero) and one on roles (a
+  player who fills a role has exactly one primary role, among those filled).
+
+**Decisions** ([0010](decisions/0010-player-value.md), [0011](decisions/0011-archetypes.md))
+
+- Value is a fitted model, not a composite with chosen weights. The weights are asked of
+  thirty seasons of team results, every estimate is built from seasons before the one
+  predicted, and a part of the model keeps its place only if leaving it out costs
+  accuracy on seasons the model had not seen. What was tried and left out - playoff
+  minutes among it - is tabled in the decision.
+- A fitted model is a file written on request. A build applies it and never fits one,
+  rows carry the revision, and the page, the report and Data Health say when the model
+  is behind the data or ahead of the build.
+- Impact is centred so the league's average minute is worth nothing; offense and defense
+  are fitted separately and add up; a replacement player is the impact of players beyond
+  each team's top ten; wins use the season's own wins per point.
+- The price of a win is read off the contracts on file, never a published figure; with
+  few contracts the line is rough and says how many it rests on. Nothing is valued
+  beyond one season ahead.
+- Archetypes are rules in configuration, scored by the weakest percentile within a
+  season. Nothing about them is fitted; what is measured instead is how often a role
+  carries over to the next season. Tracking data was left out: recent seasons only.
+
+**What the research says** (revision 1, fitted on 1996-97 to 2025-26; the document has the rest)
+
+- On 600 team-seasons from 2006-07 on, each predicted from earlier seasons only, the model
+  misses a team's net rating by 3.01 points (RMSE; offense 2.05, defense 2.14). The
+  league's player impact estimate misses by 3.38, on-court net rating by 3.54,
+  plus-minus by 3.55, last season regressed by 3.97, last season as it was by 4.41 and
+  the league average by 4.92 - every difference clear of zero.
+- Leaving out the team results costs most (RMSE +0.16), then the minutes prior for the
+  unproven part of an estimate (+0.11); on-court results, scoring efficiency and age each
+  cost about +0.05, all clear of zero. Creation, defensive activity, rebounding, spacing
+  and ball security cannot be told from adding nothing on this evidence; they stay
+  because the box score as a whole is missed when it goes, and the document says no
+  single weight in them should be leaned on.
+- Replacement level is -2.32 points per 100 possessions. A team's net rating is 1.23 times
+  the sum of its players' same-season impacts (correlation 0.96): impacts are cautious by
+  construction. A point of net rating was worth 2.57 wins in 1996-97 and 2.23 in 2025-26.
+- Projected minutes miss by 0.130 of a team's minutes on 13,675 player-seasons, against
+  0.143 for assuming last season's share.
+- Every role is filled again several times more often than by anyone at all: the primary
+  creator 64% against 6%; the connector least, 38% against 10%.
+
+**Verification**
+
+- The model is tested on an invented league (`tests/league.py`) whose team ratings are
+  planted from chosen weights, against a reference that computes the model with plain
+  loops and shares no code with it (`tests/value_reference.py`): every weight is
+  recovered on both sides of the ball when nothing is left to luck; with luck added the
+  intervals widen and still hold the truth; a season's prediction does not move when its
+  own results are changed; the baselines, replacement level, centring, wins per point and
+  projected minutes are worked by hand; the first season is only ever history; unfinished
+  seasons and incomplete teams are left out. Archetypes are tested on hand-made players
+  (percentiles and ties, groups by position and height, tiers, the primary role, missing
+  measures, persistence) and on the invented league with the shipped rules.
+- Services and pages are checked against the invented league valued by the planted model
+  and against the fixture store valued by the model the lab ships; the quality checks
+  against a scored league with each fault planted in turn.
+- Mutation spot-check: 150 planted bugs across the features, the fit, scoring, projected
+  minutes, the market, the pipeline, the checks, the services, the report, the roles and
+  the pages. 140 were caught at once. Eight exposed gaps - playoff lines slipping into the
+  features, a backtest season seeing its own results, the wrong season's age, projection
+  rows in a season table, salaries with no value in the market, the money table ignoring
+  the team filter, the Modeled tag on every view, the three-point prior taking the whole
+  record's league rather than the season's - each closed with a test and then caught.
+  One mutant was equivalent to the code, which was simplified instead; one mutation had
+  missed its line and was caught once aimed.
+- The page was looked at in both themes, every tab, on the real data and on a demo lab
+  with invented contracts, and clicked through in a browser: rows of the season table and
+  of a role's table, ordering, the position and team filters, the tabs, the weights'
+  side, roles across seasons, the Player Explorer's role column. Looking changed a
+  duplicated export key, a model tab that broke without a test on file, and "1 players".
+- The sweep runs the new page from two starting states without an exception.
+
+**Found on the way**
+
+- `_team_baselines` looked a team's last season up only among the rows it could fit on,
+  so a baseline could miss a season that was on record. Caught by the tests before it
+  reached the data.
+- In the older seasons a player's published season line, the game logs and the team's
+  totals disagree by the source's own rounding and by games a log lacks: three more rows
+  in [0003](decisions/0003-source-quirks.md), the exact checks demoted to warnings, and
+  tolerance checks as the errors.
+- `fol build` and `fol check` answered a missing configuration file with a traceback;
+  now a plain error.
+- A build that empties a modeled table is not refused, unlike one that empties a league
+  table: the league tables are whole, and a note says what to run.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| Automated tests | 2,400 passed, none skipped; a little over three minutes with `pytest -n auto` |
+| Test sensitivity | 150 planted bugs: 140 caught at once; 8 gaps closed with tests and then caught; 1 equivalent mutant removed by simplifying the code; 1 misaimed mutation caught once aimed |
+| Data-quality checks | 54 checks on the real data (build 11): 0 errors, 7 warnings - the three carried from milestone 8, and four where the older seasons' player lines, game logs and team totals disagree within the tolerances the error-level checks hold |
+| UI review | The new page in both themes, every tab, on the real data and on a demo lab with contracts; clicked through in a browser; the Player Explorer re-checked with its role column |
+| Architectural boundaries | `tests/architecture` passes. The new `modeling` layer imports `domain` and `analytics` only; `pipelines` and `services` consume it; the page computes nothing; fitting happens in one command and nowhere else |
+| Lint | `ruff check` and `ruff format --check` clean |
+
+**Open items carried forward**
+
+- Surplus value needs the contract file the user has yet to supply; the market line is
+  fitted to whatever is on file and says how many contracts that is.
+- Defense is the model's weak side: the box score records little of it, so the model
+  leans on the team's results shared among the players who were there. Tracking data
+  would help and was left out (recent seasons only).
+- The model is fitted on seasons to 2025-26 and must be fitted again when 2026-27 ends;
+  the page, the report and Data Health say so when it is behind.
+- The research documents are regenerated at gates, not checked by tests.
+
 ## Milestone 8 - Historical contender analysis (2026-10-01)
 
 **Built**

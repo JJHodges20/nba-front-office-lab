@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 import streamlit as st
 
 from wb import components, data, formats, state
-from wb.views import benchmarks, builder, contracts, health, lab, league, players, teams
+from wb.views import benchmarks, builder, contracts, health, lab, league, players, teams, value
 
 st.set_page_config(
     page_title="NBA Front Office Lab",
@@ -44,6 +44,12 @@ PAGES = {
             title="Player Explorer",
             icon=":material/person_search:",
             url_path="players",
+        ),
+        st.Page(
+            value.render,
+            title="Player Value",
+            icon=":material/trending_up:",
+            url_path="value",
         ),
         st.Page(teams.render, title="Team Explorer", icon=":material/groups:", url_path="teams"),
         st.Page(
@@ -83,8 +89,8 @@ def not_built() -> None:
     )
     st.code("fol refresh", language="powershell")
     st.caption(
-        "The first refresh makes about 440 requests to stats.nba.com and takes roughly ten "
-        "minutes. Later ones fetch only what is new."
+        "The first refresh makes about 650 requests to stats.nba.com and takes roughly "
+        "fifteen minutes. Later ones fetch only what is new."
     )
 
 

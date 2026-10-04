@@ -16,6 +16,7 @@ from front_office.services import (
     EraView,
     Lab,
     LabStatus,
+    ModelCard,
     PlayerProfile,
     PlayerTable,
     Qualification,
@@ -24,6 +25,8 @@ from front_office.services import (
     StageSummary,
     TeamProfile,
     TeamTable,
+    ValueForMoney,
+    ValueStatus,
     Window,
     relationship,
 )
@@ -182,6 +185,62 @@ def player_comparison(
 ) -> pd.DataFrame:
     table = player_table(build, season, season_type, window, qualification, None)
     return lab().players.compare(table, list(player_ids), list(keys))
+
+
+# --- player value ---------------------------------------------------------------------------
+
+
+@st.cache_data(show_spinner=False)
+def value_status(build: int | None) -> ValueStatus:
+    return lab().value.status()
+
+
+@st.cache_data(show_spinner=False)
+def value_season(build: int | None, season: str) -> pd.DataFrame:
+    return lab().value.season(season)
+
+
+@st.cache_data(show_spinner=False)
+def value_projections(build: int | None) -> pd.DataFrame:
+    return lab().value.projections()
+
+
+@st.cache_data(show_spinner=False)
+def value_history(build: int | None, player_id: int) -> pd.DataFrame:
+    return lab().value.player(player_id)
+
+
+@st.cache_data(show_spinner=False)
+def value_parts(build: int | None, player_id: int, season: str) -> pd.DataFrame:
+    return lab().value.parts(player_id, season)
+
+
+@st.cache_data(show_spinner=False)
+def value_for_money(build: int | None, season: str) -> ValueForMoney:
+    return lab().value.for_money(season)
+
+
+@st.cache_data(show_spinner=False)
+def value_roles(build: int | None, season: str) -> pd.DataFrame:
+    """The roles each player fills in a season: ``role`` and ``roles`` by ``player_id``."""
+    return lab().value.roles(season)
+
+
+@st.cache_data(show_spinner=False)
+def role_summary(build: int | None, season: str) -> pd.DataFrame:
+    return lab().value.role_summary(season)
+
+
+@st.cache_data(show_spinner=False)
+def role_players(build: int | None, season: str, archetype: str) -> pd.DataFrame:
+    return lab().value.role_players(season, archetype)
+
+
+@st.cache_data(show_spinner=False)
+def value_card(build: int | None, revision: int | None) -> ModelCard | None:
+    """The fitted model on file. Keyed on its revision too: fitting again changes the
+    file without a build."""
+    return lab().value.card()
 
 
 # --- contracts --------------------------------------------------------------------------

@@ -11,11 +11,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from front_office.config import Settings, load_all_season_rules, load_settings
+from front_office.config import Settings, load_all_season_rules, load_settings, save_value_model
 from front_office.config.settings import ENV_DATA_DIR, ENV_HOME
 from front_office.domain.cap_rules import SeasonRules
 from front_office.domain.datasets import NBA_STATS, partition_for
 from front_office.domain.snapshots import Snapshot
+from front_office.domain.value_model import ValueModel, ValueSpec
 from front_office.pipelines.build import BuildReport, build_database
 from front_office.pipelines.contracts import import_contract_file
 from front_office.pipelines.normalize import NormalizedTables, normalize
@@ -162,3 +163,37 @@ def contract_template(
     root = tmp_path_factory.mktemp("contracts") / "lab"
     with_contracts(built_template[0], root, CONTRACT_FILE)
     return root
+
+
+# --- the invented league, for anything that needs a fitted model's output -----------------
+
+VALUE_SPEC = ValueSpec(first_test_season="2004-05", resamples=100)
+
+
+@pytest.fixture(scope="session")
+def value_league():  # type: ignore[no-untyped-def]
+    """The invented league, its team ratings planted by the reference model."""
+    from tests.value_reference import planted_league
+
+    return planted_league(VALUE_SPEC)
+
+
+@pytest.fixture(scope="session")
+def value_model() -> ValueModel:
+    """The planted weights as a fitted model, with a replacement level of -2."""
+    from tests.value_reference import planted_model
+
+    return planted_model(VALUE_SPEC, replacement_level=-2.0)
+
+
+@pytest.fixture(scope="session")
+def value_home(value_league, value_model: ValueModel, tmp_path_factory) -> Path:  # type: ignore[no-untyped-def]
+    """A project whose database is the invented league, valued by the planted model,
+    which is also the model on file. Read from it; never write to it."""
+    from tests.synthetic_lab import write_lab
+
+    home = tmp_path_factory.mktemp("value") / "lab"
+    shutil.copytree(REPO_ROOT / "configs", home / "configs")
+    save_value_model(home / "configs", value_model)
+    write_lab(home, value_league, value_model)
+    return home

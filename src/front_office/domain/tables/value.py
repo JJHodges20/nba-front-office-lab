@@ -147,4 +147,54 @@ PLAYER_VALUE_SCORES = TableContract(
     introduced_in="V3",
 )
 
-TABLES: tuple[TableContract, ...] = (PLAYER_VALUE_SCORES,)
+PLAYER_ARCHETYPES = TableContract(
+    name="player_archetypes",
+    domain="player_value",
+    description=(
+        "Each player's score for each role in each regular season, by the rules in "
+        "configs/archetypes.yaml: the weakest of the player's percentiles on the role's "
+        "measures, among the players the role is open to. A rule, not a measurement."
+    ),
+    grain="One row per player per season per archetype the player is open to.",
+    fields=(
+        f.player_id(),
+        f.season(),
+        f.label("archetype", "Key of the archetype, as configured.", nullable=False),
+        Field(
+            "score",
+            DType.FLOAT,
+            "The weakest of the player's percentiles on the archetype's measures.",
+            nullable=False,
+            provenance=Provenance.MODELED,
+            unit="percentile",
+            minimum=0,
+            maximum=100,
+        ),
+        Field(
+            "fills",
+            DType.BOOLEAN,
+            "Whether the score reaches the archetype's cut-off, a convention set in configuration.",
+            nullable=False,
+            provenance=Provenance.MODELED,
+        ),
+        Field(
+            "is_primary",
+            DType.BOOLEAN,
+            "Whether, of the roles the player fills that season, this has the highest score.",
+            nullable=False,
+            provenance=Provenance.MODELED,
+        ),
+        Field(
+            "archetype_version",
+            DType.STRING,
+            "Version of the archetype definitions that produced the row.",
+            nullable=False,
+            provenance=Provenance.OPERATIONAL,
+        ),
+    ),
+    primary_key=("player_id", "season", "archetype"),
+    indexes=(("season", "archetype"),),
+    introduced_in="V3",
+)
+
+TABLES: tuple[TableContract, ...] = (PLAYER_VALUE_SCORES, PLAYER_ARCHETYPES)

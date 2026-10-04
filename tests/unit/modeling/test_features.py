@@ -199,6 +199,14 @@ class TestSeasonFeatures:
         counted = features[features["evidence_minutes"] > 0]
         assert (counted["evidence_minutes"] == counted["minutes"]).all()
 
+    def test_playoff_lines_are_not_features(self, exact_tables, played, features) -> None:
+        seasons = exact_tables["player_seasons"]
+        playoffs = seasons.head(40).assign(season_type="playoffs")
+        again = season_features(
+            pd.concat([seasons, playoffs], ignore_index=True), exact_tables["team_seasons"], played
+        )
+        pd.testing.assert_frame_equal(again, features)
+
     def test_zero_possessions_is_as_good_as_none(self, exact_tables, played, features) -> None:
         seasons = exact_tables["player_seasons"].copy()
         seasons["possessions"] = seasons["possessions"].fillna(0)

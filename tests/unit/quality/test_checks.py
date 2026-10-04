@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from front_office.domain.schema import DType, Field, Provenance, TableContract
-from front_office.domain.tables.value import PLAYER_VALUE_SCORES
+from front_office.domain.tables.value import PLAYER_ARCHETYPES, PLAYER_VALUE_SCORES
 from front_office.pipelines.normalize import NBA_STATS_TABLES
 from front_office.quality import Check, Severity, all_checks, reference_checks, run_checks
 from front_office.quality.checks import CHECKS, MAX_EXAMPLES
@@ -83,6 +83,7 @@ class TestBaseline:
     def test_default_checks_are_the_cross_table_ones(self, tables) -> None:
         # Every table a build produces, the modeled one included.
         tables["player_value_scores"] = PLAYER_VALUE_SCORES.empty_frame()
+        tables["player_archetypes"] = PLAYER_ARCHETYPES.empty_frame()
         assert len(run_checks(tables)) == len(CHECKS)
 
 
