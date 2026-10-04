@@ -84,3 +84,55 @@ def write_lab(root: Path, league: SyntheticLeague, model: ValueModel | None = No
                 },
             )
     return settings
+
+
+def pay_players(
+    settings: Settings, season: str, salaries: dict[int, int], teams: dict[int, int] | None = None
+) -> None:
+    """Put invented salaries for one season straight into the two contract tables.
+
+    The invented league has no raw store for a contract file to be imported against, so
+    the rows are written as an import would write them: one single-season contract a
+    player, active, labelled invented. ``teams`` names the team each player is under
+    contract to; anyone not named is with team 101.
+    """
+    from sqlalchemy import text
+
+    from front_office.storage import Database
+
+    teams = teams or {}
+    with Database(settings.database_path) as database, database.begin() as connection:
+        start = connection.execute(
+            text("SELECT COALESCE(MAX(contract_id), 0) FROM contracts")
+        ).scalar()
+        for number, (player, salary) in enumerate(salaries.items(), start=int(start) + 1):
+            team = int(teams.get(player, 101))
+            connection.execute(
+                text(
+                    "INSERT INTO contracts (contract_id, player_id, player_name, team_id, "
+                    "contract_type, status, first_season, last_season, seasons, total_salary, "
+                    "source_label, as_of_date) VALUES (:id, :player, :name, :team, 'standard', "
+                    "'active', :season, :season, 1, :salary, 'invented', '2008-10-01')"
+                ),
+                {
+                    "id": number,
+                    "player": int(player),
+                    "name": f"Player {player}",
+                    "team": team,
+                    "season": season,
+                    "salary": int(salary),
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO contract_years (contract_id, season, player_id, team_id, "
+                    "salary, years_remaining) VALUES (:id, :season, :player, :team, :salary, 0)"
+                ),
+                {
+                    "id": number,
+                    "season": season,
+                    "player": int(player),
+                    "team": team,
+                    "salary": int(salary),
+                },
+            )

@@ -13,7 +13,7 @@ before roster scoring, optimisation or any predictive claim. The plan is in
 
 ## Status
 
-Milestones 1-10 of 14 are complete. The first seven are the roadmap's version 1.0,
+Milestones 1-11 of 14 are complete. The first seven are the roadmap's version 1.0,
 *League and Roster Analytics*: league data from stats.nba.com, a database built from it,
 tested player and team analytics, import of contract data with cap-normalised salaries,
 and a workbench to explore all of it and to build rosters by hand. The eighth adds the
@@ -30,11 +30,17 @@ fit engine of version 4: a roster - a real team's, or one you built - described 
 roadmap's six areas of fit and placed among the season's teams, and a test of whether any
 of that predicts a team's results beyond its players' impacts added up. On thirty seasons
 it does not, so fit is shown as description and nothing is added to the sum of the parts
-([docs/research/ROSTER_FIT.md](docs/research/ROSTER_FIT.md)).
+([docs/research/ROSTER_FIT.md](docs/research/ROSTER_FIT.md)). The eleventh adds the
+roster optimizer of version 5: under a payroll line or an owner's budget, a roster size,
+role and position requirements, locks and exclusions, it finds several distinct rosters
+that project best - the sum of the parts, with the value model's error - and saves any of
+them into the Team Builder. It needs salaries for the season ahead, so it runs only once
+a contract file is imported.
 
-Nothing yet optimises a roster or predicts an outcome. Those are the later stages. Player
-value is an estimate with a stated error, shown as one, and the workbench describes; it
-does not recommend.
+Nothing yet predicts an outcome. That is the next stage. Player value and a roster's
+projection are estimates with a stated error, shown as such; the optimizer shows several
+rosters rather than one because the weights behind one best rest on assumptions; and the
+workbench describes, it does not recommend.
 
 **Contract data is not included.** No free source permits collecting NBA contracts
 automatically for this kind of project, so salaries come from a file you supply. Until
@@ -85,6 +91,7 @@ Stop it with Ctrl+C. [docs/WORKBENCH.md](docs/WORKBENCH.md) is the guide.
 | Analytics Lab | Any two metrics against each other, how one is spread, and the metric glossary. |
 | Team Builder | Rosters you assemble by hand: payroll, cap share, room under each line, roster rules, pooled indicators. |
 | Roster Fit | Do these players make sense together? A team or a built roster described in the roadmap's areas of fit, placed among the season's teams, with the sum of its parts - and the evidence on whether fit adds anything to it. |
+| Roster Optimizer | Several strong, distinct rosters under a payroll budget and the requirements you set, from the value model's projections; any of them can be saved into the Team Builder. |
 | Data Health | Freshness, failed fetches, missing data, quality checks and source status. |
 
 Season, phase, team, player and comparison window are chosen once in the sidebar and

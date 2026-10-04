@@ -30,6 +30,13 @@ from front_office.services.glossary import METRIC_CATALOGS, metric_glossary
 from front_office.services.health import Gap, HealthService, SourceStatus
 from front_office.services.lab import Lab, LabNotBuilt, LabStatus
 from front_office.services.league import LeagueService
+from front_office.services.optimizer import (
+    OptimizerError,
+    OptimizerReport,
+    OptimizerService,
+    OptimizerStatus,
+    RosterPlan,
+)
 from front_office.services.players import (
     DEFAULT_QUALIFICATION,
     PlayerProfile,
@@ -63,6 +70,10 @@ __all__ = [
     "LeagueService",
     "Measure",
     "ModelCard",
+    "OptimizerError",
+    "OptimizerReport",
+    "OptimizerService",
+    "OptimizerStatus",
     "PlayerProfile",
     "PlayerService",
     "PlayerTable",
@@ -71,6 +82,7 @@ __all__ = [
     "RosterCheck",
     "RosterError",
     "RosterNotFound",
+    "RosterPlan",
     "RosterSummary",
     "SourceStatus",
     "StageSummary",

@@ -166,15 +166,30 @@ ships none does, so nothing is added to the sum of the parts and the profile des
 The same as a document: [research/ROSTER_FIT.md](research/ROSTER_FIT.md); why it is built
 this way: [decisions/0012-roster-fit.md](decisions/0012-roster-fit.md).
 
+**Roster Optimizer.** Several strong rosters under a budget. Set the payroll line (the
+cap, the tax line, an apron, or an owner's figure), the roster size, how many players must
+fill each role and each position group, anyone to lock in or leave out, an age range, a
+highest salary and, if you like, a least projected rating; then ask for a number of rosters
+that each differ from the others by at least so many players. Each roster is the best that
+projects under all of it once the rosters before it are set aside. What is maximised is the
+sum of the parts - the value model's projections added up for the minutes projected, with
+replacement players filling the rest - held to two budgets: the payroll, and a season's
+minutes. The value model misses a real team by about three points on seasons it had not
+seen, and every figure carries that. Salaries come from your contract file, so the page
+runs only once one is imported for the season ahead. Any roster can be saved into the Team
+Builder, where the Roster Fit page will describe it. Nothing here is a recommendation; see
+[decisions/0013-roster-optimizer.md](decisions/0013-roster-optimizer.md).
+
 **Data Health.** How the last build went, the state of each source, what is missing and
 what that costs, every quality check, every adjustment the build made to source data,
 what is held of each dataset, and any fetch that is failing.
 
 ## What it does not do yet
 
-No optimiser, no forecast of a team's season. Those are later roadmap stages. The
+No forecast of a team's season or its postseason. That is the next roadmap stage. The
 benchmarks give historical frequencies, and player value is an estimate of what a player
 adds; nothing in the workbench presents either as a prediction of how a team will do. A
 role is a rule applied to a player's statistics, not a measurement of how they play, and
 the page says so. Roster fit describes a roster and reports what the evidence found; it
-does not score one.
+does not score one. The optimizer's rosters are the parts added up under a budget,
+several of them, never one answer.

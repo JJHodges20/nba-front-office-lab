@@ -12,6 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from front_office.domain.fit_model import FitEvidence
+from front_office.domain.optimizer import OptimizerRequest
 from front_office.services import (
     Era,
     EraView,
@@ -20,6 +21,8 @@ from front_office.services import (
     Lab,
     LabStatus,
     ModelCard,
+    OptimizerReport,
+    OptimizerStatus,
     PlayerProfile,
     PlayerTable,
     Qualification,
@@ -274,6 +277,35 @@ def fit_evidence(build: int | None, revision: int | None) -> FitEvidence | None:
 @st.cache_data(show_spinner=False)
 def fit_champions(build: int | None) -> pd.DataFrame:
     return lab().fit.champions()
+
+
+# --- the roster optimizer ---------------------------------------------------------------
+
+
+@st.cache_data(show_spinner=False)
+def optimizer_status(build: int | None) -> OptimizerStatus:
+    return lab().optimizer.status()
+
+
+@st.cache_data(show_spinner=False)
+def optimizer_defaults(build: int | None) -> OptimizerRequest:
+    return lab().optimizer.defaults()
+
+
+@st.cache_data(show_spinner=False)
+def optimizer_pool(build: int | None) -> pd.DataFrame:
+    return lab().optimizer.pool()
+
+
+@st.cache_data(show_spinner="Searching for rosters...")
+def optimizer_solve(build: int | None, request: OptimizerRequest) -> OptimizerReport:
+    """A run of the optimizer, kept for as long as the request and the build stand."""
+    return lab().optimizer.solve(request)
+
+
+def optimizer_save(player_ids: list[int], name: str, request: OptimizerRequest) -> int:
+    """Save a found roster in the Team Builder. Rosters are never cached."""
+    return lab().optimizer.save(player_ids, name, request)
 
 
 # --- contracts --------------------------------------------------------------------------

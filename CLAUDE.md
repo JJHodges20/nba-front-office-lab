@@ -93,6 +93,14 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   roster's sum of parts only when `combined.is_usable`, and on the evidence the lab ships
   it is not. No page, and no later optimiser, may score fit with chosen weights; role
   counts may constrain a roster, never rate it (`docs/decisions/0012-roster-fit.md`).
+- **The optimizer maximises the sum of the parts and nothing else.** A roster's
+  projected rating is five slots of replacement level plus each player's projected impact
+  above it for the projected share of minutes; fit is a requirement the user sets (role
+  and group counts), never a term, and contract value is what the budget buys. Two budgets
+  bind: the payroll line and a season's minutes. It returns several distinct rosters, each
+  cut off before the next search, and names why nothing was found. It needs salaries from
+  the user's contract file; tests and the demo use invented ones
+  (`docs/decisions/0013-roster-optimizer.md`). SciPy's `milp` (HiGHS) is the solver.
 - **Archetypes are rules, not findings.** They live in `configs/archetypes.yaml`; a
   player's score for a role is the weakest of their percentiles on its measures, among
   the group the role is open to, within the season. To change one: edit the file, raise

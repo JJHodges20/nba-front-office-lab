@@ -159,7 +159,7 @@ fol ui:  apps/workbench/app.py -> wb.views.<page> -> front_office.services.Lab -
 
 `services.Lab` opens the database and the season rules; the services hang off it:
 `players`, `teams`, `league`, `benchmarks`, `contracts`, `builder` (the user's rosters),
-`value`, `fit` and `health`.
+`value`, `fit`, `optimizer` and `health`.
 A service reads tables, calls analytics, and joins the result with names. It contains
 no formulas.
 
@@ -259,6 +259,24 @@ asks whether the measures, taken from the players' previous-season profiles, exp
 what the value model's out-of-sample predictions missed; `services/fit.py` profiles a
 team or a built roster and applies a correction only if the evidence supports one.
 See `docs/decisions/0012-roster-fit.md`.
+
+## The roster optimizer
+
+```
+a page:  OptimizerService.pool  (projections for the season ahead + the contract file's
+         salaries + the latest season's roles and groups)
+         -> modeling.optimizer.solve (an integer programme, HiGHS through SciPy)
+         -> rosters, best first, each cut off before the next
+         -> OptimizerService.save -> a Team Builder roster
+```
+
+`domain/optimizer.py` holds the request (what a run respects) and the outcome;
+`modeling/optimizer.py` the objective - the sum of the parts above replacement for the
+minutes projected - the two budgets (payroll and minutes), the requirements, the cuts
+that make rosters distinct and the diagnoses of why nothing can be found;
+`services/optimizer.py` assembles the pool, resolves a payroll line from the cap rules
+and dresses rosters with names. Nothing is fitted and nothing is cached across runs. See
+`docs/decisions/0013-roster-optimizer.md`.
 
 ## Conventions
 

@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from front_office.services.fit import FitService
     from front_office.services.health import HealthService
     from front_office.services.league import LeagueService
+    from front_office.services.optimizer import OptimizerService
     from front_office.services.players import PlayerService
     from front_office.services.teams import TeamService
     from front_office.services.value import ValueService
@@ -205,3 +206,9 @@ class Lab:
         from front_office.services.fit import FitService
 
         return FitService(self)
+
+    @property
+    def optimizer(self) -> OptimizerService:
+        from front_office.services.optimizer import OptimizerService
+
+        return OptimizerService(self)

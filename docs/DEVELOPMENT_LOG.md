@@ -3,6 +3,107 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone 11 - Roster optimizer (2026-10-04)
+
+**Built**
+
+- `domain/optimizer.py`: the request - the payroll line (cap, tax line, either apron, or
+  an owner's budget) with an optional floor, the roster size, the least number of players
+  who must fill each role and each position group, a least projected rating, age and
+  salary limits, players locked in and left out, how many rosters to find and by how
+  many players they must differ - and the outcome: the rosters, or the reasons there are
+  none.
+- `modeling/optimizer.py`: an exact integer programme (HiGHS, through SciPy, a new
+  dependency). The objective is the sum of the parts - five slots of replacement level
+  plus each player's projected impact above it for the share of a season's minutes
+  projected - with the cheaper roster preferred among equals by a weight that is never
+  a trade. Two budgets bind, the payroll and a season's minutes (with a stated slack,
+  the rating scaled down where minutes run over); roles and groups are requirements;
+  locks and exclusions fix players; a least rating that nothing reaches is dropped with
+  a plain statement of the best; each roster found is cut off before the next search, so
+  several distinct rosters come back best first; and when nothing can be found the
+  requirement that cannot be met on its own is named.
+- `services/optimizer.py` - `OptimizerService`: the pool (every player with a projection
+  for the season ahead and a salary for it on file, with the latest season's roles and
+  groups), the request to start from (the season's cap and roster limits, the roadmap's
+  example requirements), the budget a line resolves to, the rosters dressed with names,
+  payrolls against the season's lines and what each swaps against the first, and saving
+  a roster into the Team Builder with its five largest projected shares in starting slots
+  that suit their groups.
+- The **Roster Optimizer** page: the requirements as a form, the rosters as a comparison
+  and one tab each, with the model's error on every figure and a save button per roster.
+  `FitService.profiles()` is public, for the groups and roles the pool reads.
+
+**Decisions** ([0013](decisions/0013-roster-optimizer.md))
+
+- The objective is the sum of the parts and nothing else: the fit evidence (0012) left no
+  validated fit term, and contract value under a fixed budget is what the budget buys.
+  Fit enters as the user's requirements, never as a score.
+- Two budgets: fifteen players who each expect to play most of every game are not a
+  roster anyone can play, so the players' projected minutes may exceed a season's only by
+  a stated slack, and a roster that runs over is rated as if everyone played a little
+  less.
+- Several rosters, each distinct, best first - the roadmap's own argument, that the
+  weights behind one best are assumptions.
+- Salaries come only from the user's contract file; without one there is no pool, and the
+  page says so. The demo lab and the tests use invented salaries, labelled as such.
+
+**Verification**
+
+- The solver is checked against brute force on pools small enough to enumerate every
+  roster: the best under four budgets, with role and group requirements, with locks and
+  exclusions, and with a least rating; a bigger budget never projects worse; among equals
+  the cheaper; the payroll binds, the minutes bind and the rating says so, the floor binds
+  only when asked; age and salary limits narrow the pool but not a locked player; each
+  roster differs from every earlier one, the second is the best of the rest, and a pool
+  that cannot give more gives fewer; every diagnosis, and the request's own refusals.
+- The service on an invented league with every projected player under an invented
+  contract (no cap rules, so the owner's budget), on the fixture store's nine priced
+  players under 2026-27's cap, and on the fixture store without contracts: the pool, the
+  defaults, each line's figure, the rosters' arithmetic and order, saving with starters
+  in slots, and the fit service reading a saved roster back.
+- The page: the empty states, the pool caption, the form submitted through the test
+  harness with the roster size, the requirements and a lock set, the comparison and the
+  figures against the service, an impossible request's reasons, a dropped rating's note,
+  the invented league under an owner's budget, and saving a roster into the Team Builder.
+- Mutation spot-check: 26 planted bugs in the solver, the request, the service
+  and the page: 22 caught at once; one exposed a gap - the share of a season a roster's minutes cover, never pinned - closed with tests and then caught; three mutations had missed their line after the formatter rewrapped it and were caught once aimed. The harness itself needed two repairs on the way: it decoded test output in the console's code page and crashed on a curly quote, and one run stalled; it now reads UTF-8 and times a run out.
+- The page in both themes on the demo lab (real projections, invented salaries) and the
+  empty state on the real data; clicked through in a browser: the form filled, rosters
+  found, the tabs, a roster saved and opened in the Team Builder and on the Roster Fit
+  page.
+- The sweep runs the new page from its start without an exception.
+
+**Found on the way**
+
+- HiGHS accepts a solution within a relative gap of one in ten thousand as optimal, which
+  let two rosters a hair apart come back in the wrong order; the gap is set a thousand
+  times tighter. The salary tie-break was lowered to a hundredth of a point per hundred
+  million dollars for the same reason.
+- Ten of the optimizer's tests first asked for four-player rosters, and the request
+  refuses fewer than five - the right refusal.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| Automated tests | 2,580 passed, none skipped; about three and a half minutes with `pytest -n auto` |
+| Test sensitivity | 26 planted bugs: 22 caught at once; 1 gap closed with tests and then caught; 3 re-aimed mutations caught once aimed |
+| Data-quality checks | Unchanged: no table or check was added; the real database stands at build 13 (57 checks, 0 errors, 7 standing warnings) |
+| UI review | The new page in both themes on the demo lab and the real data; the form, the results and a save clicked through in a browser |
+| Architectural boundaries | `tests/architecture` passes. The request and the outcome are `domain`, the search is `modeling`, the pool and the budget are a `service`; the page computes nothing and the solver reads no settings |
+| Lint | `ruff check` and `ruff format --check` clean |
+
+**Open items carried forward**
+
+- The optimizer runs on the real workspace only once a contract file for the season
+  ahead is imported; until then the page says what it needs.
+- The pool is players under contract. Free agents and trade targets without a salary on
+  file cannot be placed; a per-player assumed salary in the request would allow it.
+- A roster's projection is the parts added up; a lineup model that redistributes minutes
+  among the players chosen would be the next refinement, and the same would feed the
+  Roster Fit page.
+
 ## Milestone 10 - Roster fit engine (2026-10-04)
 
 **Built**

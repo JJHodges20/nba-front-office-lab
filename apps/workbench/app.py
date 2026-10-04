@@ -21,6 +21,7 @@ from wb.views import (
     health,
     lab,
     league,
+    optimizer,
     players,
     teams,
     value,
@@ -83,6 +84,12 @@ PAGES = {
             title="Roster Fit",
             icon=":material/diversity_3:",
             url_path="fit",
+        ),
+        st.Page(
+            optimizer.render,
+            title="Roster Optimizer",
+            icon=":material/tune:",
+            url_path="optimizer",
         ),
     ],
     "System": [

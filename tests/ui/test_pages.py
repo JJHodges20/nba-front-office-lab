@@ -29,6 +29,7 @@ PAGES = (
     "lab",
     "builder",
     "fit",
+    "optimizer",
     "health",
 )
 STATES = {

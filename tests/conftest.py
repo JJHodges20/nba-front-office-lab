@@ -232,3 +232,31 @@ def fitted_home(tmp_path_factory) -> Path:  # type: ignore[no-untyped-def]
     fit_evidence_path(home / "configs").unlink()
     write_lab(home, league, model)
     return home
+
+
+def invented_salary(player_id: int, projected_wins: float) -> int:
+    """A salary that follows a player's projection, with a little that does not."""
+    worth = max(float(projected_wins), 0.0)
+    return 1_500_000 + int(round(7_000_000 * worth)) + (int(player_id) % 7) * 300_000
+
+
+@pytest.fixture(scope="session")
+def optimizer_home(value_home: Path, tmp_path_factory) -> Path:  # type: ignore[no-untyped-def]
+    """The invented league valued by the planted model, with every projected player under
+    an invented contract for the season ahead. Read from it; never write to it."""
+    from front_office.services import Lab
+    from tests.synthetic_lab import pay_players
+
+    home = tmp_path_factory.mktemp("optimizer") / "lab"
+    shutil.copytree(value_home, home)
+    settings = load_settings(home)
+    with Lab(settings) as lab:
+        ahead = lab.value.projections()
+        season = lab.value.status().upcoming
+        salaries = {
+            int(player): invented_salary(int(player), row["projected_wins"])
+            for player, row in ahead.iterrows()
+        }
+        teams = {int(player): int(team) for player, team in ahead["team_id"].dropna().items()}
+    pay_players(settings, season, salaries, teams)
+    return home

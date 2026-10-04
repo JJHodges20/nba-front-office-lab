@@ -42,7 +42,7 @@ points-per-dollar.
 | 8 | Historical contender analysis | Playoff/championship benchmark research | Done (team level; roster make-up and payroll await player and contract history) |
 | 9 | Player value engine | Validated value features, surplus value, archetypes | Done (surplus value needs a contract file) |
 | 10 | Roster fit engine | Fit, redundancy, role coverage, weaknesses | Done (fit is description; the evidence supports no correction to the sum of the parts) |
-| 11 | Roster optimizer | Budget and roster constraints, multiple candidate rosters | Not started |
+| 11 | Roster optimizer | Budget and roster constraints, multiple candidate rosters | Done (needs a contract file for the season ahead) |
 | 12 | Playoff/championship model | Calibrated postseason probability models | Not started |
 | 13 | Simulator | Scenario and Monte Carlo analysis | Not started |
 | 14 | Full-system audit | Architecture, leakage, tests, UI, documentation, performance | Not started |
@@ -50,8 +50,9 @@ points-per-dollar.
 Milestones 1-7 make up **v1.0 - League and Roster Analytics**, the first release target.
 All seven are done; one acceptance criterion below stays open until a contract file is
 supplied. Milestone 8 is the roadmap's version 2 (*Winning Benchmarks*), milestone 9 its
-version 3 (*Player Value Engine*) and milestone 10 its version 4 (*Roster Fit Engine*);
-the surplus-value half of version 3 waits on the same file.
+version 3 (*Player Value Engine*), milestone 10 its version 4 (*Roster Fit Engine*) and
+milestone 11 its version 5 (*Budget Roster Optimizer*); the surplus-value half of version
+3 and the optimizer's pool both wait on the same file.
 
 ## Completion gate for every milestone
 

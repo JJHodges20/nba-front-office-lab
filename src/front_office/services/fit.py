@@ -178,6 +178,13 @@ class FitService:
     def seasons(self) -> tuple[str, ...]:
         return tuple(sorted(self._lab.warehouse.distinct(TABLE, "season"), reverse=True))
 
+    def profiles(self, season: str) -> pd.DataFrame:
+        """Every player's profile for one season, indexed by ``player_id``: the rates, the
+        groups and the roles filled that the fit measures and the optimizer read."""
+        return player_profiles(self._season_tables(season), self.archetypes()).set_index(
+            "player_id"
+        )
+
     def status(self) -> FitStatus:
         evidence = self.evidence()
         warehouse = self._lab.warehouse
