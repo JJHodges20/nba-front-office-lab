@@ -52,6 +52,13 @@ from front_office.services.postseason import (
     SubjectOutlook,
     probability_key,
 )
+from front_office.services.simulator import (
+    Outcome,
+    ScenarioReport,
+    SimulatorError,
+    SimulatorService,
+    SimulatorStatus,
+)
 from front_office.services.teams import TeamProfile, TeamService, TeamTable
 from front_office.services.value import ModelCard, ValueForMoney, ValueService, ValueStatus
 from front_office.services.window import Window
@@ -84,6 +91,7 @@ __all__ = [
     "OptimizerReport",
     "OptimizerService",
     "OptimizerStatus",
+    "Outcome",
     "Outlook",
     "PlayerProfile",
     "PlayerService",
@@ -98,6 +106,10 @@ __all__ = [
     "RosterNotFound",
     "RosterPlan",
     "RosterSummary",
+    "ScenarioReport",
+    "SimulatorError",
+    "SimulatorService",
+    "SimulatorStatus",
     "SourceStatus",
     "StageSummary",
     "SubjectOutlook",

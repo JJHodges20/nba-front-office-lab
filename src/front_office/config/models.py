@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from front_office.config.settings import ConfigError, read_yaml
 from front_office.domain.fit_model import FitEvidence, FitSpec
 from front_office.domain.postseason import PostseasonModel, PostseasonSpec
+from front_office.domain.simulator import SimulatorModel, SimulatorSpec
 from front_office.domain.value_model import ValueModel, ValueSpec
 
 MODELS_DIR = "models"
@@ -24,6 +25,8 @@ FIT_SPEC_FILE = "roster_fit.yaml"
 FIT_EVIDENCE_FILE = "roster_fit.json"
 POSTSEASON_SPEC_FILE = "postseason.yaml"
 POSTSEASON_MODEL_FILE = "postseason.json"
+SIMULATOR_SPEC_FILE = "simulator.yaml"
+SIMULATOR_MODEL_FILE = "simulator.json"
 
 
 def value_spec_path(config_dir: Path) -> Path:
@@ -153,6 +156,48 @@ def load_postseason_model(config_dir: Path) -> PostseasonModel | None:
 def save_postseason_model(config_dir: Path, model: PostseasonModel) -> Path:
     """Write the fitted postseason model where the services will find it."""
     path = postseason_model_path(config_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(model.model_dump_json(indent=1) + "\n", encoding="utf-8", newline="\n")
+    return path
+
+
+# --- the simulator -------------------------------------------------------------------------
+
+
+def simulator_spec_path(config_dir: Path) -> Path:
+    return config_dir / MODELS_DIR / SIMULATOR_SPEC_FILE
+
+
+def simulator_model_path(config_dir: Path) -> Path:
+    return config_dir / MODELS_DIR / SIMULATOR_MODEL_FILE
+
+
+def load_simulator_spec(config_dir: Path) -> SimulatorSpec:
+    """How the simulator's parameters are measured and tested."""
+    path = simulator_spec_path(config_dir)
+    try:
+        return SimulatorSpec.model_validate(read_yaml(path))
+    except ValidationError as error:
+        raise ConfigError(f"invalid simulator specification in {path}:\n{error}") from error
+
+
+def load_simulator_model(config_dir: Path) -> SimulatorModel | None:
+    """The simulator's measured parameters, or ``None`` if none have been written."""
+    path = simulator_model_path(config_dir)
+    if not path.is_file():
+        return None
+    try:
+        return SimulatorModel.model_validate_json(path.read_text(encoding="utf-8"))
+    except ValidationError as error:
+        raise ConfigError(
+            f"{path} is not a simulator model this version of the lab can read:\n"
+            f"{error}\nMeasure it again: fol simulate fit --write"
+        ) from error
+
+
+def save_simulator_model(config_dir: Path, model: SimulatorModel) -> Path:
+    """Write the simulator's parameters where the services will find them."""
+    path = simulator_model_path(config_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(model.model_dump_json(indent=1) + "\n", encoding="utf-8", newline="\n")
     return path

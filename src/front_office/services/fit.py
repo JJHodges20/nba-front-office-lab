@@ -10,6 +10,7 @@ evidence does not support.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -39,6 +40,7 @@ TABLE = "team_fit_profiles"
 REGULAR = SeasonType.REGULAR.value
 TEAM = "team"
 ROSTER = "roster"
+SCENARIO = "scenario"
 ON_COURT = 5
 TOP_THIRD, BOTTOM_THIRD = 100 * 2 / 3, 100 / 3
 
@@ -244,6 +246,35 @@ class FitService:
             absent=absent,
         )
 
+    def lineup(
+        self,
+        player_ids: Sequence[int],
+        season: str,
+        shares: Mapping[int, float],
+        name: str,
+        *,
+        tables: dict[str, pd.DataFrame] | None = None,
+    ) -> FitReport:
+        """Any set of players, each given a share of a team's minutes in ``season``:
+        profiled from what they showed that season, weighted by those shares. For a
+        scenario, whose minutes are projected rather than played. ``tables`` are the
+        season's tables from :meth:`season_tables`, read once for several lineups."""
+        tables = self.season_tables(season) if tables is None else tables
+        games = tables["team_seasons"]["minutes"].astype("float64")
+        to_fill = ON_COURT * float(games.mean()) if len(games) else np.nan
+        members = pd.Index([int(player) for player in player_ids], name="player_id")
+        minutes = pd.Series(
+            [float(shares.get(int(player), 0.0)) * to_fill for player in members],
+            index=members,
+            dtype="float64",
+        ).fillna(0.0)
+        known = tables["players"].set_index("player_id")["full_name"]
+        absent = tuple(
+            str(known.get(player, f"Player {player}"))
+            for player in members[minutes.to_numpy() <= 0]
+        )
+        return self._report(SCENARIO, 0, name, season, minutes, to_fill, tables, absent=absent)
+
     def champions(self) -> pd.DataFrame:
         """Where the champions' rosters stood among their season's teams on each measure:
         :data:`CHAMPIONS_COLUMNS`, in the catalog's order.
@@ -272,6 +303,11 @@ class FitService:
         return pd.DataFrame(rows, columns=list(CHAMPIONS_COLUMNS))
 
     # --- assembly -----------------------------------------------------------------------
+
+    def season_tables(self, season: str) -> dict[str, pd.DataFrame]:
+        """The season's tables a lineup is profiled from, so that several lineups of
+        one season are read once."""
+        return self._season_tables(season)
 
     def _season_tables(self, season: str) -> dict[str, pd.DataFrame]:
         read = self._lab.read

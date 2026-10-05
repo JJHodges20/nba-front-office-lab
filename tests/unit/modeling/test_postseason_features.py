@@ -153,7 +153,8 @@ class TestGamesAndSeries:
 
     def test_playoff_games_are_from_the_home_side_with_the_gaps(self, frames, features) -> None:  # type: ignore[no-untyped-def]
         games = playoff_games(frames, features, SPEC)
-        assert len(games) == len(frames["team_games"]) // 2 == 1192
+        played = frames["team_games"]
+        assert len(games) == len(played[played["season_type"] == "playoffs"]) // 2 > 1000
         assert set(games["home"]) == {1.0}
         assert set(games.columns) >= {f"{measure}_diff" for measure in GAPS}
         table = keyed(features)

@@ -1,6 +1,6 @@
 # The Workbench
 
-The workbench is the lab's interface: twelve pages over the database, opened in your
+The workbench is the lab's interface: thirteen pages over the database, opened in your
 browser.
 
 ```powershell
@@ -207,17 +207,47 @@ seasons.
 The same as a document: [research/POSTSEASON.md](research/POSTSEASON.md); why it is built
 this way: [decisions/0014-postseason-model.md](decisions/0014-postseason-model.md).
 
+**Scenario Simulator.** What a change to a roster would do to its season. Start from a
+real team as it stands for the season ahead (the players whose current team it is, with
+the value model's projections) or from a roster you built; remove players, add anyone
+with a projection, set the presets - games missed as projected, a healthy season or a
+high-injury one; development as projected, optimistic or regression - and, player by
+player, the games they miss, a development adjustment in points of impact, a share of
+the minutes or a salary. Every one of those is your assumption, and the page says so.
+Thousands of seasons are then drawn for the roster as it stands and with your changes,
+from the value model's projections and tested error, a season's own noise, the wins a
+point of rating is worth and the postseason model's season steps.
+
+- *Before and after*: payroll, projected net rating, projected wins with an interval,
+  and the chance of every stage, side by side; how the seasons drawn came out.
+- *Players*: each player with the projection and the columns you can set; save the
+  roster into the Team Builder.
+- *Profile*: the roster's fit measures before and after, placed among the latest
+  season's teams - description, as on the Roster Fit page.
+- *The season ahead*: every team drawn as it stands, with nothing assumed.
+- *The evidence*: the figures measured for the simulator and the wins test - how often
+  the intervals of simulated wins held the wins that happened on seasons the value
+  model had not seen.
+
+The field is not in it: each roster is drawn alone, as a team of its strength entering
+any season, so a trade that strengthens one team does not weaken another here. The same
+as a document: [research/SIMULATOR.md](research/SIMULATOR.md); why it is built this way:
+[decisions/0015-simulator.md](decisions/0015-simulator.md).
+
 **Data Health.** How the last build went, the state of each source, what is missing and
 what that costs, every quality check, every adjustment the build made to source data,
 what is held of each dataset, and any fetch that is failing.
 
 ## What it does not do yet
 
-No simulation of a season: what a signing, a trade or an injury would do to a team's
-chances is the next roadmap stage. The benchmarks give historical frequencies, and player
-value is an estimate of what a player adds; the postseason chances are the one forecast in
-the workbench, and they are estimates with intervals from a model whose record on past
-seasons is a tab away, never a verdict on a team. A role is a rule applied to a player's
-statistics, not a measurement of how they play, and the page says so. Roster fit describes
-a roster and reports what the evidence found; it does not score one. The optimizer's
-rosters are the parts added up under a budget, several of them, never one answer.
+No simulation of the whole league at once: each roster is drawn alone, as a team of its
+strength entering any season, so the Scenario Simulator does not say what a trade does to
+the other side, and the chances of thirty teams need not add up. Trades, aging curves,
+draft value and multi-year planning are the roadmap's last stage. The benchmarks give
+historical frequencies, and player value is an estimate of what a player adds; the
+postseason chances and the simulator's seasons are estimates with intervals from models
+whose record on past seasons is a tab away, never a verdict on a team. A role is a rule
+applied to a player's statistics, not a measurement of how they play, and the page says
+so. Roster fit describes a roster and reports what the evidence found; it does not score
+one. The optimizer's rosters are the parts added up under a budget, several of them,
+never one answer.

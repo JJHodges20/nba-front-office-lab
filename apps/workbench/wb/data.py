@@ -14,6 +14,8 @@ import streamlit as st
 from front_office.domain.fit_model import FitEvidence
 from front_office.domain.optimizer import OptimizerRequest
 from front_office.domain.postseason import PostseasonModel
+from front_office.domain.scenario import Scenario
+from front_office.domain.simulator import SimulatorModel
 from front_office.services import (
     BracketReport,
     Era,
@@ -32,6 +34,8 @@ from front_office.services import (
     Qualification,
     Relationship,
     RosterSummary,
+    ScenarioReport,
+    SimulatorStatus,
     StageSummary,
     SubjectOutlook,
     TeamProfile,
@@ -372,6 +376,81 @@ def postseason_team(
 def postseason_roster(roster_id: int) -> SubjectOutlook:
     """A built roster read as a team of its strength. Rosters change, so never cached."""
     return lab().postseason.roster(roster_id)
+
+
+# --- the scenario simulator ---------------------------------------------------------------
+#
+# Keyed on the simulator's revision and the postseason model's too: either file can be
+# fitted again without a build. A scenario about a built roster is never cached, because
+# the roster changes from the Team Builder.
+
+
+@st.cache_data(show_spinner=False)
+def simulator_status(build: int | None) -> SimulatorStatus:
+    return lab().simulator.status()
+
+
+@st.cache_data(show_spinner=False)
+def simulator_model(build: int | None, revision: int | None) -> SimulatorModel | None:
+    return lab().simulator.model()
+
+
+@st.cache_data(show_spinner=False)
+def simulator_teams(build: int | None, revision: int | None) -> pd.DataFrame:
+    return lab().simulator.teams()
+
+
+@st.cache_data(show_spinner=False)
+def simulator_pool(build: int | None, revision: int | None) -> pd.DataFrame:
+    return lab().simulator.pool()
+
+
+@st.cache_data(show_spinner=False)
+def simulator_team_players(
+    build: int | None, revision: int | None, scenario: Scenario
+) -> pd.DataFrame:
+    return lab().simulator.roster_players(scenario)
+
+
+def roster_stamp(roster_id: int) -> str:
+    """When a built roster last changed: what its scenario caches are keyed on, since
+    the Team Builder changes rosters without a build."""
+    listed = rosters()
+    mine = listed[listed["roster_id"] == int(roster_id)]
+    return "" if mine.empty else str(mine["updated_at"].iloc[0])
+
+
+@st.cache_data(show_spinner=False)
+def simulator_roster_players(
+    build: int | None, revision: int | None, stamp: str, scenario: Scenario
+) -> pd.DataFrame:
+    return lab().simulator.roster_players(scenario)
+
+
+@st.cache_data(show_spinner="Drawing seasons...")
+def simulator_team_run(
+    build: int | None, revision: int | None, postseason: int | None, scenario: Scenario
+) -> ScenarioReport:
+    return lab().simulator.run(scenario)
+
+
+@st.cache_data(show_spinner="Drawing seasons...")
+def simulator_roster_run(
+    build: int | None, revision: int | None, postseason: int | None, stamp: str, scenario: Scenario
+) -> ScenarioReport:
+    return lab().simulator.run(scenario)
+
+
+@st.cache_data(show_spinner="Drawing the season ahead for every team...")
+def simulator_league(
+    build: int | None, revision: int | None, postseason: int | None
+) -> pd.DataFrame:
+    return lab().simulator.league()
+
+
+def simulator_save(scenario: Scenario, name: str) -> int:
+    """Save a scenario's roster in the Team Builder. Rosters are never cached."""
+    return lab().simulator.save(scenario, name)
 
 
 def optimizer_save(player_ids: list[int], name: str, request: OptimizerRequest) -> int:

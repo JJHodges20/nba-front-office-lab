@@ -24,6 +24,7 @@ from wb.views import (
     optimizer,
     players,
     postseason,
+    simulator,
     teams,
     value,
 )
@@ -99,6 +100,12 @@ PAGES = {
             title="Postseason Outlook",
             icon=":material/query_stats:",
             url_path="postseason",
+        ),
+        st.Page(
+            simulator.render,
+            title="Scenario Simulator",
+            icon=":material/casino:",
+            url_path="simulator",
         ),
     ],
     "System": [

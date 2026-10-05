@@ -1,0 +1,34 @@
+# How the simulator's parameters are measured and tested. Nothing here is a weight: the
+# figures are measured from the seasons on record, and every choice below was made
+# before looking (docs/decisions/0015-simulator.md).
+#
+# Editing this file changes nothing until the parameters are measured again:
+#   fol simulate fit --write
+
+# A season's own noise and the residual wins carry are measured over this many of the
+# most recent seasons: both have drifted with scoring and the schedule.
+noise_seasons: 10
+
+# Players are grouped by how well the value model knew them (projection reliability) for
+# the spread of their projections' misses, which the development presets step through.
+reliability_edges: [0, 0.25, 0.5, 0.75, 1]
+
+# Whose missed games make the availability distribution: players with at least this
+# many minutes in a regular season, the rotation rather than the end of the bench.
+rotation_minutes: 1000
+
+# The points of the missed-games distribution the file keeps, for drawing from it, and
+# where the high-injury preset puts every player's expected missed games.
+missed_quantiles: [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
+high_injury_quantile: 0.75
+
+# The wins test draws this many seasons for each team-season of the value model's own
+# test and reports how often these intervals held the wins that happened.
+test_simulations: 2000
+coverage_levels: [0.5, 0.8, 0.95]
+
+# A scenario's wins and rating are shown with this interval, and it draws this many
+# seasons unless asked for another number.
+wins_interval: 0.8
+simulations: 10000
+seed: 0

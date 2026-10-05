@@ -30,6 +30,9 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe playoffs show             # the fitted postseason model and how it did out of sample
 .\.venv\Scripts\fol.exe playoffs fit --write      # fit it again on the built database (configs/models/postseason.json)
 .\.venv\Scripts\fol.exe playoffs report --write   # regenerate docs/research/POSTSEASON.md
+.\.venv\Scripts\fol.exe simulate show             # the simulator's measured parameters and the wins test
+.\.venv\Scripts\fol.exe simulate fit --write      # measure them again on the built database (configs/models/simulator.json)
+.\.venv\Scripts\fol.exe simulate report --write   # regenerate docs/research/SIMULATOR.md
 .\.venv\Scripts\fol.exe ui --no-browser           # the workbench at http://localhost:8501 (Ctrl+C stops it)
 .\.venv\Scripts\python.exe scripts\make_fixtures.py   # rebuild tests/fixtures/raw from data/raw
 ```
@@ -74,11 +77,12 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   way of grouping; nothing "needs" a figure. Compare teams within their own season.
 - **Generated documents are not edited.** `docs/DATA_DICTIONARY.md`, `docs/METRICS.md`,
   `docs/research/BENCHMARKS.md`, `docs/research/PLAYER_VALUE.md`,
-  `docs/research/ROSTER_FIT.md` and `docs/research/POSTSEASON.md` come from
-  `fol dictionary|metrics|benchmarks --write`, `fol value report --write`,
-  `fol fit report --write` and `fol playoffs report --write`. The first two are checked by
-  tests; the research documents depend on the database, so regenerate them at a milestone
-  gate after the data, a model, the evidence or the research code changes.
+  `docs/research/ROSTER_FIT.md`, `docs/research/POSTSEASON.md` and
+  `docs/research/SIMULATOR.md` come from `fol dictionary|metrics|benchmarks --write`,
+  `fol value report --write`, `fol fit report --write`, `fol playoffs report --write` and
+  `fol simulate report --write`. The first two are checked by tests; the research
+  documents depend on the database, so regenerate them at a milestone gate after the
+  data, a model, the evidence or the research code changes.
 - **A model is fitted on request and applied by every build.** `fol value fit --write`
   writes `configs/models/player_value.json`; `fol build` applies it and never fits. Do
   not edit that file, and do not fit inside a build, a service or a page. Changing
@@ -117,6 +121,18 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   test and is recorded (`docs/decisions/0014-postseason-model.md`). A chance is shown with
   its 95% interval and beside what happened where the season is decided; the page's "The
   model" tab is the evidence, and nothing calls a chance a verdict.
+- **The simulator draws from tested parts and measures nothing it cannot test.** A
+  scenario (`domain/scenario.py`) is a roster plus the user's assumptions, all tagged
+  "Your assumption"; a season is drawn (`modeling/simulator/monte_carlo.py`) from the
+  value model's projections and tested error, the postseason model's season steps, and
+  the five figures `fol simulate fit --write` measures into
+  `configs/models/simulator.json` (a season's noise, the miss on strength, wins per
+  point, residual wins, projection misses by reliability, missed games). A roster's
+  spread is calibrated to the value model's RMSE, never to the sum of the players'
+  spreads. The field is not modelled and every page says so. No build applies it; the
+  wins test's coverage is the evidence and a test fails if the shipped intervals drift
+  from their claim (`docs/decisions/0015-simulator.md`). The invented league plays
+  regular seasons from a planted game model (`tests/league.py`) for these tests.
 - **Archetypes are rules, not findings.** They live in `configs/archetypes.yaml`; a
   player's score for a role is the weakest of their percentiles on its measures, among
   the group the role is open to, within the season. To change one: edit the file, raise

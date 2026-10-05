@@ -20,6 +20,8 @@ from front_office.config import (
     postseason_model_path,
     postseason_spec_path,
     save_value_model,
+    simulator_model_path,
+    simulator_spec_path,
 )
 from front_office.config.settings import ENV_DATA_DIR, ENV_HOME
 from front_office.domain.cap_rules import SeasonRules
@@ -294,4 +296,24 @@ def postseason_home(postseason_league, tmp_path_factory) -> Path:  # type: ignor
     settings = write_lab(home, league, model)
     report = fit_postseason(settings, now=lambda: datetime(2026, 10, 5, 12, 0))
     write_postseason_model(settings, report.model)
+    return home
+
+
+QUICK_SIMULATOR_SPEC = "noise_seasons: 5\ntest_simulations: 200\nsimulations: 2000\n"
+"""A simulator specification that measures and tests quickly on the invented league."""
+
+
+@pytest.fixture(scope="session")
+def simulator_home(postseason_home: Path, tmp_path_factory) -> Path:  # type: ignore[no-untyped-def]
+    """A copy of the postseason project with the simulator parameters measured on it and
+    on file under the quick specification. Read from it; never write to it."""
+    from front_office.pipelines.simulator import fit_simulator, write_simulator_model
+
+    home = tmp_path_factory.mktemp("simulator") / "lab"
+    shutil.copytree(postseason_home, home)
+    simulator_spec_path(home / "configs").write_text(QUICK_SIMULATOR_SPEC, encoding="utf-8")
+    simulator_model_path(home / "configs").unlink()
+    settings = load_settings(home)
+    report = fit_simulator(settings, now=lambda: datetime(2026, 10, 5, 12, 0))
+    write_simulator_model(settings, report.model)
     return home

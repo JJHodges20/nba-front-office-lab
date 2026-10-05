@@ -801,3 +801,41 @@ class TestBandLine:
             palette=LIGHT,
         )  # fmt: skip
         assert all(len(trace.x) == 0 for trace in figure.data)
+
+
+class TestComparisonDotsAxis:
+    def test_the_axis_can_be_any_scale(self) -> None:
+        figure = charts.comparison_dots(
+            TIDY.assign(percentile=TIDY["percentile"] / 100),
+            metric="metric",
+            who="who",
+            percentile="percentile",
+            text="text",
+            palette=LIGHT,
+            axis_title="Chance",
+            axis_range=(0, 1),
+            tickvals=(0, 0.5, 1),
+            tickformat=".0%",
+            reference=None,
+        )
+        assert figure.layout.xaxis.title.text == "Chance"
+        assert list(figure.layout.xaxis.range) == [0, 1]
+        assert list(figure.layout.xaxis.tickvals) == [0, 0.5, 1]
+        assert figure.layout.xaxis.tickformat == ".0%"
+        # Only the hairlines joining each row remain; no reference line.
+        assert all(shape.x0 != shape.x1 for shape in figure.layout.shapes)
+        assert list(figure.data[0].x) == pytest.approx([0.8, 0.3])
+
+
+class TestLinesAxis:
+    def test_the_x_axis_can_be_titled_and_ticked(self) -> None:
+        figure = charts.lines(
+            FRAME, x="x", series={"y": "Net"}, text={"y": "text"}, palette=LIGHT,
+            x_title="Wins per 82", x_dtick=10,
+        )  # fmt: skip
+        assert figure.layout.xaxis.title.text == "Wins per 82"
+        assert figure.layout.xaxis.dtick == 10
+
+    def test_by_default_the_x_axis_is_left_to_the_data(self) -> None:
+        figure = charts.lines(FRAME, x="x", series={"y": "Net"}, text={"y": "text"}, palette=LIGHT)
+        assert figure.layout.xaxis.title.text is None and figure.layout.xaxis.dtick is None

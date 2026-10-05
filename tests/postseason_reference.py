@@ -12,6 +12,7 @@ uncertain rating by a plain grid.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from datetime import datetime
 from math import exp, isnan
 
 import numpy as np
@@ -19,12 +20,18 @@ import pandas as pd
 
 from front_office.domain.seasons import Season
 from front_office.domain.value_model import ValueModel, ValueSpec
+from front_office.modeling.value import fit_value_model
 from tests.league import SyntheticLeague
 from tests.synthetic_lab import league_frames
-from tests.value_reference import planted_league, planted_model
+from tests.value_reference import planted_league
+
+FITTED_AT = datetime(2026, 10, 1, 12, 0)
 
 PLANTED = {"home_advantage": 0.45, "net_slope": 0.11, "top_slope": 0.3}
 """The series model the invented league's playoffs are played by."""
+REGULAR_SEASON = {"home_edge": 3.0, "margin_noise": 12.0}
+"""How the invented league's regular-season games go: the home side's edge in points,
+and the noise on a game's margin."""
 TOP_PLAYERS = 3
 REGULAR = "regular"
 ROUND_KEYS = ("won_a_round", "made_conference_finals", "made_finals", "won_championship")
@@ -86,7 +93,11 @@ def postseason_league(
     played by the planted series model: the league, the model, and the frames a build
     would hold."""
     league = planted_league(spec, noise=noise, seed=seed, teams=teams, seasons=seasons)
-    model = planted_model(spec, replacement_level=-2.0)
+    for year in sorted(league.ratings):
+        league.plant_regular_season(year, seed=seed, **REGULAR_SEASON)
+    # Fitted rather than planted, so that the model carries a test of its own: the
+    # simulator's wins test draws seasons for every team-season of that test.
+    model = fit_value_model(league.tables(), spec, revision=1, fitted_at=FITTED_AT)
     plant_postseasons(league, league_frames(league, model), seed=seed, **parameters)
     return league, model, league_frames(league, model)
 

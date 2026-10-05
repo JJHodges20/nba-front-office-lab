@@ -3,6 +3,131 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone 13 - Scenario simulator (2026-10-05)
+
+**Built**
+
+- `domain/scenario.py`: a scenario - a subject (a real team as it stands for the season
+  ahead, or a roster built in the Team Builder), the players added and removed, a
+  per-player adjustment (games missed, development in points of impact, a share of the
+  minutes, a salary), the availability and development presets, and how many seasons to
+  draw - with its validation and a fingerprint. `domain/simulator.py`: the specification
+  (`configs/models/simulator.yaml`: the seasons the noise is measured over, the
+  reliability bands, the rotation threshold, the quantiles kept, the wins test's draws
+  and levels, the interval shown) and what a measurement writes down - the five figures,
+  the noise by era, how projections have missed by band, the missed-games distribution
+  and the wins test.
+- `modeling/simulator/`: `measure.py` (a season's own noise from the spread of game
+  margins; how far projections have missed by how well the player was known, weighted
+  by the minutes played; the share of a season rotation players have missed; wins per
+  point of net rating and the residual wins), `monte_carlo.py` (one scenario drawn
+  thousands of times: every player's impact and missed games, the parts added up for
+  the minutes drawn, the miss on a team's strength the value model's test leaves, a
+  season's noise, wins, the postseason model's season steps) and `fit.py` (the
+  measurement on the warehouse and the wins test).
+- `pipelines/simulator.py` and `fol simulate fit [--write]`, `fol simulate show`,
+  `fol simulate report [--write]`; `configs/models/simulator.json`, revision 1, measured
+  on 892 team-seasons, 35,546 regular-season games and 14,569 player-seasons.
+- `services/simulator.py` - `SimulatorService`: the teams and the pool for the season
+  ahead, a team's or a roster's players with their projections, a scenario drawn before
+  and after (payroll, projected rating, wins with their interval, top-player quality,
+  the chance of every stage with its interval, the wins distribution, the roster's fit
+  profile through the Roster Fit lineup), the season ahead drawn for every team, and a
+  scenario saved as a Team Builder roster. `services/simulator_report.py` and
+  [research/SIMULATOR.md](research/SIMULATOR.md).
+- The **Scenario Simulator** page, in the Forecast group: the subject, the changes
+  (players out and in, the two presets, the seasons drawn) and five tabs - Before and
+  after, Players (a table of each player's projection and the assumptions typed in),
+  Profile, The season ahead, The evidence. The line chart grows an x-axis title and tick
+  step; the comparison dots an axis range and format. A screenshot in the README.
+- The invented league now plays regular seasons: a double round robin and twelve more
+  home games each, 82 in all, from the planted strengths, a home edge and a margin
+  noise, so that every measurement can be checked by hand; `postseason_league()` fits
+  the value model on it so that a backtest exists for the wins test.
+
+**Decisions** ([0015](decisions/0015-simulator.md))
+
+- A season is drawn from the parts the lab has tested plus five figures measured here,
+  and the spread of a roster's strength is calibrated to the value model's
+  out-of-sample error, not to the sum of the players' spreads.
+- Every input is the user's assumption and is tagged so; the presets move every player
+  by the typical miss of players known that well, and a projected share already allows
+  for the games typically missed.
+- The field is not modelled: each roster is drawn alone, as a team of its strength
+  entering any season, and the page and the report say so.
+- No store of scenarios: a scenario is saved as a roster, which is what persists.
+
+**Verification**
+
+- The measurements against hand computations: the noise of planted margins, eras
+  averaging the seasons they cover, bands from planted misses, quantiles of planted
+  missed games, wins per point from the value model's own routine. The Monte Carlo
+  without noise is exactly the sum of the parts; scales shares that run over a season
+  down; steps the presets by each band's typical size and lets a figure of the user's
+  own replace them; reads missed games off the measured distribution and shifts them to
+  the preset or the user's figure; is reproducible and spreads as the parameters say;
+  takes the players' own spread out of the team-level miss; reads an emptied roster as
+  five replacement players.
+- The fit on the invented league recovers the planted noise and the value model's wins
+  per point, leaves nothing for the strength miss where the ratings carry no noise, and
+  writes a file that reads back equal; the wins test's coverage by hand.
+- The pipeline measures what the modeling measures, writes nothing unless asked and
+  names what is missing; the fixture store measures what it can. The service on the
+  invented league: an unchanged scenario is the same before and after; removing the best
+  player costs wins and chances; a player added; each adjustment on one player; seeds;
+  every team drawn; a scenario saved. The report and the three commands.
+- The shipped parameters: over the 600 team-seasons the value model predicted out of
+  sample, the 50%, 80% and 95% intervals held the wins that happened 53%, 83% and 97%
+  of the time, and the median season missed by 6.0 wins against 12.5 for an even
+  record.
+- The page: every tab against the service on the fixture store and on the invented
+  league; the subject switch; a player removed; a preset; an emptied roster; the save;
+  the sweep from two starts. In both themes on the real data, every tab, through a
+  browser: as it stands, a player out and one in with both presets set, and every
+  player removed.
+
+**Found on the way**
+
+- Players the value model had never seen had no reliability and fell out of the
+  development bands; they are the least-known band now, which also lets the fixture
+  store measure.
+- The invented league's double round robin came to 70 games, not 82; twelve extra home
+  games fill the season, so the noise is measured over a real schedule's length.
+- Segmented controls with enum options broke under AppTest, which formats an option by
+  the string's own `title`, a method on an enum; the options are plain strings with a
+  dictionary of titles.
+- In the browser: three controls on one row cut the preset names short, so the presets
+  have the row and the seasons drawn sit below; an emptied roster showed an empty editor
+  over its caption, and its three best players were the mean of nothing, a warning the
+  tests treat as an error - it reads as five replacement players now; empty cells in
+  the editor read "None"; the wins chart had two ticks.
+- The sweep of the simulator page ran for twenty minutes in a full parallel run: the
+  service read the projections and the status several times for one scenario and the
+  fit tables twice over, and the page never cached the run of a built roster. Each is
+  read once now, and the run of a built roster is cached on when the roster last
+  changed; the sweep takes about a minute.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| Automated tests | 2,958 passed, none skipped; about six minutes with `pytest -n auto` |
+| Data-quality checks | Unchanged: no table or check was added; the real database stands at build 13 (57 checks, 0 errors, 7 standing warnings) |
+| UI review | The new page in both themes on the real data, every tab, through a browser; the subject, the players out and in, both presets and the tabs clicked through, and the two fixes above re-checked the same way |
+| Architectural boundaries | `tests/architecture` passes. The scenario and the parameter file are `domain`, the measurement and the Monte Carlo are `modeling`, the measurement on request is a `pipeline`, every figure is computed by a `service` from the file; the page computes nothing and the build applies nothing |
+| Lint | `ruff check` and `ruff format --check` clean |
+
+**Open items carried forward**
+
+- The field: a league simulation - thirty rosters, a schedule, standings, the play-in
+  and the bracket - would need the parts re-derived so that luck is not counted twice.
+- The wins test draws from the predicted rating alone, as the value model's backtest
+  keeps it; a test of the whole roster draw, players' misses included, needs rosters as
+  they stood before each season, which the warehouse does not keep.
+- Scenarios are not stored; a store of named scenarios with their results is the next
+  refinement if wanted.
+- Milestone 14 is the full-system audit.
+
 ## Milestone 12 - Playoff and championship model (2026-10-05)
 
 **Built**

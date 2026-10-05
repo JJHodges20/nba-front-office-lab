@@ -13,7 +13,7 @@ before roster scoring, optimisation or any predictive claim. The plan is in
 
 ## Status
 
-Milestones 1-12 of 14 are complete. The first seven are the roadmap's version 1.0,
+Milestones 1-13 of 14 are complete. The first seven are the roadmap's version 1.0,
 *League and Roster Analytics*: league data from stats.nba.com, a database built from it,
 tested player and team analytics, import of contract data with cap-normalised salaries,
 and a workbench to explore all of it and to build rosters by hand. The eighth adds the
@@ -39,13 +39,17 @@ a contract file is imported. The twelfth adds the contender probability model of
 6: how likely each stage of the playoffs is, for the teams in a season's bracket and for
 a team - or a roster you built - of a given strength, from a model fitted to thirty
 seasons of playoff games and tested on twenty it had not seen, every chance with its
-interval ([docs/research/POSTSEASON.md](docs/research/POSTSEASON.md)).
+interval ([docs/research/POSTSEASON.md](docs/research/POSTSEASON.md)). The thirteenth
+adds the scenario simulator of version 7: lay your assumptions over a roster - players
+in and out, games missed, development, minutes, salaries - and draw thousands of seasons
+for it before and after, from those tested parts, with the wins the simulator gives
+tested against twenty seasons of results ([docs/research/SIMULATOR.md](docs/research/SIMULATOR.md)).
 
-The postseason chances are the lab's one forecast, and they are shown as estimates with
-intervals beside the model's record on past seasons. Player value and a roster's
-projection are estimates with a stated error, shown as such; the optimizer shows several
-rosters rather than one because the weights behind one best rest on assumptions; and the
-workbench describes, it does not recommend.
+The postseason chances and the simulator's seasons are the lab's forecasts, and they are
+shown as estimates with intervals beside the models' record on past seasons. Player value
+and a roster's projection are estimates with a stated error, shown as such; the optimizer
+shows several rosters rather than one because the weights behind one best rest on
+assumptions; and the workbench describes, it does not recommend.
 
 **Contract data is not included.** No free source permits collecting NBA contracts
 automatically for this kind of project, so salaries come from a file you supply. Until
@@ -98,6 +102,7 @@ Stop it with Ctrl+C. [docs/WORKBENCH.md](docs/WORKBENCH.md) is the guide.
 | Roster Fit | Do these players make sense together? A team or a built roster described in the roadmap's areas of fit, placed among the season's teams, with the sum of its parts - and the evidence on whether fit adds anything to it. |
 | Roster Optimizer | Several strong, distinct rosters under a payroll budget and the requirements you set, from the value model's projections; any of them can be saved into the Team Builder. |
 | Postseason Outlook | How likely each stage of the playoffs is: for a team, a built roster or a strength you set, for every team of a season, and for a decided season's bracket and series - with intervals, and the model's record on seasons it had not seen. |
+| Scenario Simulator | What a change to a roster would do to its season: players in and out, games missed, development and minutes as your assumptions, and thousands of seasons drawn before and after - payroll, rating, wins and the chance of every stage. |
 | Data Health | Freshness, failed fetches, missing data, quality checks and source status. |
 
 Season, phase, team, player and comparison window are chosen once in the sidebar and
@@ -111,6 +116,8 @@ lab derived or estimated, and which you assumed.
 ![Roster Fit: a team's measures placed among the season's teams, area by area](docs/images/roster-fit.png)
 
 ![Postseason Outlook: a team's chance of each stage of the playoffs, with its interval](docs/images/postseason-outlook.png)
+
+![Scenario Simulator: a roster before and after a change, with the chance of each stage](docs/images/scenario-simulator.png)
 
 ![Team Explorer: ratings with league ranks, the four factors and form](docs/images/team-explorer.png)
 
@@ -140,6 +147,9 @@ lab derived or estimated, and which you assumed.
 .\.venv\Scripts\fol.exe playoffs show    # the fitted postseason model and how it did out of sample
 .\.venv\Scripts\fol.exe playoffs fit     # fit it again on the built database (--write to save)
 .\.venv\Scripts\fol.exe playoffs report  # the postseason research, generated from the model and the database
+.\.venv\Scripts\fol.exe simulate show    # the simulator's measured parameters and the wins test
+.\.venv\Scripts\fol.exe simulate fit     # measure them again on the built database (--write to save)
+.\.venv\Scripts\fol.exe simulate report  # the simulator research, with the season ahead drawn for every team
 .\.venv\Scripts\fol.exe ui --port 8600 --no-browser   # the workbench on another port
 ```
 
@@ -173,6 +183,7 @@ tests/              unit, architecture, integration and interface tests
 - [Player value research](docs/research/PLAYER_VALUE.md) - the value model, how it was tested and what it found
 - [Roster fit research](docs/research/ROSTER_FIT.md) - what a roster is described by, and whether it matters beyond the sum of the parts
 - [Postseason research](docs/research/POSTSEASON.md) - the postseason model, how it was tested and how its chances have come out
+- [Simulator research](docs/research/SIMULATOR.md) - what a season is drawn from, the figures measured, the wins test, and the season ahead as drawn
 - [Architecture](docs/ARCHITECTURE.md) - the layers and the rules between them
 - [Data dictionary](docs/DATA_DICTIONARY.md) - generated from the table contracts
 - [Metric glossary](docs/METRICS.md) - every player, team and roster metric, generated from the catalogs

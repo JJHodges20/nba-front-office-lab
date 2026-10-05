@@ -600,6 +600,8 @@ def lines(
     baseline_zero: bool = False,
     categorical_x: bool = False,
     height: int = 320,
+    x_title: str = "",
+    x_dtick: float | None = None,
 ) -> go.Figure:
     """Several series over one ordered axis, on one scale, with a legend.
 
@@ -625,6 +627,10 @@ def lines(
         )
     _ordered_axis(figure, palette, categories=len(frame) if categorical_x else None)
     figure.update_yaxes(title_text=y_title, tickformat=tickformat)
+    if x_title:
+        figure.update_xaxes(title_text=x_title)
+    if x_dtick is not None:
+        figure.update_xaxes(dtick=x_dtick)
     return figure
 
 
@@ -724,18 +730,27 @@ def comparison_dots(
     percentile: str,
     text: str,
     palette: Palette,
+    axis_title: str = "Percentile (higher is better)",
+    axis_range: Sequence[float] = (-2, 102),
+    tickvals: Sequence[float] | None = (0, 25, 50, 75, 100),
+    tickformat: str = "",
+    reference: float | None = 50,
 ) -> go.Figure:
     """Several players or teams on the same metrics: one row per metric, one dot each.
 
     ``frame`` is tidy: one row per metric per subject, in display order. A hairline
-    joins the dots of a row so the gap between subjects reads at a glance.
+    joins the dots of a row so the gap between subjects reads at a glance. By default
+    the axis is a percentile; ``axis_title``, ``axis_range``, ``tickvals``,
+    ``tickformat`` and ``reference`` make it any other scale - a chance before and after
+    a change, say.
     """
     subjects = list(dict.fromkeys(frame[who]))
     if len(subjects) > MAX_SCATTER_SERIES:
         raise ValueError(f"compare at most {MAX_SCATTER_SERIES}, not {len(subjects)}")
     metrics = list(dict.fromkeys(frame[metric]))
     figure = _base(palette, height=ROW_HEIGHT * len(metrics) + 96, legend=True)
-    _reference_line(figure, palette, x=50)
+    if reference is not None:
+        _reference_line(figure, palette, x=reference)
     spans = frame.groupby(metric, sort=False)[percentile].agg(["min", "max"])
     for name, span in spans.iterrows():
         figure.add_shape(
@@ -762,9 +777,10 @@ def comparison_dots(
             )
         )
     figure.update_xaxes(
-        range=[-2, 102],
-        tickvals=[0, 25, 50, 75, 100],
-        title_text="Percentile (higher is better)",
+        range=list(axis_range),
+        tickvals=None if tickvals is None else list(tickvals),
+        tickformat=tickformat,
+        title_text=axis_title,
     )
     figure.update_yaxes(
         type="category",

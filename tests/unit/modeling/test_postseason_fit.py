@@ -50,7 +50,7 @@ class TestWhatIsRecovered:
         assert game.home_advantage == pytest.approx(PLANTED["home_advantage"], abs=0.12)
         assert game.net_rating == pytest.approx(PLANTED["net_slope"], abs=0.04)
         assert game.top_players == pytest.approx(PLANTED["top_slope"], abs=0.12)
-        assert game.games == 1192 and len(game.draws) == SPEC.kept_draws
+        assert game.games == fitted.fitted_on.playoff_games and len(game.draws) == SPEC.kept_draws
 
     def test_what_it_was_fitted_on(self, fitted: PostseasonModel, postseason_league) -> None:  # type: ignore[no-untyped-def]
         league = postseason_league[0]
@@ -81,7 +81,7 @@ class TestWhatIsRecovered:
         by_key = {era.key: era for era in fitted.by_era}
         # The modern and play-in eras begin after the league ends, so they are left out.
         assert list(by_key) == ["all", "last_10", "last_5"]
-        assert by_key["all"].games == 1192
+        assert by_key["all"].games == fitted.fitted_on.playoff_games
         assert (by_key["last_5"].first_season, by_key["last_5"].last_season) == (
             "2009-10",
             "2013-14",

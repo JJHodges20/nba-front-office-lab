@@ -1,0 +1,180 @@
+{
+ "revision": 1,
+ "fitted_at": "2026-10-05T17:34:39",
+ "spec": {
+  "noise_seasons": 10,
+  "reliability_edges": [
+   0.0,
+   0.25,
+   0.5,
+   0.75,
+   1.0
+  ],
+  "rotation_minutes": 1000,
+  "missed_quantiles": [
+   0.0,
+   0.1,
+   0.25,
+   0.5,
+   0.75,
+   0.9,
+   1.0
+  ],
+  "high_injury_quantile": 0.75,
+  "test_simulations": 2000,
+  "coverage_levels": [
+   0.5,
+   0.8,
+   0.95
+  ],
+  "wins_interval": 0.8,
+  "simulations": 10000,
+  "seed": 0
+ },
+ "value_model_version": "r1",
+ "postseason_model_version": "p1",
+ "fitted_on": {
+  "first_season": "1996-97",
+  "last_season": "2025-26",
+  "team_seasons": 892,
+  "games": 35546,
+  "player_seasons": 14569
+ },
+ "value_error": 3.0145,
+ "season_noise": 1.5843,
+ "strength_error": 2.5646,
+ "noise_by_era": [
+  {
+   "key": "all",
+   "label": "All seasons",
+   "first_season": "1996-97",
+   "last_season": "2025-26",
+   "team_seasons": 892,
+   "noise": 1.5341
+  },
+  {
+   "key": "last_10",
+   "label": "Last 10 seasons",
+   "first_season": "2016-17",
+   "last_season": "2025-26",
+   "team_seasons": 300,
+   "noise": 1.5843
+  },
+  {
+   "key": "last_5",
+   "label": "Last 5 seasons",
+   "first_season": "2021-22",
+   "last_season": "2025-26",
+   "team_seasons": 150,
+   "noise": 1.6124
+  },
+  {
+   "key": "modern",
+   "label": "Modern era",
+   "first_season": "2015-16",
+   "last_season": "2025-26",
+   "team_seasons": 330,
+   "noise": 1.571
+  },
+  {
+   "key": "play_in",
+   "label": "Play-In era",
+   "first_season": "2020-21",
+   "last_season": "2025-26",
+   "team_seasons": 180,
+   "noise": 1.6268
+  }
+ ],
+ "wins_season": "2025-26",
+ "wins_per_point": 2.235,
+ "wins_residual": 3.1976,
+ "development": [
+  {
+   "lower": 0.0,
+   "upper": 0.25,
+   "players": 1027,
+   "mean_miss": 1.7636,
+   "spread": 2.0416
+  },
+  {
+   "lower": 0.25,
+   "upper": 0.5,
+   "players": 1221,
+   "mean_miss": 0.5065,
+   "spread": 1.6654
+  },
+  {
+   "lower": 0.5,
+   "upper": 0.75,
+   "players": 3918,
+   "mean_miss": -0.2047,
+   "spread": 1.3262
+  },
+  {
+   "lower": 0.75,
+   "upper": 1.0,
+   "players": 5488,
+   "mean_miss": -0.2193,
+   "spread": 1.1177
+  }
+ ],
+ "missed": {
+  "players": 7656,
+  "mean": 0.1345,
+  "quantiles": [
+   {
+    "level": 0.0,
+    "value": 0.0
+   },
+   {
+    "level": 0.1,
+    "value": 0.0
+   },
+   {
+    "level": 0.25,
+    "value": 0.0366
+   },
+   {
+    "level": 0.5,
+    "value": 0.0976
+   },
+   {
+    "level": 0.75,
+    "value": 0.2073
+   },
+   {
+    "level": 0.9,
+    "value": 0.3171
+   },
+   {
+    "level": 1.0,
+    "value": 0.6463
+   }
+  ]
+ },
+ "test": {
+  "team_seasons": 600,
+  "first_test_season": "2006-07",
+  "last_test_season": "2025-26",
+  "mae": 6.03,
+  "rmse": 7.5672,
+  "baseline_rmse": 12.4755,
+  "coverage": [
+   {
+    "level": 0.5,
+    "cases": 600,
+    "covered": 319
+   },
+   {
+    "level": 0.8,
+    "cases": 600,
+    "covered": 496
+   },
+   {
+    "level": 0.95,
+    "cases": 600,
+    "covered": 583
+   }
+  ]
+ }
+}

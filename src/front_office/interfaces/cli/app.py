@@ -33,13 +33,16 @@ from front_office.config.models import (
     fit_evidence_path,
     load_fit_evidence,
     load_postseason_model,
+    load_simulator_model,
     postseason_model_path,
+    simulator_model_path,
 )
 from front_office.config.settings import ENV_HOME
 from front_office.domain import PayrollLine, Season
 from front_office.domain.dictionary import render_data_dictionary
 from front_office.domain.fit_model import FitEvidence
 from front_office.domain.postseason import PostseasonModel
+from front_office.domain.simulator import SimulatorModel
 from front_office.domain.tables import ALL_TABLES, PLANNED_TABLES
 from front_office.domain.value_model import Comparison, ValueModel
 from front_office.pipelines.build import build_database, database_status, log_fetches
@@ -71,12 +74,21 @@ from front_office.pipelines.postseason import (
     fit_postseason,
     write_postseason_model,
 )
+from front_office.pipelines.simulator import (
+    FIT_COMMAND as SIMULATE_FIT_COMMAND,
+)
+from front_office.pipelines.simulator import (
+    SimulatorFitError,
+    fit_simulator,
+    write_simulator_model,
+)
 from front_office.pipelines.value import FIT_COMMAND, ValueFitError, fit_value, write_value_model
 from front_office.services import Lab, LabNotBuilt
 from front_office.services.benchmark_report import benchmark_report
 from front_office.services.fit_report import NoFitEvidence, fit_report
 from front_office.services.glossary import METRIC_CATALOGS, metric_glossary
 from front_office.services.postseason_report import NoPostseasonModel, postseason_report
+from front_office.services.simulator_report import NoSimulatorModel, simulator_report
 from front_office.services.value_report import NoValueModel, value_report
 
 DATA_DICTIONARY = "docs/DATA_DICTIONARY.md"
@@ -85,6 +97,7 @@ BENCHMARK_REPORT = "docs/research/BENCHMARKS.md"
 VALUE_REPORT = "docs/research/PLAYER_VALUE.md"
 FIT_REPORT = "docs/research/ROSTER_FIT.md"
 POSTSEASON_REPORT = "docs/research/POSTSEASON.md"
+SIMULATOR_REPORT = "docs/research/SIMULATOR.md"
 WORKBENCH = "apps/workbench/app.py"
 DEFAULT_PORT = 8501
 STARTUP_SECONDS = 30
@@ -112,6 +125,11 @@ playoffs_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(playoffs_app, name="playoffs")
+simulate_app = typer.Typer(
+    help="The scenario simulator: measure its parameters, test them, write them up.",
+    no_args_is_help=True,
+)
+app.add_typer(simulate_app, name="simulate")
 console = Console()
 
 
@@ -1060,3 +1078,120 @@ def playoffs_report_command(
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(document, encoding="utf-8", newline="\n")
     _say(f"Wrote {target} (revision {revision} of the postseason model)")
+
+
+# --- the simulator ---------------------------------------------------------------------------
+
+
+@simulate_app.command("fit")
+def simulate_fit(
+    write: Annotated[
+        bool,
+        typer.Option("--write", help="Save the parameters so that the services use them."),
+    ] = False,
+) -> None:
+    """Measure the simulator's parameters on the built database and test the wins they give.
+
+    Without --write nothing changes: the parameters are shown and thrown away.
+    """
+    try:
+        settings = load_settings()
+        report = fit_simulator(settings)
+    except (ConfigError, SimulatorFitError) as error:
+        raise _fail(error) from error
+    _print_simulator_model(report.model)
+    if report.previous is not None and not report.changed:
+        _say(
+            f"\nThe same as revision {report.previous.revision}, already on file. Nothing to write."
+        )
+        return
+    if not write:
+        _say(f"\nNot saved. To save it as revision {report.model.revision}: {SIMULATE_FIT_COMMAND}")
+        return
+    target = write_simulator_model(settings, report.model)
+    _say(f"\nWrote {target} (revision {report.model.revision}).")
+
+
+@simulate_app.command("show")
+def simulate_show() -> None:
+    """Show the simulator's parameters on file and how the wins they give have held up."""
+    try:
+        settings = load_settings()
+        model = load_simulator_model(settings.config_dir)
+    except ConfigError as error:
+        raise _fail(error) from error
+    if model is None:
+        _say(
+            f"No simulator parameters have been measured ({simulator_model_path(settings.config_dir)})."
+        )
+        _say(f"Run: {SIMULATE_FIT_COMMAND}")
+        raise typer.Exit(code=1)
+    _say(f"Revision {model.revision}, measured {model.fitted_at:%Y-%m-%d %H:%M} UTC.")
+    _print_simulator_model(model)
+
+
+def _print_simulator_model(model: SimulatorModel) -> None:
+    on = model.fitted_on
+    _say(
+        f"Measured on {on.team_seasons:,} team-seasons and {on.games:,} regular-season games, "
+        f"{on.first_season} to {on.last_season}, against value model {model.value_model_version}"
+        + (
+            f" and postseason model {model.postseason_model_version}."
+            if model.postseason_model_version
+            else "; no postseason model was on file."
+        )
+    )
+    _say(
+        f"The value model misses a team by {model.value_error:.2f}; a season's own noise is "
+        f"{model.season_noise:.2f}, so a projected rating misses a team's strength by "
+        f"{model.strength_error:.2f}. Wins per point of net rating {model.wins_per_point:.2f} "
+        f"({model.wins_season}); residual wins {model.wins_residual:.2f}."
+    )
+    _say("How far projections have missed, by projection reliability:")
+    for band in model.development:
+        _say(
+            f"  {band.lower:.2f} to {band.upper:.2f}: {band.players:,} player-seasons, "
+            f"typically {band.mean_miss:+.2f}, spread {band.spread:.2f}"
+        )
+    quantiles = ", ".join(f"{q.level:.0%}: {q.value:.1%}" for q in model.missed.quantiles)
+    _say(
+        f"Share of the season missed by {model.missed.players:,} rotation player-seasons: mean "
+        f"{model.missed.mean:.1%} ({quantiles})."
+    )
+    test = model.test
+    _say(
+        f"Wins test on {test.team_seasons} team-seasons, {test.first_test_season} to "
+        f"{test.last_test_season}: the median season missed by {test.mae:.1f} wins "
+        f"({test.rmse:.1f} RMSE) against {test.baseline_rmse:.1f} for an even record; "
+        + "; ".join(
+            f"the {item.level:.0%} interval held {item.share:.1%}" for item in test.coverage
+        )
+        + "."
+    )
+
+
+@simulate_app.command("report")
+def simulate_report_command(
+    write: Annotated[
+        bool, typer.Option("--write", help=f"Write {SIMULATOR_REPORT} instead of printing.")
+    ] = False,
+) -> None:
+    """Write up the simulator: what it draws from, what was measured, and the season ahead."""
+    try:
+        settings = load_settings()
+        # Opening the lab creates the database; asking a question should not.
+        if not database_status(settings).exists:
+            raise LabNotBuilt
+        with Lab(settings) as lab:
+            lab.require_built()
+            document = simulator_report(lab)
+            revision = lab.simulator.status().revision
+    except (ConfigError, LabNotBuilt, NoSimulatorModel) as error:
+        raise _fail(error) from error
+    if not write:
+        typer.echo(document, nl=False)
+        return
+    target = settings.project_root / SIMULATOR_REPORT
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(document, encoding="utf-8", newline="\n")
+    _say(f"Wrote {target} (revision {revision} of the simulator)")

@@ -159,7 +159,7 @@ fol ui:  apps/workbench/app.py -> wb.views.<page> -> front_office.services.Lab -
 
 `services.Lab` opens the database and the season rules; the services hang off it:
 `players`, `teams`, `league`, `benchmarks`, `contracts`, `builder` (the user's rosters),
-`value`, `fit`, `optimizer`, `postseason` and `health`.
+`value`, `fit`, `optimizer`, `postseason`, `simulator` and `health`.
 A service reads tables, calls analytics, and joins the result with names. It contains
 no formulas.
 
@@ -306,6 +306,34 @@ read as a team of its strength, or for a strength given by hand - every figure w
 interval its kept parameter draws give. Tests of fitting use the invented league with its
 playoffs played by a planted game model (`tests/postseason_reference.py`). See
 `docs/decisions/0014-postseason-model.md`.
+
+## The scenario simulator
+
+```
+fol simulate fit --write:  database -> modeling.simulator.fit_simulator_model
+                           -> configs/models/simulator.json (measured figures + the wins test)
+a page:                    SimulatorService.run(scenario)
+                           -> the roster with the user's assumptions
+                           -> modeling.simulator.simulate (thousands of seasons)
+                           -> before and after; SimulatorService.save -> a Team Builder roster
+fol simulate report:       the file + the database -> docs/research/SIMULATOR.md
+```
+
+`domain/scenario.py` is a scenario: the subject (a real team as it stands for the season
+ahead, or a built roster), the players added and removed, each player's assumptions
+(games missed, development, share of minutes, salary) and the two presets - every one of
+them the user's. `domain/simulator.py` holds the specification
+(`configs/models/simulator.yaml`) and the measured figures. `modeling/simulator/`:
+`measure.py` measures a season's own noise, the residual wins carry, how far projections
+miss by reliability and how many games rotation players miss; `monte_carlo.py` draws the
+seasons from those figures and from the value model's projections, replacement level and
+tested error, reading the postseason model's season steps for the chances; `fit.py`
+measures everything and runs the wins test against the value model's own out-of-sample
+test. `services/simulator.py` assembles and prices a scenario's roster, draws before and
+after, and dresses the comparison; `FitService.lineup` places the roster's fit measures
+for any set of players and shares. No build applies any of it; the invented league plays
+regular seasons from a planted game model so the measurements can be checked. See
+`docs/decisions/0015-simulator.md`.
 
 ## Conventions
 

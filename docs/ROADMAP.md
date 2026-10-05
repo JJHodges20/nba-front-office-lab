@@ -44,18 +44,21 @@ points-per-dollar.
 | 10 | Roster fit engine | Fit, redundancy, role coverage, weaknesses | Done (fit is description; the evidence supports no correction to the sum of the parts) |
 | 11 | Roster optimizer | Budget and roster constraints, multiple candidate rosters | Done (needs a contract file for the season ahead) |
 | 12 | Playoff/championship model | Calibrated postseason probability models | Done (tested out of sample from 2006-07; chances shown with intervals and the evidence) |
-| 13 | Simulator | Scenario and Monte Carlo analysis | Not started |
+| 13 | Simulator | Scenario and Monte Carlo analysis | Done (seasons drawn from tested parts; the field is not modelled) |
 | 14 | Full-system audit | Architecture, leakage, tests, UI, documentation, performance | Not started |
 
 Milestones 1-7 make up **v1.0 - League and Roster Analytics**, the first release target.
 All seven are done; one acceptance criterion below stays open until a contract file is
 supplied. Milestone 8 is the roadmap's version 2 (*Winning Benchmarks*), milestone 9 its
 version 3 (*Player Value Engine*), milestone 10 its version 4 (*Roster Fit Engine*),
-milestone 11 its version 5 (*Budget Roster Optimizer*) and milestone 12 its version 6
-(*Contender Probability Model*); the surplus-value half of version 3 and the optimizer's
-pool both wait on the same file. With milestone 12 the lab shows its first forecast: a
-chance of each postseason stage, with its interval, from a model validated on seasons it
-had not seen ([decisions/0014](decisions/0014-postseason-model.md)).
+milestone 11 its version 5 (*Budget Roster Optimizer*), milestone 12 its version 6
+(*Contender Probability Model*) and milestone 13 its version 7 (*Scenario Simulator*);
+the surplus-value half of version 3 and the optimizer's pool both wait on the same file.
+With milestone 12 the lab shows its first forecast: a chance of each postseason stage,
+with its interval, from a model validated on seasons it had not seen
+([decisions/0014](decisions/0014-postseason-model.md)). Milestone 13 lays a user's
+assumptions over a roster and draws thousands of seasons for it from those tested parts,
+before and after a change ([decisions/0015](decisions/0015-simulator.md)).
 
 ## Completion gate for every milestone
 

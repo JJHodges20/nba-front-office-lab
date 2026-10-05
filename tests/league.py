@@ -44,6 +44,9 @@ PLAYOFF_PATTERN = (True, True, False, False, True, False, True)
 PLAYOFF_TEAMS = 8
 """Teams a conference sends to the bracket."""
 FIRST_ROUND_SEEDS = ((1, 8), (4, 5), (3, 6), (2, 7))
+EXTRA_HOME_GAMES = 12
+"""Home games a team plays beyond hosting every other team once: with as many away games
+it makes 82 for thirty teams."""
 """First-round pairs in slot order: the winners of the first two meet, and of the last two."""
 
 RATES = {  # per 100 possessions on the court: (league mean, spread between players)
@@ -168,10 +171,81 @@ class SyntheticLeague:
     postseasons: dict[int, Postseason] = field(default_factory=dict)
     """Playoffs played by :meth:`plant_postseason`, by season. Without one a finished
     season's outcomes are a fixed convention and no playoff game is on record."""
+    regular_seasons: dict[int, list[PlayoffGame]] = field(default_factory=dict)
+    """Regular seasons played by :meth:`plant_regular_season`, by season: every game with
+    its result. Without one a season's record is a fixed function of its rating and no
+    regular-season game is on record."""
+    margins: dict[int, dict[str, float]] = field(default_factory=dict)
+    """Each planted regular-season game's point margin for the home side, by game id."""
 
     def plant(self, year: int, ratings: dict[int, tuple[float, float]]) -> None:
         assert set(ratings) == set(self.team_ids), "a season needs a rating for every team"
         self.ratings[year] = dict(ratings)
+
+    def plant_regular_season(
+        self, year: int, *, home_edge: float, margin_noise: float, seed: int = 0
+    ) -> None:
+        """Play the season's regular season game by game and keep every result.
+
+        Each team hosts every other team once and visits it once, then hosts and visits
+        twelve more opponents, for 82 games. A game's margin, in points, is the gap in
+        the teams' planted net ratings plus ``home_edge`` plus noise with standard
+        deviation ``margin_noise``; whoever has the margin wins. The season's record is
+        then what the games gave, and its team games are on record.
+        """
+        assert year in self.ratings, "a season needs planted ratings first"
+        generator = np.random.default_rng([seed, year, 3])
+        teams = list(self.team_ids)
+        net = {team: sum(self.ratings[year][team]) for team in teams}
+        pairs = [(home, away) for home in teams for away in teams if home != away]
+        # Twelve more home games each against the teams that follow in the order, which
+        # gives everyone twelve more away games too.
+        extra = min(EXTRA_HOME_GAMES, len(teams) - 1)
+        for position, home in enumerate(teams):
+            for step in range(1, extra + 1):
+                pairs.append((home, teams[(position + step) % len(teams)]))
+        games: list[PlayoffGame] = []
+        margins: dict[str, float] = {}
+        start = date(year, 10, 20)
+        for number, (home, away) in enumerate(pairs):
+            margin = net[home] - net[away] + home_edge + margin_noise * generator.normal()
+            if margin == 0:
+                margin = 0.5
+            game = PlayoffGame(
+                game_id=f"{year % 100:02d}8{number:07d}",
+                day=start + timedelta(days=number // (len(teams) // 2)),
+                playoff_round=0,
+                home_team=home,
+                away_team=away,
+                home_won=margin > 0,
+            )
+            games.append(game)
+            margins[game.game_id] = float(margin)
+        self.regular_seasons[year] = games
+        self.margins[year] = margins
+
+    def record(self, year: int, team: int) -> tuple[int, int]:
+        """A team's regular-season wins and losses: from the games played when the season
+        was planted, otherwise a fixed function of its rating."""
+        games = self.regular_seasons.get(year)
+        if games is None:
+            wins = self._wins(*self.ratings[year][team])
+            return wins, GAMES - wins
+        wins = sum(
+            (game.home_won if game.home_team == team else not game.home_won)
+            for game in games
+            if team in (game.home_team, game.away_team)
+        )
+        played = sum(team in (game.home_team, game.away_team) for game in games)
+        return wins, played - wins
+
+    def head_to_head(self, year: int, mine: int, theirs: int) -> int:
+        """Regular-season wins of one team over another, from the games planted."""
+        return sum(
+            (game.home_won if game.home_team == mine else not game.home_won)
+            for game in self.regular_seasons.get(year, [])
+            if {game.home_team, game.away_team} == {mine, theirs}
+        )
 
     def plant_postseason(
         self,
@@ -198,7 +272,7 @@ class SyntheticLeague:
         conference = self._conferences()
         net = {team: strengths[team][0] for team in self.team_ids}
         top = {team: strengths[team][1] for team in self.team_ids}
-        wins = {team: self._wins(*self.ratings[year][team]) for team in self.team_ids}
+        wins = {team: self.record(year, team)[0] for team in self.team_ids}
         seeds: dict[int, int] = {}
         order: dict[str, list[int]] = {}
         for name in ("East", "West"):
@@ -213,8 +287,15 @@ class SyntheticLeague:
         start = date(year + 1, 4, 15)
 
         def holds_home(mine: int, theirs: int) -> bool:
+            # The lab's own rule: record, head-to-head, seed within a conference, rating.
             if wins[mine] != wins[theirs]:
                 return wins[mine] > wins[theirs]
+            mine_over, theirs_over = (
+                self.head_to_head(year, mine, theirs),
+                self.head_to_head(year, theirs, mine),
+            )
+            if mine_over != theirs_over:
+                return mine_over > theirs_over
             if conference[mine] == conference[theirs]:
                 return seeds[mine] < seeds[theirs]
             if net[mine] != net[theirs]:
@@ -290,7 +371,7 @@ class SyntheticLeague:
             "player_game_logs": self._player_game_logs(years),
             "team_seasons": self._team_seasons(years),
         }
-        if self.postseasons:
+        if self.postseasons or self.regular_seasons:
             frames["team_games"] = self._team_games(years)
             frames["playoff_results"] = self._playoff_results(years)
         return frames
@@ -427,7 +508,7 @@ class SyntheticLeague:
             postseason = self.postseasons.get(year)
             for place, team in enumerate(self.team_ids):
                 offense, defense = self.ratings[year][team]
-                wins = self._wins(offense, defense)
+                wins, _ = self.record(year, team)
                 if postseason is None:
                     outcome = {
                         "conference_rank": None,
@@ -487,37 +568,41 @@ class SyntheticLeague:
         return conform_frame(frame, TEAM_SEASONS)
 
     def _team_games(self, years: list[int]) -> pd.DataFrame:
-        """Every playoff game played, twice: once from each side."""
+        """Every game played, regular season and playoffs, twice: once from each side."""
         rows = []
         for year in years:
+            played: list[tuple[PlayoffGame, str, float]] = []
+            for game in self.regular_seasons.get(year, []):
+                played.append((game, "regular", self.margins[year][game.game_id]))
             postseason = self.postseasons.get(year)
-            if postseason is None:
-                continue
-            for series in postseason.series:
-                for game in series.games:
-                    sides = (
-                        (game.home_team, game.away_team, True),
-                        (game.away_team, game.home_team, False),
+            if postseason is not None:
+                for series in postseason.series:
+                    for game in series.games:
+                        played.append((game, "playoffs", 5.0 if game.home_won else -5.0))
+            for game, season_type, margin in played:
+                sides = (
+                    (game.home_team, game.away_team, True),
+                    (game.away_team, game.home_team, False),
+                )
+                for team, opponent, is_home in sides:
+                    mine = margin if is_home else -margin
+                    rows.append(
+                        {
+                            "game_id": game.game_id,
+                            "team_id": team,
+                            "season": Season(year).label,
+                            "season_type": season_type,
+                            "game_date": pd.Timestamp(game.day),
+                            "opponent_team_id": opponent,
+                            "is_home": is_home,
+                            "is_neutral_site": False,
+                            "won": game.home_won == is_home,
+                            "minutes": 240,
+                            **dict.fromkeys(_BOX, 0),
+                            "pts": int(round(100 + mine / 2)),
+                            "opp_pts": int(round(100 - mine / 2)),
+                        }
                     )
-                    for team, opponent, is_home in sides:
-                        won = game.home_won == is_home
-                        rows.append(
-                            {
-                                "game_id": game.game_id,
-                                "team_id": team,
-                                "season": Season(year).label,
-                                "season_type": "playoffs",
-                                "game_date": pd.Timestamp(game.day),
-                                "opponent_team_id": opponent,
-                                "is_home": is_home,
-                                "is_neutral_site": False,
-                                "won": won,
-                                "minutes": 240,
-                                **dict.fromkeys(_BOX, 0),
-                                "pts": 100 if won else 95,
-                                "opp_pts": 95 if won else 100,
-                            }
-                        )
         frame = pd.DataFrame(rows, columns=list(TEAM_GAMES.column_names))
         return conform_frame(frame, TEAM_GAMES)
 
