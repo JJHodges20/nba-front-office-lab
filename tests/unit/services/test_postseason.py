@@ -62,7 +62,7 @@ class TestStatus:
 
     def test_on_the_fixture_store_with_the_shipped_model(self, lab: Lab) -> None:
         status = lab.postseason.status()
-        assert status.is_fitted and status.is_current and status.revision == 1
+        assert status.is_fitted and status.is_current and status.revision == 2
         assert status.seasons == ("2025-26", "2012-13", "1996-97") and status.latest == "2025-26"
 
     def test_without_a_model_the_service_says_how_to_fit_one(

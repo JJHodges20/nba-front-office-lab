@@ -47,11 +47,15 @@ def test_every_roadmap_table_is_either_declared_or_planned() -> None:
     declared = {contract.name for contract in ALL_TABLES}
     planned = {entry.name for entry in PLANNED_TABLES}
     assert not declared & planned, "a declared table is still listed as planned"
-    assert ROADMAP_TABLES <= declared | planned
+    # Two of the roadmap's tables were decided against: chances are computed on request
+    # (decision 0014) and a scenario is kept as a roster (decision 0015).
+    decided_against = {"model_predictions", "simulation_results"}
+    assert ROADMAP_TABLES <= declared | planned | decided_against
 
 
 def test_planned_tables_name_a_real_milestone() -> None:
-    assert all(1 <= entry.milestone <= 14 for entry in PLANNED_TABLES)
+    # A table deferred past the roadmap has no milestone; the rest name one of the fourteen.
+    assert all(entry.milestone is None or 1 <= entry.milestone <= 14 for entry in PLANNED_TABLES)
 
 
 def test_references_point_at_declared_columns() -> None:

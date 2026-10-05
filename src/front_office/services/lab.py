@@ -3,10 +3,14 @@
 A :class:`Lab` holds the database and the configured season rules. The services hang off
 it. Nothing here is cached: every answer is read fresh, so a rebuild in another process
 is seen at once. A screen that wants caching keys it on :attr:`LabStatus.build_id`.
+Within one answer a service may ask the lab to be :meth:`Lab.remembering` what it reads,
+so that a season drawn for thirty teams reads each table once.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +19,12 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
+from front_office.config.models import (
+    fit_evidence_path,
+    postseason_model_path,
+    simulator_model_path,
+    value_model_path,
+)
 from front_office.config.season_rules import load_all_season_rules
 from front_office.config.settings import Settings, load_settings
 from front_office.domain.cap_rules import SeasonRules
@@ -41,6 +51,29 @@ class LabNotBuilt(RuntimeError):
 
     def __init__(self) -> None:
         super().__init__("no data has been built yet; run: fol refresh")
+
+
+def _memo_key(table: str, where: dict | None, kwargs: dict) -> tuple | None:
+    """What a read is remembered under, or ``None`` when its filters cannot be hashed."""
+    try:
+        filters = (
+            None
+            if where is None
+            else tuple(
+                sorted(
+                    (
+                        str(column),
+                        tuple(wanted) if isinstance(wanted, list | tuple | set) else wanted,
+                    )
+                    for column, wanted in where.items()
+                )
+            )
+        )
+        key = (table, filters, tuple(kwargs.get("order_by", ())))
+        hash(key)
+    except TypeError:
+        return None
+    return key
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,6 +126,7 @@ class Lab:
         self.rosters = RosterRepository(self.database)
         self.operations = OperationsLog(self.database)
         self._rules = load_all_season_rules(settings.season_rules_dir)
+        self._memo: dict[tuple, pd.DataFrame] | None = None
 
     @classmethod
     def open(cls, project_root: Path | None = None) -> Lab:
@@ -133,13 +167,60 @@ class Lab:
             raise LabNotBuilt
 
     def read(self, table: str, where: dict | None = None, **kwargs: object) -> pd.DataFrame:
-        """Read a table, turning "not built" into the error the workbench explains."""
+        """Read a table, turning "not built" into the error the workbench explains.
+
+        Inside a :meth:`remembering` block a read is served from what the block has
+        already read, as a copy, so that what a caller does to a frame stays its own.
+        """
+        key = None if self._memo is None else _memo_key(table, where, kwargs)
+        if key is not None and self._memo is not None and key in self._memo:
+            return self._memo[key].copy()
         try:
-            return self.warehouse.read(table, where, **kwargs)  # type: ignore[arg-type]
+            frame = self.warehouse.read(table, where, **kwargs)  # type: ignore[arg-type]
         except StorageError as error:
             if not self.warehouse.is_built():
                 raise LabNotBuilt from error
             raise
+        if key is not None and self._memo is not None:
+            self._memo[key] = frame.copy()
+        return frame
+
+    @contextmanager
+    def remembering(self) -> Iterator[None]:
+        """Within the block, a table read once is not read again.
+
+        For one answer that reads the same tables many times over - a season drawn for
+        every team, a scenario before and after. What was read is forgotten when the
+        block ends, so the next answer still sees a rebuild. Blocks nest: an inner block
+        shares the memory of the outer one.
+        """
+        outer = self._memo
+        if outer is None:
+            self._memo = {}
+        try:
+            yield
+        finally:
+            self._memo = outer
+
+    def model_stamp(self) -> str:
+        """When the fitted files last changed: the value model, the fit evidence, the
+        postseason model and the simulator. Fitting or measuring again changes a file
+        without a build, so a screen keys what it caches of them on this as well."""
+        config_dir = self.settings.config_dir
+        parts = []
+        for path in (
+            value_model_path(config_dir),
+            fit_evidence_path(config_dir),
+            postseason_model_path(config_dir),
+            simulator_model_path(config_dir),
+        ):
+            try:
+                stat = path.stat()
+            except FileNotFoundError:
+                parts.append(f"{path.name}:-")
+            else:
+                parts.append(f"{path.name}:{stat.st_mtime_ns}:{stat.st_size}")
+        return "|".join(parts)
 
     def rules(self, season: str) -> SeasonRules | None:
         """Cap rules for a season, or ``None`` if none are configured."""

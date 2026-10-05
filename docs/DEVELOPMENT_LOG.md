@@ -3,6 +3,105 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone 14 - Full-system audit (2026-10-05)
+
+**Built**
+
+- [AUDIT.md](AUDIT.md): the audit in six passes - architecture, leakage, tests, the
+  workbench, documentation, performance - with what was found, changed and left.
+- The value model tested a second time with the minutes projected
+  (`modeling/value/estimate.py`, `Validation.projected`, `BacktestRow.projected_net`):
+  3.63 points of net rating against 3.01 with the minutes as played, the projected
+  minutes covering 87% of the floor. The optimizer, the simulator and the postseason
+  model carry the second figure; the Player Value page and the research document show
+  both.
+- The season model scored as a forecast reads it (`Evaluation.before_season`): from the
+  rating predicted before each season, averaged over its error, with the typical
+  top-player quality; on the Postseason Outlook page's model tab and in the research
+  document beside the in-season reading.
+- Every model file refitted in order against build 14: value revision 2, postseason
+  revision 2, simulator revision 2 (its least-known band had drifted from the code), fit
+  evidence revision 2; every research document regenerated.
+- Performance: warehouse reads from row tuples; integer and text fast paths in the
+  contract check; `Lab.remembering` for one answer's reads; postseason intervals only
+  where shown; roster-subject scenarios cached on the roster's stamp; the status caches
+  keyed on the model files' stamps so a refit shows without a rebuild.
+- Rule fixes: the home-court chance as a method of the game model; the profile's change
+  column, a stint's on/off difference, top-player quality for a roster and a team's
+  standing among its season each defined once in the layer that owns them; the NaN-safe
+  interval everywhere; dead code gone; the optimizer page's `except Exception` and its
+  invented $100M fallback gone; the qualification policy and the season's date range in
+  services; the default page served at the root alone.
+- The pool for a season being played keeps the players who have appeared in it.
+- Documentation: the contract import followed by a build everywhere it is described;
+  a dozen stale statements corrected; two planned tables removed as decided against and
+  lineups deferred; the glossary's origin note; the benchmark limits; the regeneration
+  order in the research headers.
+
+**Decisions** ([0016](decisions/0016-audit.md))
+
+- A forecast carries the error of the test that projected minutes too; the rating-alone
+  test stays for the comparisons with simpler methods.
+- The season model is scored both from the season played and from what could be known
+  before it, and both are shown.
+- Fitted files are refitted in order and each names the others; statuses are keyed on
+  the files' stamps.
+- The lab remembers reads within one answer and never across answers.
+- The value-for-money line, a description of the user's contract file, may be fitted on
+  request.
+
+**Verification**
+
+- The projected-minutes test on the invented league: present, finite, its share in
+  range, every backtest row carrying its projected rating, and a file without it still
+  readable. The simulator's error is that figure and says so; its wins test is drawn
+  around the projected ratings.
+- The before-the-season reading on the invented league: present when predictions are
+  given and absent when they are not, every stage scored, and never a better log loss
+  than the season played.
+- The read memo: fresh outside a block, once within it, copies to callers, nested blocks
+  sharing one memory. The intervals switch changes nothing but the intervals. An emptied
+  roster is five replacement players. The pool during a season keeps appeared players.
+- The warehouse's tuple reads give frames equal to the dictionary reads on every table
+  measured; the contract check's fast paths pass the domain, storage and processing
+  tests unchanged.
+- The whole suite, `fol check` (57 checks, 7 standing warnings, no error) and a rebuild
+  (build 14, 959,661 rows). Every page and tab in both themes through a browser on the
+  final code.
+
+**Found on the way**
+
+- The running workbench loads code at the first request and keeps it: a code change
+  under a browser walk produced an import error on screen, and every screenshot pass
+  after a change needs the server restarted first.
+- Streamlit serves the default page at the root and ignores its path; a page's URL path
+  on the default page is dead.
+- Streamlit's own "connection error" dialog appears when the machine is saturated, and
+  it intercepts every click; browser passes cannot share the machine with a parallel
+  test run.
+- `pyproject.toml` already passes `-q`, so a second `-q` hides the summary line; a test
+  count comes from the collection's per-file lines.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| Automated tests | 2,969 passed, none skipped; about five minutes with `pytest -n auto` |
+| Data-quality checks | `fol check`: 57 checks, 50 passed, 7 standing warnings, 0 errors; build 14 loaded 959,661 rows in one to two minutes |
+| UI review | Every page and every top-level tab in both themes through a browser on the final code; the three fixes re-checked the same way |
+| Architectural boundaries | `tests/architecture` passes; no rule changed. Reads and the memo are `storage` and `services`; the second value test and the before-the-season reading are `modeling`; the pages compute nothing new |
+| Lint | `ruff check` and `ruff format --check` clean |
+
+**Open items carried forward**
+
+- A contract file, which every salary view and the optimizer wait on.
+- Value weights refitted inside each postseason window, and fit measures built from
+  them: +0.003 log loss, measured and left.
+- A wins test through the simulator's own draw, on rosters as they stood before each
+  season.
+- The field: a league simulation with a schedule, standings, the play-in and the bracket.
+- Lineups; the long modules and the duplicated small helpers listed in the audit.
+
 ## Milestone 13 - Scenario simulator (2026-10-05)
 
 **Built**
@@ -78,8 +177,8 @@ completion gate. Newest first.
   every team drawn; a scenario saved. The report and the three commands.
 - The shipped parameters: over the 600 team-seasons the value model predicted out of
   sample, the 50%, 80% and 95% intervals held the wins that happened 53%, 83% and 97%
-  of the time, and the median season missed by 6.0 wins against 12.5 for an even
-  record.
+  of the time, and the median season missed by 7.6 wins root mean square (6.0 on
+  average) against 12.5 for an even record.
 - The page: every tab against the service on the fixture store and on the invented
   league; the subject switch; a player removed; a preset; an emptied roster; the save;
   the sweep from two starts. In both themes on the real data, every tab, through a

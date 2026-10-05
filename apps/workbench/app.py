@@ -42,7 +42,6 @@ PAGES = {
             league.render,
             title="League Overview",
             icon=":material/leaderboard:",
-            url_path="league",
             default=True,
         ),
         st.Page(

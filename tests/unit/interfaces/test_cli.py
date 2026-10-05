@@ -775,7 +775,7 @@ class TestFitCommands:
         result = runner.invoke(app, ["fit", "show"])
         assert result.exit_code == 0, result.output
         flat = " ".join(result.output.split())
-        assert "Revision 1, gathered " in flat
+        assert "Revision 2, gathered " in flat
         assert "each corrected with weights fitted to the seasons before it" in flat
         for heading in (
             "Each measure alone, correcting the sum of the parts",
@@ -859,7 +859,7 @@ class TestPlayoffsCommands:
         result = runner.invoke(app, ["playoffs", "show"])
         assert result.exit_code == 0, result.output
         flat = " ".join(result.output.split())
-        assert "Revision 1, fitted " in flat
+        assert "Revision 2, fitted " in flat
         assert "Series model: home advantage" in flat
         assert "Out of sample, 2006-07 to " in flat and "Through the bracket:" in flat
         assert "Tried beside the series model" in flat

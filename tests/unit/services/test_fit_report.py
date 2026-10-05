@@ -19,7 +19,7 @@ def report(lab: Lab) -> str:
 
 def test_it_says_where_it_came_from_and_what_it_is(report: str) -> None:
     assert report.startswith("# Do These Players Make Sense Together?\n")
-    assert "from revision 1 of the fit evidence (gathered " in report
+    assert "from revision 2 of the fit evidence (gathered " in report
     assert "> A roster's profile is description" in report
     assert report.endswith("\n") and "Out of date" not in report
 
@@ -103,6 +103,6 @@ def test_evidence_from_another_model_is_flagged(copy: Path) -> None:
     with Lab(load_settings(copy)) as opened:
         document = fit_report(opened)
     assert (
-        "> **Out of date.** The evidence was gathered against value model r1 and roles v7"
+        "> **Out of date.** The evidence was gathered against value model r2 and roles v7"
         in document
     )

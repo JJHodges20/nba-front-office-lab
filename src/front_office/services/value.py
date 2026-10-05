@@ -247,7 +247,9 @@ class ValueService:
         if upcoming is None:
             return empty
         scores = self._lab.read(TABLE, {"season": upcoming})
-        scores = scores[scores["impact"].isna()].set_index("player_id")
+        # Everyone projected into the season, whether or not they have appeared in it: while
+        # a season is being played, the players already in it keep their projection.
+        scores = scores[scores["projected_impact"].notna()].set_index("player_id")
         if scores.empty:
             return empty
         players = self._lab.read("players", {"player_id": scores.index.tolist()})

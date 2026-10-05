@@ -194,6 +194,18 @@ class TestWithoutNoise:
         assert drawn.shares == pytest.approx(0.0)
         assert (drawn.players, drawn.projected) == (0, 0)
 
+    def test_the_intervals_can_be_left_out_and_nothing_else_changes(self) -> None:
+        model = model_with()
+        full = simulate(FIVE, model=model, steps=steps(), replacement=REPLACEMENT, simulations=50)
+        bare = simulate(
+            FIVE, model=model, steps=steps(), replacement=REPLACEMENT, simulations=50,
+            intervals=False,
+        )  # fmt: skip
+        assert np.array_equal(bare.rating, full.rating) and np.array_equal(bare.wins, full.wins)
+        for key, chance in full.chances.items():
+            assert np.array_equal(bare.chances[key], chance)
+        assert all(np.isnan(low) and np.isnan(high) for low, high in bare.intervals.values())
+
     def test_development_presets_step_every_player_by_the_bands_typical_size(self) -> None:
         model = model_with(mean_miss=-0.5, spread=1.0)
         plain = simulate(

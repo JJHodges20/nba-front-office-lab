@@ -13,7 +13,7 @@ before roster scoring, optimisation or any predictive claim. The plan is in
 
 ## Status
 
-Milestones 1-13 of 14 are complete. The first seven are the roadmap's version 1.0,
+All 14 milestones are complete. The first seven are the roadmap's version 1.0,
 *League and Roster Analytics*: league data from stats.nba.com, a database built from it,
 tested player and team analytics, import of contract data with cap-normalised salaries,
 and a workbench to explore all of it and to build rosters by hand. The eighth adds the
@@ -28,8 +28,9 @@ archetypes written as readable rules - on a page of the workbench and in
 [docs/research/PLAYER_VALUE.md](docs/research/PLAYER_VALUE.md). The tenth adds the roster
 fit engine of version 4: a roster - a real team's, or one you built - described in the
 roadmap's six areas of fit and placed among the season's teams, and a test of whether any
-of that predicts a team's results beyond its players' impacts added up. On thirty seasons
-it does not, so fit is shown as description and nothing is added to the sum of the parts
+of that predicts a team's results beyond its players' impacts added up. On the 510
+team-seasons tested, 2009-10 to 2025-26, it does not, so fit is shown as description and
+nothing is added to the sum of the parts
 ([docs/research/ROSTER_FIT.md](docs/research/ROSTER_FIT.md)). The eleventh adds the
 roster optimizer of version 5: under a payroll line or an owner's budget, a roster size,
 role and position requirements, locks and exclusions, it finds several distinct rosters
@@ -44,6 +45,10 @@ adds the scenario simulator of version 7: lay your assumptions over a roster - p
 in and out, games missed, development, minutes, salaries - and draw thousands of seasons
 for it before and after, from those tested parts, with the wins the simulator gives
 tested against twenty seasons of results ([docs/research/SIMULATOR.md](docs/research/SIMULATOR.md)).
+The fourteenth is the audit of the whole, [docs/AUDIT.md](docs/AUDIT.md): every pass with
+what was found, what was changed and what was left, and the forecasts now carrying the
+error of a test that projected minutes too - 3.63 points of net rating, not the 3.01 of
+a test that knew them.
 
 The postseason chances and the simulator's seasons are the lab's forecasts, and they are
 shown as estimates with intervals beside the models' record on past seasons. Player value
@@ -53,7 +58,8 @@ assumptions; and the workbench describes, it does not recommend.
 
 **Contract data is not included.** No free source permits collecting NBA contracts
 automatically for this kind of project, so salaries come from a file you supply. Until
-you import one, the salary, payroll and cap views are empty and say so. See
+you import one and rebuild (`fol contracts import`, then `fol build`), the salary,
+payroll and cap views are empty and say so. See
 [docs/CONTRACT_DATA.md](docs/CONTRACT_DATA.md).
 
 ## Setup
@@ -81,7 +87,7 @@ python -m venv .venv
 The first `fol refresh` makes about 650 requests and takes roughly fifteen minutes: team
 and player statistics for every season since 1996-97, and team-by-team detail (rosters,
 on/off splits) for the current league year and the three seasons before it. Later runs
-fetch only what is new. Rebuilding the database takes about a minute and never touches
+fetch only what is new. Rebuilding the database takes one to two minutes and never touches
 rosters you have built.
 
 ### The workbench
@@ -153,7 +159,11 @@ lab derived or estimated, and which you assumed.
 .\.venv\Scripts\fol.exe ui --port 8600 --no-browser   # the workbench on another port
 ```
 
-`fol ingest --season 2025-26` fetches one season.
+`fol ingest --season 2025-26` fetches one season; `--teams-only` fetches only the
+team-by-team detail and `--force` fetches again what is already stored. `fol build
+--force` loads even when that would empty a table that now holds data. `fol contracts
+template --output FILE --seasons N` chooses where the template goes and how many seasons
+of salary columns it carries.
 
 ## Development
 
@@ -167,9 +177,9 @@ lab derived or estimated, and which you assumed.
 
 ```
 apps/workbench/     the Streamlit workbench: pages, filters, charts
-configs/            base settings and one cap-rules file per season
-data/               local data: raw snapshots, database, imports, exports (not committed)
-docs/               roadmap, architecture, guides, decisions, dev log
+configs/            settings, cap rules by season, eras, archetypes, model specs and fitted models
+data/               local data: raw snapshots, database, imports (not committed)
+docs/               roadmap, architecture, guides, decisions, research, images, dev log
 scripts/            setup helpers
 src/front_office/   the package, one sub-package per architectural layer
 tests/              unit, architecture, integration and interface tests
@@ -184,6 +194,7 @@ tests/              unit, architecture, integration and interface tests
 - [Roster fit research](docs/research/ROSTER_FIT.md) - what a roster is described by, and whether it matters beyond the sum of the parts
 - [Postseason research](docs/research/POSTSEASON.md) - the postseason model, how it was tested and how its chances have come out
 - [Simulator research](docs/research/SIMULATOR.md) - what a season is drawn from, the figures measured, the wins test, and the season ahead as drawn
+- [Full-system audit](docs/AUDIT.md) - what the audit of milestone 14 found, changed and left
 - [Architecture](docs/ARCHITECTURE.md) - the layers and the rules between them
 - [Data dictionary](docs/DATA_DICTIONARY.md) - generated from the table contracts
 - [Metric glossary](docs/METRICS.md) - every player, team and roster metric, generated from the catalogs
@@ -197,5 +208,7 @@ tests/              unit, architecture, integration and interface tests
 Player values are analytical estimates: the model behind them was tested on seasons it
 had not seen, and its error is shown beside its results. The optimizer's rosters carry
 that error. Postseason chances are held to the same standard: the model behind them was
-validated out of sample and calibrated, every chance is shown with its interval and
-beside the model's record, and none is presented as a guarantee.
+validated out of sample, its calibration is shown rather than corrected, every chance
+is shown with its interval and beside the model's record, and none is presented as a
+guarantee. The simulator draws its seasons from those tested parts, and the test of the
+wins it gives is on its page and in its research document.

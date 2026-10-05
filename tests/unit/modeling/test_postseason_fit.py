@@ -3,6 +3,7 @@ again, and the out-of-sample test covers what it should."""
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 
 import numpy as np
@@ -34,8 +35,19 @@ def eras() -> list:
 
 @pytest.fixture(scope="module")
 def fitted(postseason_league, eras) -> PostseasonModel:  # type: ignore[no-untyped-def]
+    value_model = postseason_league[1]
+    ahead = value_model.validation.projected
+    assert ahead is not None
     return fit_postseason_model(
-        postseason_league[2], SPEC, eras, revision=1, fitted_at=AT, value_model_version="r1"
+        postseason_league[2],
+        SPEC,
+        eras,
+        revision=1,
+        fitted_at=AT,
+        value_model_version="r1",
+        value_backtest=value_model.backtest,
+        value_error=ahead.rmse,
+        rating_basis="projected",
     )
 
 
@@ -149,8 +161,17 @@ class TestTheTest:
     def test_the_same_inputs_give_the_same_model(
         self, fitted: PostseasonModel, postseason_league, eras
     ) -> None:  # type: ignore[no-untyped-def]
+        value_model = postseason_league[1]
         again = fit_postseason_model(
-            postseason_league[2], SPEC, eras, revision=1, fitted_at=AT, value_model_version="r1"
+            postseason_league[2],
+            SPEC,
+            eras,
+            revision=1,
+            fitted_at=AT,
+            value_model_version="r1",
+            value_backtest=value_model.backtest,
+            value_error=value_model.validation.projected.rmse,
+            rating_basis="projected",
         )
         assert again == fitted
 
@@ -174,3 +195,29 @@ class TestTheTest:
             fit_postseason_model(
                 none, SPEC, eras, revision=1, fitted_at=AT, value_model_version="r1"
             )
+
+
+class TestReadBeforeTheSeason:
+    def test_the_season_model_is_also_scored_from_predicted_ratings(
+        self, fitted: PostseasonModel, postseason_league
+    ) -> None:  # type: ignore[no-untyped-def]
+        ahead = fitted.evaluation.before_season
+        assert ahead is not None
+        assert ahead.rating_basis == "projected"
+        assert ahead.rating_error == pytest.approx(
+            postseason_league[1].validation.projected.rmse, abs=1e-4
+        )
+        assert 0 < ahead.team_seasons <= len(postseason_league[1].backtest)
+        assert [item.key for item in ahead.stages] == list(BRACKET_STAGE_KEYS)
+        for item in ahead.stages:
+            assert item.cases == ahead.team_seasons and 0 < item.mean_probability < 1
+            assert math.isfinite(item.log_loss) and item.log_loss > 0
+        # A rating known only as a forecast cannot read the season better than the season itself.
+        in_season = {item.key: item.log_loss for item in fitted.evaluation.season.stages}
+        assert ahead.stages[0].log_loss >= in_season[ahead.stages[0].key] - 1e-9
+
+    def test_without_predictions_there_is_nothing_to_read(self, postseason_league, eras) -> None:  # type: ignore[no-untyped-def]
+        bare = fit_postseason_model(
+            postseason_league[2], SPEC, eras, revision=1, fitted_at=AT, value_model_version="r1"
+        )
+        assert bare.evaluation.before_season is None

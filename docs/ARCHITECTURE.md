@@ -14,17 +14,18 @@ NBA + contract + cap data
   -> apps/workbench Streamlit front office UI
 ```
 
-Later roadmap stages (player value, roster fit, optimisation, prediction, simulation)
-slot in between `analytics` and `services` as their own layers.
+The later roadmap stages (player value, roster fit, optimisation, prediction, simulation)
+sit between `analytics` and `services` in one layer, `modeling`.
 
-This document describes the intended structure. A layer's package and its import rule
-exist from milestone 1; its code arrives with the milestone that builds it. See
-`docs/ROADMAP.md` for what is implemented today.
+This document describes the structure as built. Every layer's package and import rule
+existed from milestone 1 except `modeling`, which milestone 9 added; a layer's code
+arrives with the milestone that builds it. See `docs/ROADMAP.md` for the milestones.
 
 ## Layers and what each may import
 
 All layers live in `src/front_office/`. A layer may import itself, the layers listed for
-it, and nothing else in the project.
+it, and nothing else in the project (decision
+[0001](decisions/0001-layered-architecture.md)).
 
 | Layer | Responsibility | May import |
 | --- | --- | --- |
@@ -47,7 +48,7 @@ than reading configuration themselves. Only `pipelines`, `services` and `interfa
 settings, which keeps everything beneath them trivially testable.
 
 Third-party libraries are confined the same way: `nba_api` and `requests` only in
-`providers`; `sqlalchemy` only in `storage`; `yaml` only in `config`; `typer` and `rich`
+`providers`; `sqlalchemy` and `sqlite3` only in `storage`; `yaml` only in `config`; `typer` and `rich`
 only in `interfaces`; `streamlit` and `plotly` only in `apps/`.
 
 These rules are enforced by `tests/architecture/test_layer_boundaries.py`. A forbidden
@@ -70,7 +71,7 @@ same commit and record why in `docs/decisions/`.
 
 A *data contract* (`front_office.domain.schema.TableContract`) declares one canonical
 table: its columns, logical types, nullability, units, allowed values, primary key, and
-the **provenance** of each column.
+the **provenance** of each column (decision [0002](decisions/0002-data-contracts.md)).
 
 - `processing` must return frames that satisfy the contract (`conform_frame` raises
   otherwise).
@@ -96,8 +97,9 @@ label a number correctly without knowing how it was produced.
 
 What a data contract is to a table, a `MetricSpec` (`domain/metrics.py`) is to a number
 on screen: its key, label, description, display format, provenance and which direction
-is better. The specs are grouped in catalogs, `PLAYER_METRICS` and `TEAM_METRICS`, next
-to the code that computes them.
+is better. The specs are grouped in catalogs next to the code that computes them:
+`PLAYER_METRICS` and `TEAM_METRICS` in `analytics`, and the value, role, roster-fit and
+postseason catalogs the later milestones added; `services/glossary.py` lists them all.
 
 - `analytics/formulas.py` defines each formula once; the catalog modules call it.
 - A service returns frames whose columns are catalog keys, together with the catalog,
@@ -139,8 +141,10 @@ fol build:  RawStore -> normalize() -> quality checks -> Warehouse.replace() [on
 One SQLite file, `data/front_office.sqlite`, whose tables are generated from the data
 contracts. Tables come in two groups:
 
-- **Rebuilt** - the league tables and the last build's own report (`build_issues`,
-  `check_results`, `raw_snapshots`). Every build drops and rewrites all of them inside
+- **Rebuilt** - the league tables, the modeled tables computed from them
+  (`player_value_scores`, `player_archetypes`, `team_fit_profiles`) and the last build's
+  own report (`build_issues`, `check_results`, `raw_snapshots`). Every build drops and
+  rewrites all of them inside
   a single transaction, so a reader sees one complete build or the other, never a mix,
   and a failed build leaves the previous one in place.
 - **Kept** - the user's rosters (`custom_rosters`, `roster_players`) and the history
@@ -161,7 +165,11 @@ fol ui:  apps/workbench/app.py -> wb.views.<page> -> front_office.services.Lab -
 `players`, `teams`, `league`, `benchmarks`, `contracts`, `builder` (the user's rosters),
 `value`, `fit`, `optimizer`, `postseason`, `simulator` and `health`.
 A service reads tables, calls analytics, and joins the result with names. It contains
-no formulas.
+no formulas. It reads fresh, so a rebuild in another process is seen at once; for one
+answer that reads the same tables many times it asks the lab to remember what it reads
+(`Lab.remembering`), and the memory ends with the answer. The warehouse builds a frame
+from the row tuples a cursor returns and conforms it to the table's contract on the
+way out.
 
 The workbench (`apps/workbench`) is a Streamlit app:
 
@@ -170,7 +178,7 @@ The workbench (`apps/workbench`) is a Streamlit app:
 | `app.py` | The frame: navigation, global filters, data status. |
 | `wb/views/` | One module per page, each with a `render()`. |
 | `wb/state.py` | The global filters: season, phase, team, player, comparison window. |
-| `wb/data.py` | Access to the lab. Results are cached per build id. |
+| `wb/data.py` | Access to the lab. Results are cached per build id; a model status on the model files' stamps as well, so a refit shows without a rebuild. |
 | `wb/charts.py` | Chart builders: a frame and a palette in, a figure out. |
 | `wb/theme.py` | The palette, for a light and for a dark surface. |
 | `wb/components.py`, `wb/formats.py` | Shared pieces and text formatting. |
@@ -233,6 +241,10 @@ carries its weights with their intervals and every piece of evidence for them. A
 applies it and never fits one, so values change only when someone fits the model again.
 Tests of fitting use an invented league with planted weights (`tests/league.py`) and a
 loop-based reference that shares no code with the model (`tests/value_reference.py`).
+The model is tested twice: with each season's minutes as played, the measure of the
+rating alone and the basis of every comparison with simpler methods, and with the
+minutes projected by the minutes model, the error a forecast carries
+(`Validation.projected`; decision 0016).
 See `docs/decisions/0010-player-value.md`.
 
 `modeling/archetypes.py` scores every player against the roles defined in
@@ -303,7 +315,9 @@ The fitted model is a file written only by `fol playoffs fit --write`. No build 
 it: `services/postseason.py` reads it and computes a chance on request, for a decided
 season's bracket and series, for every team of a season, for a real team or a built roster
 read as a team of its strength, or for a strength given by hand - every figure with the
-interval its kept parameter draws give. Tests of fitting use the invented league with its
+interval its kept parameter draws give. The file also scores the season model as a
+forecast reads it, from the rating the value model predicted before each season
+(`Evaluation.before_season`). Tests of fitting use the invented league with its
 playoffs played by a planted game model (`tests/postseason_reference.py`). See
 `docs/decisions/0014-postseason-model.md`.
 
@@ -329,7 +343,7 @@ miss by reliability and how many games rotation players miss; `monte_carlo.py` d
 seasons from those figures and from the value model's projections, replacement level and
 tested error, reading the postseason model's season steps for the chances; `fit.py`
 measures everything and runs the wins test against the value model's own out-of-sample
-test. `services/simulator.py` assembles and prices a scenario's roster, draws before and
+test with the minutes projected, whose error the simulator carries. `services/simulator.py` assembles and prices a scenario's roster, draws before and
 after, and dresses the comparison; `FitService.lineup` places the roster's fit measures
 for any set of players and shares. No build applies any of it; the invented league plays
 regular seasons from a planted game model so the measurements can be checked. See

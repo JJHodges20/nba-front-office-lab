@@ -6,12 +6,10 @@ import pandas as pd
 import streamlit as st
 
 from front_office.services import DEFAULT_QUALIFICATION, PlayerTable, Qualification
+from front_office.services.players import SPAN_QUALIFICATION
 from wb import charts, components, data, formats, state
 from wb.components import DERIVED, EMPTY_CELL, MEASURED, MODELED, Figure
 from wb.state import Filters
-
-SPAN_QUALIFICATION = Qualification(min_games=3, min_minutes=30)
-"""Where the thresholds start for a span of games: a 20-game minimum cannot apply to ten."""
 
 IDENTITY = ("player_name", "team", "position", "age")
 OVERVIEW = (

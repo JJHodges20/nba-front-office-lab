@@ -81,7 +81,7 @@ def test_parameters_from_another_value_model_are_flagged(copy: Path) -> None:
     path = simulator_model_path(copy / "configs")
     path.write_text(
         path.read_text(encoding="utf-8").replace(
-            '"value_model_version": "r1"', '"value_model_version": "r9"'
+            '"value_model_version": "r2"', '"value_model_version": "r9"'
         ),
         encoding="utf-8",
     )

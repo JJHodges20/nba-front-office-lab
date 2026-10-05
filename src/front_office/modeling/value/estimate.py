@@ -36,6 +36,7 @@ from front_office.domain.value_model import (
     BacktestRow,
     Comparison,
     FittedOn,
+    ProjectedScore,
     SameSeason,
     Score,
     SeasonScore,
@@ -44,7 +45,13 @@ from front_office.domain.value_model import (
     ValueModel,
     ValueSpec,
 )
-from front_office.modeling.value.availability import NotEnoughHistory, fit_availability
+from front_office.modeling.value.availability import (
+    NotEnoughHistory,
+    fit_availability,
+    history,
+    season_shares,
+)
+from front_office.modeling.value.availability import terms as minute_terms
 from front_office.modeling.value.design import (
     AGE,
     LEVEL_KEYS,
@@ -68,7 +75,7 @@ from front_office.modeling.value.features import (
 )
 from front_office.modeling.value.pooling import entering
 from front_office.modeling.value.resampling import interval, rmse_differences, season_draws
-from front_office.modeling.value.scoring import season_impact
+from front_office.modeling.value.scoring import projection, season_impact
 
 Tables = Mapping[str, pd.DataFrame]
 
@@ -161,6 +168,7 @@ def fit_value_model(
     design = _design(problem, spec, FEATURE_KEYS, LEVEL_KEYS)
     fitted = _solve(design, problem.actual)
     tested, predicted = _expanding(design, problem.actual, problem.start, first_test)
+    projected_net, projected_score = _projected_backtest(problem, spec, first_test, tested)
     errors = (predicted - problem.actual)[tested]
     net_errors = errors.sum(axis=1)
     actual = problem.actual[tested]
@@ -250,6 +258,7 @@ def fit_value_model(
                 for year in sorted(set(season_of.tolist()))
             ),
             same_season=_same_season(problem, impact),
+            projected=projected_score,
         ),
         backtest=tuple(
             BacktestRow(
@@ -259,9 +268,10 @@ def fit_value_model(
                 predicted_defense=round(float(row[1]), RATING_DECIMALS),
                 actual_offense=round(float(truth[0]), RATING_DECIMALS),
                 actual_defense=round(float(truth[1]), RATING_DECIMALS),
+                projected_net=round(float(ahead), RATING_DECIMALS),
             )
-            for (season, team_id), row, truth in zip(
-                tested_rows, predicted[tested], actual, strict=True
+            for (season, team_id), row, truth, ahead in zip(
+                tested_rows, predicted[tested], actual, projected_net[tested], strict=True
             )
         ),
     )
@@ -296,6 +306,93 @@ def _expanding(
         predicted[test] = design[test] @ _solve(design[train], actual[train])
         tested |= test
     return tested, predicted
+
+
+ON_COURT = 5.0
+"""Shares of the minutes on the floor; what a full roster adds up to."""
+
+
+def _projected_backtest(
+    problem: Problem, spec: ValueSpec, first_test: int, tested: np.ndarray
+) -> tuple[np.ndarray, ProjectedScore]:
+    """The test again with the minutes projected rather than played.
+
+    Each test season's teams are predicted the way a forecast would predict them: each
+    player's projected impact for the share of the minutes a minutes model gives them,
+    and replacement level for whatever those shares leave of the five on the floor. The
+    weights, the minutes model and the replacement level are all fitted on the seasons
+    before. What is still taken from the season itself is who played for whom.
+
+    Returns the projected net rating of every row (missing where untested) and the score
+    over the tested rows.
+    """
+    design = _design(problem, spec, FEATURE_KEYS, LEVEL_KEYS)
+    shares = season_shares(problem.played)
+    known = history(problem.features, shares)
+    known = known[known["age"].notna()]
+    actual_share = shares.rename(columns={"start": "target", "share": "actual"})
+    known = known.merge(actual_share, on=["player_id", "target"], how="left")
+    known["actual"] = known["actual"].fillna(0.0)
+    minute_design = minute_terms(known).to_numpy()
+    targets = known["target"].to_numpy()
+    finished = {int(year) for year in problem.finished}
+    # One team per player-season, the one played most for: a forecast knows a roster,
+    # not how a traded player's season was split.
+    home = problem.played.sort_values("share", ascending=False).drop_duplicates(
+        ["season", "player_id"]
+    )[["season", "player_id", "team_id", "start"]]
+
+    projected = np.full(len(problem.rows), np.nan)
+    covered_share = np.full(len(problem.rows), np.nan)
+    for year in sorted({int(value) for value in problem.start if value >= first_test}):
+        train, test = problem.start < year, problem.start == year
+        fitted = _solve(design[train], problem.actual[train])
+        weights = {
+            side: dict(zip(TERM_KEYS, fitted[:, column].tolist(), strict=True))
+            for column, side in enumerate(SIDES)
+        }
+        earlier = [season for season in sorted(finished) if season < year]
+        impact = season_impact(problem.features, spec, weights)
+        replacement = _replacement_level(problem, impact, earlier, spec)
+        learn = np.isin(targets, earlier)
+        coefficients = np.linalg.lstsq(
+            minute_design[learn], known["actual"].to_numpy()[learn], rcond=None
+        )[0]
+        entering_now = targets == year
+        projected_share = pd.Series(
+            np.clip(minute_design[entering_now] @ coefficients, 0.0, 1.0),
+            index=pd.MultiIndex.from_frame(known.loc[entering_now, ["player_id", "target"]]),
+        )
+        pooled_now = problem.pooled[problem.pooled["target"] == year]
+        projected_impact = projection(pooled_now, spec, weights)["projected_impact"]
+        projected_impact.index = pd.MultiIndex.from_frame(pooled_now[["player_id", "target"]])
+        members = home[home["start"] == year]
+        keys = pd.MultiIndex.from_arrays([members["player_id"], members["start"]])
+        share = projected_share.reindex(keys).fillna(0.0).to_numpy()
+        above = projected_impact.reindex(keys).fillna(replacement).to_numpy() - replacement
+        parts = pd.DataFrame(
+            {
+                "season": members["season"].to_numpy(),
+                "team_id": members["team_id"].to_numpy(),
+                "share": share,
+                "points": share * above,
+            }
+        )
+        summed = parts.groupby(["season", "team_id"])[["share", "points"]].sum()
+        summed = summed.reindex(problem.rows[test]).fillna(0.0)
+        covered = summed["share"].to_numpy()
+        # Shares that run over a season are scaled down, as the simulator scales them.
+        scale = np.where(covered > ON_COURT, ON_COURT / np.where(covered > 0, covered, 1.0), 1.0)
+        projected[test] = ON_COURT * replacement + scale * summed["points"].to_numpy()
+        covered_share[test] = np.minimum(covered, ON_COURT) / ON_COURT
+    errors = projected[tested] - problem.actual[tested].sum(axis=1)
+    score = ProjectedScore(
+        rmse=_round(_rmse(errors)),
+        mae=_round(np.abs(errors).mean()),
+        team_seasons=int(tested.sum()),
+        share_covered=_round(float(np.mean(covered_share[tested]))),
+    )
+    return projected, score
 
 
 def _net_errors(

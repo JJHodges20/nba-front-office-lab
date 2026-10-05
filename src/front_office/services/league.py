@@ -6,6 +6,8 @@ names. It contains no formulas.
 
 from __future__ import annotations
 
+from datetime import date
+
 import pandas as pd
 
 from front_office.analytics import comparison as compare
@@ -25,6 +27,13 @@ class LeagueService:
     @property
     def metrics(self) -> MetricCatalog:
         return analytics.TEAM_METRICS
+
+    def season_dates(self, season: str, season_type: str) -> tuple[date, date] | None:
+        """The first and last game dates of a season's phase, or ``None`` without games."""
+        games = self._lab.read("team_games", {"season": season, "season_type": season_type})
+        if games.empty:
+            return None
+        return games["game_date"].min().date(), games["game_date"].max().date()
 
     def standings(self, season: str) -> pd.DataFrame:
         """One season's teams in conference order.

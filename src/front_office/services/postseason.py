@@ -35,6 +35,7 @@ from front_office.modeling.postseason import (
     stage_probabilities,
     team_features,
 )
+from front_office.modeling.postseason.features import top_player_quality
 from front_office.modeling.postseason.fitting import percentile_interval
 from front_office.services.lab import Lab
 
@@ -533,8 +534,9 @@ class PostseasonService:
                 f"No player on {report.name} has an impact on record for {report.season}, so "
                 "there is no strength to read.", None,
             )  # fmt: skip
-        best = valued.nlargest(model.spec.top_players)
-        net, top, error = float(report.parts.impact), float(best.mean()), report.parts.error
+        best = valued.sort_values(ascending=False).head(model.spec.top_players)
+        top = top_player_quality(valued, model.spec)
+        net, error = float(report.parts.impact), report.parts.error
         return SubjectOutlook(
             ROSTER,
             int(roster_id),
@@ -592,9 +594,12 @@ class PostseasonService:
     def _bounds(values: np.ndarray, model: PostseasonModel) -> tuple[np.ndarray, np.ndarray]:
         """The interval of each row of ``values`` over its draws (every column but the
         first, which is the estimate)."""
-        tail = 100 * (1 - model.spec.confidence) / 2
-        low, high = np.percentile(values[:, 1:], [tail, 100 - tail], axis=1)
-        return low, high
+        if len(values) == 0:
+            return np.array([]), np.array([])
+        bounds = np.array(
+            [percentile_interval(row, model.spec.confidence) for row in values[:, 1:]]
+        )
+        return bounds[:, 0], bounds[:, 1]
 
     @staticmethod
     def _identity(rows: pd.DataFrame, names: pd.DataFrame) -> pd.DataFrame:

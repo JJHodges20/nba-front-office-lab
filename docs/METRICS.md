@@ -11,7 +11,7 @@ describes what is on screen rather than what was once intended.
 - **Origin** says where a number comes from:
   - `measured`: Published by the league - counted from the box score or from play-by-play - and passed through unchanged.
   - `derived`: Computed by the lab from measured totals, with the formulas in `src/front_office/analytics/formulas.py`.
-  - `modeled`: Output of a fitted model: an estimate, not a fact. What the model is and how it was tested is in `docs/research/PLAYER_VALUE.md`.
+  - `modeled`: Output of a fitted model: an estimate, not a fact. What the models are and how each was tested is in `docs/research/PLAYER_VALUE.md`, `docs/research/ROSTER_FIT.md` and `docs/research/POSTSEASON.md`.
 - **Better** says which direction is good. Percentiles and ranks are oriented by it, so a
   high percentile always means good; where neither direction is better, it means high.
 - A rate whose denominator is zero is missing, not zero.

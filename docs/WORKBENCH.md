@@ -13,9 +13,13 @@ no data yet it says so and tells you to run `fol refresh`. Stop it with Ctrl+C.
 
 ## The frame
 
-**Navigation** is at the top of the sidebar. **Filters** are below it and apply to every
-page but Winning Benchmarks, which chooses its own seasons; a choice you make on one
-page still holds on the next.
+**Navigation** is at the top of the sidebar, in five groups: League, Explore, Build,
+Forecast and System. **Filters** are below it, and a choice you make on one page still
+holds on the next. Each page reads the filters it can use: the League Overview, the
+explorers and the Analytics Lab read them all; Player Value reads the season, the team
+and the player; the Contract Explorer and the Scenario Simulator read the team; Roster
+Fit and Postseason Outlook read the season and the team; Winning Benchmarks chooses its
+own seasons; and the Team Builder, the Roster Optimizer and Data Health read none.
 
 | Filter | What it does |
 | --- | --- |
@@ -102,7 +106,9 @@ Value page - a rule, not a measurement, and empty for a player who fills none.
 
 **Player Value.** What the value model makes of every player, and what the model rests
 on. Value is estimated for whole regular seasons, so the phase and the comparison
-window do not narrow this page.
+window do not narrow this page. *The model* shows the test twice: the typical miss with
+each season's minutes as played, and with the minutes projected, which is the error the
+optimizer and the simulator carry.
 
 - *Season*: everyone who played in the season chosen in the sidebar, by wins above
   replacement, impact, or impact at either end. **Impact** is the points per 100
@@ -153,8 +159,8 @@ directly in the table. It describes a roster; it does not rank or recommend play
 its pooled figures are not a projection of how the players would play together.
 
 **Roster Fit.** Do these players make sense together? The sidebar's team, or a roster you
-built, described in the roadmap's six areas of fit - role coverage, shooting, defense, the
-possession battle, structure, depth and usage - each player weighted by minutes, and
+built, described in the roadmap's six areas of fit - offense, defense, the possession
+battle, structure, depth and usage - each player weighted by minutes, and
 placed among the season's real teams as a percentile and a rank. *Coverage*: who in the
 rotation fills each role, who comes nearest, and what nobody fills. *Profile*: every
 measure beside the league's median. *Sum of parts*: the players' impacts added up for the
@@ -185,7 +191,9 @@ seasons on record and tested on seasons it had not seen estimates it. The model 
 team by two things known before a playoff game is played: its regular-season net rating
 and its *top-player quality*, the mean impact of its three best players by the value
 model. Every chance is shown with its 95% interval, from refitting the model on resampled
-seasons.
+seasons. *The model* also shows the season model read before the season - from the
+rating the value model predicted for each team, averaged over its error - beside the
+reading from the season played; the first is what a chance for a roster rests on.
 
 - *A team's chances*: the sidebar's team, a roster you built, or a strength you set
   yourself, read as a team of that strength entering any season - the season model, a
@@ -215,7 +223,8 @@ high-injury one; development as projected, optimistic or regression - and, playe
 player, the games they miss, a development adjustment in points of impact, a share of
 the minutes or a salary. Every one of those is your assumption, and the page says so.
 Thousands of seasons are then drawn for the roster as it stands and with your changes,
-from the value model's projections and tested error, a season's own noise, the wins a
+from the value model's projections and the error of its test with the minutes projected,
+a season's own noise, the wins a
 point of rating is worth and the postseason model's season steps.
 
 - *Before and after*: payroll, projected net rating, projected wins with an interval,

@@ -1,6 +1,6 @@
 {
- "revision": 1,
- "fitted_at": "2026-10-05T17:34:39",
+ "revision": 2,
+ "fitted_at": "2026-10-05T20:06:17",
  "spec": {
   "noise_seasons": 10,
   "reliability_edges": [
@@ -31,8 +31,8 @@
   "simulations": 10000,
   "seed": 0
  },
- "value_model_version": "r1",
- "postseason_model_version": "p1",
+ "value_model_version": "r2",
+ "postseason_model_version": "p2",
  "fitted_on": {
   "first_season": "1996-97",
   "last_season": "2025-26",
@@ -40,9 +40,10 @@
   "games": 35546,
   "player_seasons": 14569
  },
- "value_error": 3.0145,
+ "value_error": 3.6271,
+ "value_error_basis": "projected",
  "season_noise": 1.5843,
- "strength_error": 2.5646,
+ "strength_error": 3.2628,
  "noise_by_era": [
   {
    "key": "all",
@@ -92,9 +93,9 @@
   {
    "lower": 0.0,
    "upper": 0.25,
-   "players": 1027,
-   "mean_miss": 1.7636,
-   "spread": 2.0416
+   "players": 3942,
+   "mean_miss": 1.6989,
+   "spread": 1.9196
   },
   {
    "lower": 0.25,
@@ -156,24 +157,24 @@
   "team_seasons": 600,
   "first_test_season": "2006-07",
   "last_test_season": "2025-26",
-  "mae": 6.03,
-  "rmse": 7.5672,
+  "mae": 7.31,
+  "rmse": 9.0933,
   "baseline_rmse": 12.4755,
   "coverage": [
    {
     "level": 0.5,
     "cases": 600,
-    "covered": 319
+    "covered": 308
    },
    {
     "level": 0.8,
     "cases": 600,
-    "covered": 496
+    "covered": 485
    },
    {
     "level": 0.95,
     "cases": 600,
-    "covered": 583
+    "covered": 574
    }
   ]
  }

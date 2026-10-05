@@ -56,16 +56,18 @@ class PlannedTable:
     name: str
     domain: str
     purpose: str
-    milestone: int
+    milestone: int | None
+    """The milestone that builds it, or ``None`` for a table deferred past the roadmap."""
 
 
 # The roadmap's core database design (section 12). An entry is deleted from this list in
-# the same commit that adds the table's contract.
+# the same commit that adds the table's contract, or in the decision that leaves it out:
+# model_predictions (decision 0014: chances are computed on request from the model file)
+# and simulation_results (decision 0015: a scenario is saved as a roster). Lineups were
+# deferred past the roadmap's milestones.
 PLANNED_TABLES: tuple[PlannedTable, ...] = (
-    PlannedTable("lineups", "lineups", "Five-player lineup identities.", 10),
-    PlannedTable("lineup_stats", "lineups", "Minutes and performance for lineups.", 10),
-    PlannedTable("model_predictions", "modeling", "Versioned postseason probability outputs.", 12),
-    PlannedTable("simulation_results", "simulation", "Scenario and Monte Carlo results.", 13),
+    PlannedTable("lineups", "lineups", "Five-player lineup identities.", None),
+    PlannedTable("lineup_stats", "lineups", "Minutes and performance for lineups.", None),
 )
 
 

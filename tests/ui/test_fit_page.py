@@ -74,7 +74,7 @@ class TestThePage:
         path = fit_evidence_path(target / "configs")
         path.write_text(
             path.read_text(encoding="utf-8").replace(
-                '"value_model_version": "r1"', '"value_model_version": "r3"'
+                '"value_model_version": "r2"', '"value_model_version": "r3"'
             ),
             encoding="utf-8",
         )

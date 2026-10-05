@@ -360,9 +360,9 @@ def _limits() -> list[str]:
         "once the others are known, and they say nothing about cause.",
         "- **Regular-season figures only.** How a team played in the playoffs themselves "
         "is not used to describe it.",
-        "- **Nothing on roster make-up or payroll.** The lab holds player detail for "
-        "recent seasons only and no contract history, so how contenders were built and "
-        "what they cost cannot be measured yet.",
+        "- **Nothing on payroll.** The lab holds no contract history, so what contenders "
+        "cost cannot be measured; where the champions' rosters stood on the fit measures "
+        "is in the roster fit research.",
         "- **Few champions.** One a season. Anything said about them rests on a few dozen "
         "teams at most, and on a handful in the short eras.",
         "",

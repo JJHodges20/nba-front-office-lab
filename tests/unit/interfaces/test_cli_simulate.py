@@ -50,8 +50,8 @@ def test_show_prints_the_shipped_parameters_and_the_wins_test() -> None:
     result = runner.invoke(app, ["simulate", "show"])
     assert result.exit_code == 0, result.output
     flat = " ".join(result.output.split())
-    assert "Revision 1, measured " in flat
-    assert "against value model r1 and postseason model p1" in flat
+    assert "Revision 2, measured " in flat
+    assert "against value model r2 and postseason model p2" in flat
     assert "Wins test on 600 team-seasons, 2006-07 to 2025-26" in flat
     assert "the 80% interval held" in flat
 
@@ -102,7 +102,7 @@ def test_fit_measures_the_fixture_store_and_saves_nothing(project: Path, prebuil
     assert result.exit_code == 0, result.output
     flat = " ".join(result.output.split())
     assert "Measured on" in flat and "Wins test on" in flat
-    assert "Not saved. To save it as revision 2: fol simulate fit --write" in flat
+    assert "Not saved. To save it as revision 3: fol simulate fit --write" in flat
     assert on_file.read_bytes() == shipped
 
 

@@ -367,3 +367,27 @@ def test_a_fitted_model_survives_being_written_down(exact_model: ValueModel) -> 
     assert again == exact_model
     frame = pd.DataFrame([row.model_dump() for row in again.backtest])
     assert frame.notna().all().all()
+
+
+class TestMinutesProjected:
+    def test_the_test_is_run_again_with_the_minutes_projected(self, spec: ValueSpec) -> None:
+        league = planted_league(spec)
+        model = fit_value_model(league.tables(), spec, revision=1, fitted_at=FITTED_AT)
+        ahead = model.validation.projected
+        assert ahead is not None
+        assert ahead.team_seasons == model.validation.team_seasons
+        assert 0 < ahead.mae <= ahead.rmse
+        assert 0 < ahead.share_covered <= 1
+        for row in model.backtest:
+            assert row.projected_net is not None and math.isfinite(row.projected_net)
+
+    def test_a_file_without_the_second_test_still_reads(self, spec: ValueSpec) -> None:
+        league = planted_league(spec)
+        model = fit_value_model(league.tables(), spec, revision=1, fitted_at=FITTED_AT)
+        dumped = model.model_dump(mode="json")
+        del dumped["validation"]["projected"]
+        for row in dumped["backtest"]:
+            del row["projected_net"]
+        older = ValueModel.model_validate(dumped)
+        assert older.validation.projected is None
+        assert all(row.projected_net is None for row in older.backtest)

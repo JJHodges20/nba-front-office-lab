@@ -437,6 +437,13 @@ def box_metrics(totals: pd.DataFrame) -> pd.DataFrame:
     return metrics[list(BOX_METRIC_KEYS)]
 
 
+def stint_on_off(on_off: pd.DataFrame) -> pd.Series:
+    """Each stint's on/off net rating difference, on court less off court, missing where
+    either side is: the difference :func:`combined_on_off` takes once a player's stints
+    are weighted together."""
+    return on_off["on_court_net_rating"] - on_off["off_court_net_rating"]
+
+
 def combined_on_off(on_off: pd.DataFrame) -> pd.DataFrame:
     """Each player's on/off net rating difference for a season, across every team played for.
 

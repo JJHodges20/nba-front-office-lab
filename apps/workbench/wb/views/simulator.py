@@ -24,7 +24,7 @@ from front_office.domain.scenario import (
     SubjectKind,
 )
 from front_office.domain.simulator import SimulatorModel
-from front_office.services import Outcome, ScenarioReport, SimulatorStatus, probability_key
+from front_office.services import ScenarioReport, SimulatorStatus, probability_key
 from front_office.services.simulator import ADDED, KEPT, REMOVED
 from wb import charts, components, data, formats, state
 from wb.components import ASSUMPTION, EMPTY_CELL, MODELED, Figure
@@ -653,7 +653,6 @@ def _profile(report: ScenarioReport) -> None:
         "predicts beyond the sum of the parts."
     )
     shown = profile.assign(
-        change=profile["after"] - profile["before"],
         direction=profile["higher_is_better"]
         .map({True: "higher is better", False: "lower is better"})
         .fillna("no better or worse"),
@@ -772,9 +771,16 @@ def _evidence(model: SimulatorModel) -> None:
             Figure(
                 "Value model's miss",
                 f"{model.value_error:.2f}",
-                "points of net rating",
+                "minutes projected"
+                if model.value_error_basis == "projected"
+                else "minutes as played",
                 help="How far its prediction of a team fell from what the season showed, out "
-                "of sample (RMSE).",
+                "of sample (RMSE), with the minutes "
+                + (
+                    "projected, as a forecast has them."
+                    if model.value_error_basis == "projected"
+                    else "as the season played them."
+                ),
             ),
             Figure(
                 "A season's own noise",
@@ -827,7 +833,8 @@ def _evidence(model: SimulatorModel) -> None:
         f"sample ({test.first_test_season} to {test.last_test_season}), "
         f"{model.spec.test_simulations:,} seasons were drawn from the predicted rating and the "
         "wins that happened were set against them. The median season missed by "
-        f"{test.mae:.1f} wins on average ({test.rmse:.1f} RMSE), against {test.baseline_rmse:.1f} "
+        f"{test.mae:.1f} wins on average and {test.rmse:.1f} root mean square, against "
+        f"{test.baseline_rmse:.1f} root mean square "
         "for giving every team an even record. An interval that holds the wins that happened "
         "about as often as it claims is one to lean on; more often is too wide, less often "
         "too narrow."
@@ -920,7 +927,3 @@ def _listed(names: list[str]) -> str:
     if len(names) <= 1:
         return "".join(names)
     return ", ".join(names[:-1]) + " and " + names[-1]
-
-
-def _outcome_word(outcome: Outcome) -> str:
-    return f"{outcome.wins:.0f} wins"

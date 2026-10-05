@@ -100,8 +100,10 @@ class Warehouse:
         for column in order_by:
             statement = statement.order_by(sql_table.c[column])
         with self._database.connect() as connection:
-            rows = connection.execute(statement).mappings().all()
-        return frame_from_rows(rows, contract)
+            result = connection.execute(statement)
+            keys = list(result.keys())
+            rows = result.fetchall()
+        return frame_from_tuples(rows, keys, contract)
 
     def distinct(
         self, table: str, column: str, where: Mapping[str, Any] | None = None
@@ -133,6 +135,19 @@ def _condition(sql_table: Table, column: str, wanted: Any) -> Any:
 def _plain(value: Any) -> Any:
     """A NumPy or pandas scalar as the Python value the driver expects."""
     return value.item() if hasattr(value, "item") else value
+
+
+def frame_from_tuples(
+    rows: Sequence[Sequence[Any]], keys: Sequence[str], contract: TableContract
+) -> pd.DataFrame:
+    """Database rows, as the tuples a cursor returns with the column names it returns
+    them under, as a frame with the contract's columns and canonical types. Several
+    times faster than going through a mapping per row, which matters for the tables of
+    games and player-seasons."""
+    if not rows:
+        return contract.empty_frame()
+    frame = pd.DataFrame.from_records(list(rows), columns=list(keys))
+    return conform_frame(frame, contract)
 
 
 def frame_from_rows(rows: Sequence[Mapping[str, Any]], contract: TableContract) -> pd.DataFrame:

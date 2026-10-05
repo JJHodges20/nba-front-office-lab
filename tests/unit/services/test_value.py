@@ -644,3 +644,27 @@ class TestRoles:
         summary = lab.value.role_summary("2025-26")
         assert summary["again"].isna().all() and summary["anyone"].isna().all()
         assert summary.set_index("archetype").at["primary_creator", "filled"] == 3
+
+
+def test_players_already_in_an_unfinished_season_keep_their_projection(
+    value_lab: Lab, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # While a season is being played, a player who has appeared in it has an impact for
+    # it as well as a projection. The pool is everyone projected, not only the absent.
+    upcoming = value_lab.value.status().upcoming
+    assert upcoming is not None
+    before = value_lab.value.projections()
+    appeared = int(before.index[0])
+    original = value_lab.read
+
+    def reading(table, where=None, **kwargs):  # type: ignore[no-untyped-def]
+        frame = original(table, where, **kwargs)
+        if table == "player_value_scores" and where == {"season": upcoming}:
+            frame = frame.copy()
+            frame.loc[frame["player_id"] == appeared, "impact"] = 1.5
+        return frame
+
+    monkeypatch.setattr(value_lab, "read", reading)
+    projected = value_lab.value.projections()
+    assert appeared in projected.index
+    assert len(projected) == len(before)

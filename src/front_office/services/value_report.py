@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from front_office.domain.value_model import ValueModel
+from front_office.domain.value_model import ProjectedScore, ValueModel
 from front_office.modeling.value import wins_per_net_point
 from front_office.services.lab import Lab
 from front_office.services.value import LEVELS, MODEL_ROW, TABLE, ModelCard, ValueStatus
@@ -106,6 +106,21 @@ def _what(model: ValueModel) -> list[str]:
     ]
 
 
+def _projected(ahead: ProjectedScore | None) -> list[str]:
+    """The test with the minutes projected, where the file has it."""
+    if ahead is None:
+        return []
+    return [
+        f"Tested again with the minutes projected rather than played - the error the lab's "
+        "forecasts carry, since they project minutes too - the model misses by "
+        f"{ahead.rmse:.2f} (MAE {ahead.mae:.2f}) over the same {ahead.team_seasons} "
+        f"team-seasons, the projected minutes covering {ahead.share_covered:.0%} of the floor "
+        "and replacement level standing in for the rest. The optimizer and the simulator "
+        "carry this error, not the smaller one above.",
+        "",
+    ]
+
+
 def _test(card: ModelCard) -> list[str]:
     tested, confidence = card.model.validation, f"{card.model.spec.confidence:.0%}"
     lines = [
@@ -117,6 +132,7 @@ def _test(card: ModelCard) -> list[str]:
         "is the rating and not a forecast of playing time. Errors are in points of net "
         "rating per 100 possessions.",
         "",
+        *_projected(tested.projected),
         f"| Method | RMSE | MAE | Value model's RMSE less this ({confidence} interval) |",
         "| --- | ---: | ---: | --- |",
     ]

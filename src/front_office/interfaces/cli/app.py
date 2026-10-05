@@ -559,7 +559,8 @@ def contracts_template(
     _say(f"Wrote {path}")
     _say(
         f"{players} players listed. Fill in the salaries from a source you are entitled to "
-        'use, then run: fol contracts import <file> --source "<where the figures came from>"'
+        'use, then run: fol contracts import <file> --source "<where the figures came from>" '
+        "and fol build"
     )
 
 
@@ -612,7 +613,9 @@ def contracts_import(
             _say(f"         line {row.line}: {row.player}{team} - {row.reason}")
     if not report.stored:
         _say("This file is identical to the last import; nothing new was stored.")
-    _say("Run 'fol check' to validate the contract data against the rest.")
+    _say(
+        "Run fol build to rebuild the database with the contracts (fol check validates them against the rest first, writing nothing)."
+    )
 
 
 @value_app.command("fit")
@@ -1142,7 +1145,8 @@ def _print_simulator_model(model: SimulatorModel) -> None:
         )
     )
     _say(
-        f"The value model misses a team by {model.value_error:.2f}; a season's own noise is "
+        f"The value model misses a team by {model.value_error:.2f} with the minutes "
+        f"{'projected' if model.value_error_basis == 'projected' else 'as played'}; a season's own noise is "
         f"{model.season_noise:.2f}, so a projected rating misses a team's strength by "
         f"{model.strength_error:.2f}. Wins per point of net rating {model.wins_per_point:.2f} "
         f"({model.wins_season}); residual wins {model.wins_residual:.2f}."

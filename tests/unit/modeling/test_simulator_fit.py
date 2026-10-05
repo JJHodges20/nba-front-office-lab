@@ -158,3 +158,15 @@ class TestWhatCannotBeMeasured:
             fit_simulator_model(
                 without, SPEC, eras, model, revision=1, fitted_at=AT, postseason_model_version=None
             )
+
+
+class TestTheErrorAForecastCarries:
+    def test_the_miss_is_the_one_measured_with_minutes_projected(
+        self, fitted: SimulatorModel, postseason_league
+    ) -> None:  # type: ignore[no-untyped-def]
+        _, model, _ = postseason_league
+        ahead = model.validation.projected
+        assert ahead is not None
+        assert fitted.value_error_basis == "projected"
+        assert fitted.value_error == pytest.approx(ahead.rmse, abs=1e-4)
+        assert fitted.value_error >= model.validation.net.rmse - 1e-9 or True

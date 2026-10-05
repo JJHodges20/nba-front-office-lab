@@ -1,6 +1,6 @@
 {
- "revision": 1,
- "fitted_at": "2026-10-04T17:19:50",
+ "revision": 2,
+ "fitted_at": "2026-10-05T20:07:59",
  "spec": {
   "first_test_season": "2009-10",
   "min_training_seasons": 3,
@@ -8,7 +8,7 @@
   "seed": 0,
   "confidence": 0.95
  },
- "value_model_version": "r1",
+ "value_model_version": "r2",
  "archetype_version": "v1",
  "first_test_season": "2009-10",
  "last_test_season": "2025-26",

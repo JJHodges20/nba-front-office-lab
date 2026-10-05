@@ -86,7 +86,8 @@ For each of the 600 team-seasons the value model predicted out of sample, 2,000 
 are drawn from the predicted rating with the value model's miss and the residual wins
 carry, and the wins that happened are set against them. The 50%, 80% and 95% intervals
 held the wins that happened 53%, 83% and 97% of the time; the median season missed by
-6.0 wins on average (7.6 RMSE) against 12.5 for giving every team an even record. An
+6.0 wins on average and 7.6 root mean square, against 12.5 root mean square for giving
+every team an even record. An
 interval that holds what happened about as often as it claims is one a reader can lean
 on, and the test is in the file and on the page.
 
@@ -121,3 +122,11 @@ as drawn for every team. A build applies nothing of it.
   of named scenarios with their results is the next refinement if the user wants one.
 - The season ahead as drawn depends on who the projections say is on each team now;
   a roster move after the last fetch is not seen until the next refresh.
+
+## Amended in milestone 14
+
+The value model's miss the simulator carries is the one measured with the minutes
+projected, 3.63, not the 3.01 of the test that knew them; with it the wins test holds
+the wins that happened 51%, 81% and 96% of the time for the 50%, 80% and 95% intervals.
+The least-known reliability band counts the players the model never valued, 3,942
+player-seasons; see [0016](0016-audit.md).

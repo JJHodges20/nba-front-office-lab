@@ -24,6 +24,8 @@ from front_office.services.value import ROLE_COLUMNS
 from front_office.services.window import Window
 
 DEFAULT_QUALIFICATION = Qualification(min_games=20, min_minutes=300)
+SPAN_QUALIFICATION = Qualification(min_games=3, min_minutes=30)
+"""Where the thresholds start for a span of games: a 20-game minimum cannot apply to ten."""
 REGULAR = SeasonType.REGULAR.value
 
 PLAYER_AND_VALUE_METRICS = MetricCatalog(
@@ -216,7 +218,7 @@ class PlayerService:
 
         stints = on_off.copy()
         stints.insert(4, "team", stints["team_id"].map(teams["abbreviation"]))
-        stints["on_off_net"] = stints["on_court_net_rating"] - stints["off_court_net_rating"]
+        stints["on_off_net"] = analytics.stint_on_off(on_off)
 
         years = self._lab.read("contract_years", {"player_id": int(player_id)}, order_by=["season"])
         years.insert(2, "team", years["team_id"].map(teams["abbreviation"]))

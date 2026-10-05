@@ -55,6 +55,7 @@ PROFILE_COLUMNS = (
     "name",
     "before",
     "after",
+    "change",
     "before_value",
     "after_value",
     "higher_is_better",
@@ -313,6 +314,10 @@ class SimulatorService:
     def run(self, scenario: Scenario) -> ScenarioReport:
         """Seasons drawn for the scenario and for its subject as it stands, and what
         changed between them."""
+        with self._lab.remembering():
+            return self._run(scenario)
+
+    def _run(self, scenario: Scenario) -> ScenarioReport:
         status = self.status()
         if not status.is_available:
             raise SimulatorError(status.reason or "the simulator cannot run")
@@ -350,6 +355,10 @@ class SimulatorService:
         """Every team with projected players, drawn as it stands: :data:`LEAGUE_COLUMNS`
         indexed by ``team_id``, the best projected rating first. Empty when the simulator
         cannot run."""
+        with self._lab.remembering():
+            return self._league(simulations)
+
+    def _league(self, simulations: int | None) -> pd.DataFrame:
         status = self.status()
         empty = pd.DataFrame(columns=list(LEAGUE_COLUMNS)).rename_axis("team_id")
         if not status.is_available:
@@ -367,8 +376,14 @@ class SimulatorService:
                 simulations=simulations or model.spec.simulations,
             )
             players = self._roster_players(scenario, status, pool)
+            # The table shows no intervals, and they are most of the work.
             outcome = self._outcome(
-                players, scenario, model, postseason.steps, value_model.replacement_level
+                players,
+                scenario,
+                model,
+                postseason.steps,
+                value_model.replacement_level,
+                intervals=False,
             )
             chances = outcome.stages.set_index("key")["probability"]
             rows.append(
@@ -436,9 +451,9 @@ class SimulatorService:
             )
             members = [int(player) for player in mine.index]
             if status.upcoming is not None:
-                listed = self._lab.read(
-                    "team_rosters", {"season": status.upcoming, "team_id": int(scenario.key)}
-                )
+                # The season's rosters, read once for every team when the lab remembers.
+                season = self._lab.read("team_rosters", {"season": status.upcoming})
+                listed = season[season["team_id"] == int(scenario.key)]
                 members += [
                     int(player) for player in listed["player_id"] if int(player) not in members
                 ]
@@ -489,6 +504,8 @@ class SimulatorService:
         model: SimulatorModel,
         steps,  # type: ignore[no-untyped-def]
         replacement: float,
+        *,
+        intervals: bool = True,
     ) -> Outcome:
         active = players[players["status"] != REMOVED]
         roster = active[list(ROSTER_COLUMNS)]
@@ -497,6 +514,7 @@ class SimulatorService:
             model=model,
             steps=steps,
             replacement=replacement,
+            intervals=intervals,
             availability=scenario.availability,
             development=scenario.development,
             simulations=scenario.simulations,
@@ -576,6 +594,7 @@ class SimulatorService:
         frame = placed["before"][["area", "name", "higher_is_better"]].copy()
         frame["before"] = placed["before"]["percentile"]
         frame["after"] = placed["after"]["percentile"].reindex(frame.index)
+        frame["change"] = frame["after"] - frame["before"]
         frame["before_value"] = placed["before"]["value"]
         frame["after_value"] = placed["after"]["value"].reindex(frame.index)
         return frame.reset_index()[list(PROFILE_COLUMNS)]

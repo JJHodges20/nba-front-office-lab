@@ -191,6 +191,10 @@ class SimulatorModel(_Frozen):
     fitted_on: FittedOn
     value_error: float
     """The value model's miss on a team's net rating, out of sample (RMSE)."""
+    value_error_basis: str = "played"
+    """Which test the miss comes from: ``"projected"`` where the value model was tested
+    with the minutes projected, as a forecast has them, else ``"played"`` - the test
+    that knew each season's minutes."""
     season_noise: float
     """How far a season's net rating strays from a team's strength, over the most recent
     seasons: the part of the value model's miss that no model could remove."""

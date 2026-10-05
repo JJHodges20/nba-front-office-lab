@@ -270,6 +270,10 @@ def _coerce(series: pd.Series, field: Field) -> tuple[pd.Series, int]:
     is_number = pd.api.types.is_numeric_dtype(kind) and not is_bool
     none_bad = pd.Series(False, index=series.index)
 
+    if field.dtype is DType.INTEGER and pd.api.types.is_integer_dtype(kind):
+        # Already integral and finite: no round trip through float64 is needed.
+        return series.astype("Int64"), 0
+
     if field.dtype in (DType.INTEGER, DType.FLOAT):
         bad = none_bad if is_number else present & ~series.map(_is_number)
         numeric = pd.to_numeric(series.where(~bad), errors="coerce").astype("float64")
@@ -286,6 +290,8 @@ def _coerce(series: pd.Series, field: Field) -> tuple[pd.Series, int]:
     if field.dtype is DType.STRING:
         # An object column may hold anything, so its values are checked one by one.
         if not pd.api.types.is_object_dtype(kind) and pd.api.types.is_string_dtype(kind):
+            return series, 0
+        if _all_text(series):
             return series, 0
         bad = present & ~series.map(lambda value: isinstance(value, str))
         return series.where(~bad), int(bad.sum())
@@ -313,6 +319,11 @@ def _coerce(series: pd.Series, field: Field) -> tuple[pd.Series, int]:
     if field.dtype is DType.DATE:
         bad = bad | (present & ~bad & (moments != moments.dt.normalize()))
     return moments.where(~bad), int(bad.sum())
+
+
+def _all_text(series: pd.Series) -> bool:
+    """Whether every present value is a string, found without a Python-level pass."""
+    return bool(series.notna().any()) and pd.api.types.infer_dtype(series, skipna=True) == "string"
 
 
 def _is_number(value: object) -> bool:
@@ -346,7 +357,11 @@ def _check_values(table: str, field: Field, series: pd.Series) -> list[Violation
                     )
                 )
     if field.dtype is DType.STRING:
-        text = series[series.map(lambda value: isinstance(value, str))]
+        text = (
+            series.dropna()
+            if _all_text(series)
+            else series[series.map(lambda value: isinstance(value, str))]
+        )
         blank = int((text.str.strip() == "").sum())
         if blank:
             found.append(

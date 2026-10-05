@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator, model_validator
@@ -175,6 +176,11 @@ class GameModel(_Frozen):
     top_high: float
     games: int
     draws: tuple[Draw, ...]
+
+    def home_court_chance(self) -> float:
+        """How often the home side wins a game between two sides equal on both inputs:
+        the home advantage read back from log-odds."""
+        return 1.0 / (1.0 + math.exp(-self.home_advantage))
 
 
 class EraParameters(_Frozen):
@@ -372,10 +378,30 @@ class SeasonEvaluation(_Frozen):
     comparisons: tuple[Comparison, ...]
 
 
+class BeforeSeasonEvaluation(_Frozen):
+    """The season model read the way a forecast reads it: from the net rating the value
+    model predicted for each team-season before it was played, averaged over that
+    prediction's error, with the top-player quality typical of such a rating. Scored out
+    of sample on the team-seasons the value model's own test covers, with the steps and
+    the typical quality fitted on earlier seasons."""
+
+    team_seasons: int
+    first_test_season: str
+    last_test_season: str
+    rating_basis: str
+    """``"projected"`` where the rating came from the value model's test with the minutes
+    projected, else ``"played"``."""
+    rating_error: float
+    """The error the ratings carry, which the chances are averaged over."""
+    stages: tuple[StageEvaluation, ...]
+
+
 class Evaluation(_Frozen):
     series: SeriesEvaluation
     bracket: BracketEvaluation
     season: SeasonEvaluation
+    before_season: BeforeSeasonEvaluation | None = None
+    """Missing in files fitted before it existed, or without a value model test to read."""
 
 
 class FittedOn(_Frozen):

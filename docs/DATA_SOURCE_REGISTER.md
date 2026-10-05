@@ -9,7 +9,7 @@ something new.
 | NBA salary-cap announcements | Cap, tax line, aprons, minimum team salary, exceptions | Read by hand, transcribed into `configs/seasons/` | In use |
 | NBA "CBA 101" | Roster limits | Read by hand, transcribed into `configs/seasons/` | In use |
 | stats.nba.com (via `nba_api`) | Player, team, game, standings and advanced statistics | Public JSON endpoints, no key | In use |
-| Contract file supplied by the user | Salaries, options, guarantees | CSV placed by hand, imported with `fol contracts import` | In use (no file imported yet) |
+| Contract file supplied by the user | Salaries, options, guarantees | CSV placed by hand, imported with `fol contracts import` and built in by `fol build` | In use (no file imported yet) |
 | Basketball Reference | - | - | Not used: terms prohibit this project's use |
 | Spotrac | - | - | Not used: refuses automated requests |
 | BALLDONTLIE API | - | - | Not used: contracts are on its paid tier only |

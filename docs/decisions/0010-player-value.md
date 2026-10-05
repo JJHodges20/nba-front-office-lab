@@ -152,3 +152,10 @@ supports.
 - Role versatility is not measured: nothing ingested describes it. Playoff performance
   was tested and adds nothing to next season's results; milestone 12 asks the different
   question of whether it matters in the playoffs.
+
+## Amended in milestone 14
+
+The test gave the model each season's minutes as played, which no forecast has. A
+second test with the minutes projected by the minutes model - 3.63 points of net rating
+against 3.01 - is in the file beside the first, and the forecasts carry it; see
+[0016](0016-audit.md).

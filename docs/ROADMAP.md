@@ -39,13 +39,13 @@ points-per-dollar.
 | 5 | Player analytics | Reusable player calculations and comparison tools | Done |
 | 6 | Team analytics | Team efficiency, point differential, pace, historical outcomes | Done |
 | 7 | Front Office UI foundation | Navigation, filters, player/team explorers, Team Builder | Done |
-| 8 | Historical contender analysis | Playoff/championship benchmark research | Done (team level; roster make-up and payroll await player and contract history) |
+| 8 | Historical contender analysis | Playoff/championship benchmark research | Done (team level; payroll awaits contract history; where the champions' rosters stood is in the roster fit research) |
 | 9 | Player value engine | Validated value features, surplus value, archetypes | Done (surplus value needs a contract file) |
 | 10 | Roster fit engine | Fit, redundancy, role coverage, weaknesses | Done (fit is description; the evidence supports no correction to the sum of the parts) |
 | 11 | Roster optimizer | Budget and roster constraints, multiple candidate rosters | Done (needs a contract file for the season ahead) |
 | 12 | Playoff/championship model | Calibrated postseason probability models | Done (tested out of sample from 2006-07; chances shown with intervals and the evidence) |
 | 13 | Simulator | Scenario and Monte Carlo analysis | Done (seasons drawn from tested parts; the field is not modelled) |
-| 14 | Full-system audit | Architecture, leakage, tests, UI, documentation, performance | Not started |
+| 14 | Full-system audit | Architecture, leakage, tests, UI, documentation, performance | Done ([AUDIT.md](AUDIT.md): every pass with what was found, changed and left) |
 
 Milestones 1-7 make up **v1.0 - League and Roster Analytics**, the first release target.
 All seven are done; one acceptance criterion below stays open until a contract file is
@@ -58,7 +58,10 @@ With milestone 12 the lab shows its first forecast: a chance of each postseason 
 with its interval, from a model validated on seasons it had not seen
 ([decisions/0014](decisions/0014-postseason-model.md)). Milestone 13 lays a user's
 assumptions over a roster and draws thousands of seasons for it from those tested parts,
-before and after a change ([decisions/0015](decisions/0015-simulator.md)).
+before and after a change ([decisions/0015](decisions/0015-simulator.md)). Milestone 14
+audits the whole: it found every test window clean and the forecasts' error understated,
+and the forecasts now carry the error of a test that projected minutes too
+([AUDIT.md](AUDIT.md), [decisions/0016](decisions/0016-audit.md)).
 
 ## Completion gate for every milestone
 
@@ -94,7 +97,9 @@ Assessed at the milestone 7 gate (2026-10-01).
   Every team-season since 1996-97 with league-relative ratings, and every playoff series.
 - [x] All major analytics functions have automated tests.
 - [x] No predictive championship claim is presented before the historical benchmark and modeling stages exist.
-  The history views describe and say so; nothing scores, ranks or projects a roster.
+  True at the milestone 7 gate: the history views described and said so, and nothing
+  scored, ranked or projected a roster. The models that do came in milestones 9 to 13,
+  each with its test on seasons it had not seen.
 
 ## Standing cautions from the roadmap
 

@@ -20,7 +20,7 @@ import pandas as pd
 from front_office.config.archetypes import load_archetypes
 from front_office.config.models import load_fit_evidence
 from front_office.domain.archetypes import ArchetypeSet
-from front_office.domain.fit import MEASURES, ROTATION_SIZE, STARTERS, measure
+from front_office.domain.fit import MEASURES, ROTATION_SIZE, STARTERS
 from front_office.domain.fit_model import FitEvidence
 from front_office.domain.metrics import MetricCatalog
 from front_office.domain.seasons import SeasonType
@@ -32,7 +32,7 @@ from front_office.modeling.fit import (
     player_profiles,
     rotation_profile,
 )
-from front_office.modeling.fit.profile import PROFILED
+from front_office.modeling.fit.profile import PROFILED, place_among
 from front_office.modeling.value.features import stints
 from front_office.services.lab import Lab
 
@@ -416,10 +416,7 @@ class FitService:
                     float(values.median()) if len(values) else np.nan,
                 )
             else:
-                below, equal = int((values < value).sum()), int((values == value).sum())
-                standing = 100 * (below + 0.5 * equal) / len(values)
-                rank = int((values > value).sum()) + 1
-                median = float(values.median())
+                standing, rank, median = place_among(values, value)
             rows.append(
                 {
                     "key": item.key,
@@ -476,7 +473,3 @@ class FitService:
                 }
             )
         return pd.DataFrame(rows, columns=list(COVERAGE_COLUMNS))
-
-
-def measure_name(key: str) -> str:
-    return measure(key).name

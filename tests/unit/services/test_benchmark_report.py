@@ -94,7 +94,7 @@ def test_it_states_its_limits(report: str) -> None:
     for limit in (
         "It is description, not prediction.",
         "One metric at a time.",
-        "Nothing on roster make-up or payroll.",
+        "Nothing on payroll.",
         "Few champions.",
     ):
         assert f"**{limit}**" in report

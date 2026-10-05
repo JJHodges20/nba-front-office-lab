@@ -71,11 +71,11 @@ class TestThePage:
         self, page, plain_home: Path, tmp_path: Path
     ) -> None:
         home = altered(
-            plain_home, tmp_path, '"value_model_version": "r1"', '"value_model_version": "r9"'
+            plain_home, tmp_path, '"value_model_version": "r2"', '"value_model_version": "r9"'
         )
         said = texts(page(home, "postseason"))
         assert "fitted with top-player quality from value model r9" in said
-        assert "the database was built with r1" in said
+        assert "the database was built with r2" in said
 
 
 class TestATeamsChances:

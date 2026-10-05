@@ -73,6 +73,9 @@ def fit_postseason(
                 "model on file"
             )
         revision = 1 if previous is None else previous.revision + 1
+        # A forecast reads the season model from a projected rating, with the error of
+        # the value model's test that projected minutes too, where that test exists.
+        ahead = value_model.validation.projected
         model = fit_postseason_model(
             tables,
             spec,
@@ -80,6 +83,9 @@ def fit_postseason(
             revision=revision,
             fitted_at=now(),
             value_model_version=str(applied[0]),
+            value_backtest=value_model.backtest,
+            value_error=(ahead or value_model.validation.net).rmse,
+            rating_basis="projected" if ahead is not None else "played",
         )
     except (StorageError, NotEnoughHistory) as error:
         raise PostseasonFitError(str(error)) from error

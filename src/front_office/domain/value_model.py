@@ -150,6 +150,10 @@ class BacktestRow(_Frozen):
     predicted_defense: float
     actual_offense: float
     actual_defense: float
+    projected_net: float | None = None
+    """The same prediction with the minutes projected rather than played: the players'
+    projected impacts for the shares a minutes model fitted on earlier seasons gives
+    them, and replacement level for the rest. Missing in files fitted before it existed."""
 
     @property
     def predicted(self) -> float:
@@ -158,6 +162,21 @@ class BacktestRow(_Frozen):
     @property
     def actual(self) -> float:
         return self.actual_offense + self.actual_defense
+
+
+class ProjectedScore(_Frozen):
+    """The test run again with the minutes projected rather than played.
+
+    The main test gives the model each season's minutes, which no forecast has. The
+    lab's forecasts project minutes too, so this is the error they carry.
+    """
+
+    rmse: float
+    mae: float
+    team_seasons: int
+    share_covered: float
+    """Of the five shares on the floor, how many the projected minutes covered on average;
+    the rest was taken as replacement level."""
 
 
 class SameSeason(_Frozen):
@@ -178,6 +197,8 @@ class Validation(_Frozen):
     ablations: tuple[Comparison, ...]
     by_season: tuple[SeasonScore, ...]
     same_season: SameSeason
+    projected: ProjectedScore | None = None
+    """The test with the minutes projected; missing in files fitted before it existed."""
 
     def baseline(self, key: str) -> Comparison:
         return _named(self.baselines, key)

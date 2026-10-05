@@ -16,8 +16,9 @@ _ORIGIN = {
     "play-by-play - and passed through unchanged.",
     Provenance.DERIVED: "Computed by the lab from measured totals, with the formulas in "
     "`src/front_office/analytics/formulas.py`.",
-    Provenance.MODELED: "Output of a fitted model: an estimate, not a fact. What the model "
-    "is and how it was tested is in `docs/research/PLAYER_VALUE.md`.",
+    Provenance.MODELED: "Output of a fitted model: an estimate, not a fact. What the models "
+    "are and how each was tested is in `docs/research/PLAYER_VALUE.md`, "
+    "`docs/research/ROSTER_FIT.md` and `docs/research/POSTSEASON.md`.",
     Provenance.ASSUMPTION: "Entered or chosen by the user.",
 }
 _SHOWN_AS = {

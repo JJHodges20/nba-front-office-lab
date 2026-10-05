@@ -201,6 +201,8 @@ class OptimizerService:
                 payroll_season=season,
                 stats_season=stats,
                 budget_mode=BudgetMode.SALARY_CAP,
+                # The figure an owner-set budget starts from: the cap, until it is changed.
+                budget=int(rules.thresholds.salary_cap),
                 min_players=rules.roster.min_standard_contracts,
                 max_players=rules.roster.max_standard_contracts,
                 roles=roles,
@@ -273,7 +275,8 @@ class OptimizerService:
             outcome=outcome,
             plans=tuple(plans),
             pool_size=len(pool),
-            error=model.validation.net.rmse,
+            # A forecast projects minutes, so it carries the error of the test that did too.
+            error=(model.validation.projected or model.validation.net).rmse,
         )
 
     def save(self, player_ids: Sequence[int], name: str, request: OptimizerRequest) -> int:

@@ -38,14 +38,14 @@ def team_report(value_lab: Lab) -> FitReport:
 class TestStatus:
     def test_the_evidence_on_file_and_what_the_database_holds(self, lab: Lab) -> None:
         status = lab.fit.status()
-        assert status.is_gathered and status.revision == 1
-        assert (status.value_model_version, status.applied_value_version) == ("r1", "r1")
+        assert status.is_gathered and status.revision == 2
+        assert (status.value_model_version, status.applied_value_version) == ("r2", "r2")
         assert (status.archetype_version, status.applied_archetype_version) == ("v1", "v1")
         assert status.is_current and status.team_seasons > 100
         # The evidence the lab ships supports no correction.
         assert not status.usable
         assert status.seasons == ("2025-26",)
-        assert lab.fit.evidence().revision == 1 and lab.fit.metrics is FIT_METRICS
+        assert lab.fit.evidence().revision == 2 and lab.fit.metrics is FIT_METRICS
 
     def test_without_evidence_the_profiles_are_description_only(self, fitted_home: Path) -> None:
         with Lab(load_settings(fitted_home)) as opened:
@@ -61,7 +61,7 @@ class TestStatus:
         path = fit_evidence_path(target / "configs")
         path.write_text(
             path.read_text(encoding="utf-8").replace(
-                '"value_model_version": "r1"', '"value_model_version": "r9"'
+                '"value_model_version": "r2"', '"value_model_version": "r9"'
             ),
             encoding="utf-8",
         )

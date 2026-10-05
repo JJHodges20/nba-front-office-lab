@@ -99,10 +99,7 @@ def playoffs(build: int | None, season: str) -> pd.DataFrame:
 @st.cache_data(show_spinner=False)
 def season_dates(build: int | None, season: str, season_type: str) -> tuple[date, date] | None:
     """The first and last game dates of a season, or ``None`` if it has no games."""
-    games = lab().read("team_games", {"season": season, "season_type": season_type})
-    if games.empty:
-        return None
-    return games["game_date"].min().date(), games["game_date"].max().date()
+    return lab().league.season_dates(season, season_type)
 
 
 # --- teams ------------------------------------------------------------------------------
@@ -205,8 +202,13 @@ def player_comparison(
 # --- player value ---------------------------------------------------------------------------
 
 
-@st.cache_data(show_spinner=False)
 def value_status(build: int | None) -> ValueStatus:
+    """Keyed on the model files too: fitting again changes them without a build."""
+    return _value_status(build, lab().model_stamp())
+
+
+@st.cache_data(show_spinner=False)
+def _value_status(build: int | None, stamp: str) -> ValueStatus:
     return lab().value.status()
 
 
@@ -261,8 +263,13 @@ def value_card(build: int | None, revision: int | None) -> ModelCard | None:
 # --- roster fit -------------------------------------------------------------------------
 
 
-@st.cache_data(show_spinner=False)
 def fit_status(build: int | None) -> FitStatus:
+    """Keyed on the model files too: fitting again changes them without a build."""
+    return _fit_status(build, lab().model_stamp())
+
+
+@st.cache_data(show_spinner=False)
+def _fit_status(build: int | None, stamp: str) -> FitStatus:
     return lab().fit.status()
 
 
@@ -318,8 +325,13 @@ def optimizer_solve(build: int | None, request: OptimizerRequest) -> OptimizerRe
 # changes the file without a build.
 
 
-@st.cache_data(show_spinner=False)
 def postseason_status(build: int | None) -> PostseasonStatus:
+    """Keyed on the model files too: fitting again changes them without a build."""
+    return _postseason_status(build, lab().model_stamp())
+
+
+@st.cache_data(show_spinner=False)
+def _postseason_status(build: int | None, stamp: str) -> PostseasonStatus:
     return lab().postseason.status()
 
 
@@ -385,8 +397,13 @@ def postseason_roster(roster_id: int) -> SubjectOutlook:
 # the roster changes from the Team Builder.
 
 
-@st.cache_data(show_spinner=False)
 def simulator_status(build: int | None) -> SimulatorStatus:
+    """Keyed on the model files too: fitting again changes them without a build."""
+    return _simulator_status(build, lab().model_stamp())
+
+
+@st.cache_data(show_spinner=False)
+def _simulator_status(build: int | None, stamp: str) -> SimulatorStatus:
     return lab().simulator.status()
 
 

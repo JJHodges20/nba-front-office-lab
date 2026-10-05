@@ -1,6 +1,6 @@
 {
- "revision": 1,
- "fitted_at": "2026-10-04T20:38:59",
+ "revision": 2,
+ "fitted_at": "2026-10-05T20:05:49",
  "spec": {
   "first_test_season": "2006-07",
   "min_training_seasons": 5,
@@ -38,7 +38,7 @@
   "seed": 0,
   "confidence": 0.95
  },
- "value_model_version": "r1",
+ "value_model_version": "r2",
  "fitted_on": {
   "first_season": "1996-97",
   "last_season": "2025-26",
@@ -6960,6 +6960,115 @@
      "difference": -0.0109,
      "low": -0.0203,
      "high": -0.0018
+    }
+   ]
+  },
+  "before_season": {
+   "team_seasons": 600,
+   "first_test_season": "2006-07",
+   "last_test_season": "2025-26",
+   "rating_basis": "projected",
+   "rating_error": 3.6271,
+   "stages": [
+    {
+     "key": "made_playoffs",
+     "cases": 600,
+     "reached": 320,
+     "mean_probability": 0.4804,
+     "log_loss": 0.5168,
+     "brier": 0.1733,
+     "calibration": {
+      "slope": 1.158,
+      "intercept": 0.318
+     },
+     "baselines": [
+      {
+       "key": "base_rate",
+       "label": "The share of past teams that got there, for every team",
+       "log_loss": 0.6911,
+       "brier": 0.249
+      }
+     ]
+    },
+    {
+     "key": "won_a_round",
+     "cases": 600,
+     "reached": 160,
+     "mean_probability": 0.2303,
+     "log_loss": 0.458,
+     "brier": 0.1526,
+     "calibration": {
+      "slope": 1.1252,
+      "intercept": 0.3667
+     },
+     "baselines": [
+      {
+       "key": "base_rate",
+       "label": "The share of past teams that got there, for every team",
+       "log_loss": 0.58,
+       "brier": 0.1956
+      }
+     ]
+    },
+    {
+     "key": "made_conference_finals",
+     "cases": 600,
+     "reached": 80,
+     "mean_probability": 0.1145,
+     "log_loss": 0.3141,
+     "brier": 0.0963,
+     "calibration": {
+      "slope": 1.0793,
+      "intercept": 0.3331
+     },
+     "baselines": [
+      {
+       "key": "base_rate",
+       "label": "The share of past teams that got there, for every team",
+       "log_loss": 0.3927,
+       "brier": 0.1156
+      }
+     ]
+    },
+    {
+     "key": "made_finals",
+     "cases": 600,
+     "reached": 40,
+     "mean_probability": 0.0556,
+     "log_loss": 0.1895,
+     "brier": 0.0529,
+     "calibration": {
+      "slope": 1.3843,
+      "intercept": 1.0638
+     },
+     "baselines": [
+      {
+       "key": "base_rate",
+       "label": "The share of past teams that got there, for every team",
+       "log_loss": 0.2449,
+       "brier": 0.0622
+      }
+     ]
+    },
+    {
+     "key": "won_championship",
+     "cases": 600,
+     "reached": 20,
+     "mean_probability": 0.0277,
+     "log_loss": 0.1116,
+     "brier": 0.0283,
+     "calibration": {
+      "slope": 1.2616,
+      "intercept": 0.9187
+     },
+     "baselines": [
+      {
+       "key": "base_rate",
+       "label": "The share of past teams that got there, for every team",
+       "log_loss": 0.1461,
+       "brier": 0.0322
+      }
+     ]
     }
    ]
   }

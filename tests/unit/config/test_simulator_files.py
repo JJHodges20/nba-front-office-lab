@@ -81,11 +81,12 @@ class TestTheShippedParameters:
         assert shipped.spec == load_simulator_spec(repo_root / "configs"), (
             "the specification changed: measure again"
         )
-        assert shipped.value_model_version == "r1" and shipped.postseason_model_version == "p1"
+        assert shipped.value_model_version == "r2" and shipped.postseason_model_version == "p2"
         assert shipped.fitted_on.first_season == "1996-97" and shipped.fitted_on.team_seasons >= 850
 
     def test_the_figures_make_basketball_sense(self, shipped: SimulatorModel) -> None:
-        assert 2.5 < shipped.value_error < 3.5
+        # The miss with the minutes projected, which a forecast carries (decision 0016).
+        assert 2.5 < shipped.value_error < 4.5 and shipped.value_error_basis == "projected"
         assert 1.0 < shipped.season_noise < 2.0 < shipped.strength_error < shipped.value_error
         assert 2.0 < shipped.wins_per_point < 2.8 and 2.0 < shipped.wins_residual < 4.5
         assert [item.key for item in shipped.noise_by_era][0] == "all"

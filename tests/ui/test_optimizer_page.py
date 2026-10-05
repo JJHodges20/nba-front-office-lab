@@ -42,7 +42,7 @@ class TestThePage:
         assert "Several strong rosters under a budget" in said
         assert "Modeled" in said and "Derived" in said and "Your assumption" in said
         assert "**The optimizer needs more than it has**" in said
-        assert "no salaries for 2026-27 are on file" in said and "fol contracts import FILE" in said
+        assert "No salaries for 2026-27 are on file" in said and "fol contracts import FILE" in said
         assert not opened.button
 
     def test_with_contracts_it_describes_the_pool_and_offers_the_form(

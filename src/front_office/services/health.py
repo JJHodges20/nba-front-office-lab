@@ -249,8 +249,8 @@ class HealthService:
                     "Contracts",
                     WARNING,
                     "No contract data. Salaries, payrolls and cap shares are empty until a "
-                    "contract file is imported: fol contracts template, then fol contracts "
-                    "import.",
+                    "contract file is imported and the database rebuilt: fol contracts "
+                    "template, then fol contracts import, then fol build.",
                 )
             )
         else:

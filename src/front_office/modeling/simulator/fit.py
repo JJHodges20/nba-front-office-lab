@@ -85,7 +85,10 @@ def fit_simulator_model(
         quantiles=spec.missed_quantiles,
     )
     recent_noise = float(noise.loc[noise["season"].isin(seasons), "noise"].mean())
-    value_error = float(value_model.validation.net.rmse)
+    # A forecast projects minutes, so it carries the error of the test that did too.
+    ahead = value_model.validation.projected
+    basis = "projected" if ahead is not None else "played"
+    value_error = float(ahead.rmse if ahead is not None else value_model.validation.net.rmse)
     strength_error = float(np.sqrt(max(value_error**2 - recent_noise**2, 0.0)))
     test = wins_test(
         value_model,
@@ -94,6 +97,7 @@ def fit_simulator_model(
         value_error=value_error,
         wins_residual=residual,
         spec=spec,
+        basis=basis,
     )
     played = teams[teams["games_played"] > 0]
     regular = tables["team_games"][tables["team_games"]["season_type"] == REGULAR]
@@ -112,6 +116,7 @@ def fit_simulator_model(
             player_seasons=int(len(lines)),
         ),
         value_error=rounded(value_error),
+        value_error_basis=basis,
         season_noise=rounded(recent_noise),
         strength_error=rounded(strength_error),
         noise_by_era=era_noise(noise, eras),
@@ -132,9 +137,11 @@ def wins_test(
     value_error: float,
     wins_residual: float,
     spec: SimulatorSpec,
+    basis: str = "played",
 ) -> WinsTest:
     """Seasons drawn for every team-season of the value model's test, scored against the
-    wins that happened."""
+    wins that happened. With ``basis`` ``"projected"`` the seasons are drawn around the
+    rating predicted with the minutes projected, where the row has one."""
     rows = value_model.backtest
     if not rows:
         raise NotEnoughHistory("the value model on file carries no out-of-sample test")
@@ -150,7 +157,10 @@ def wins_test(
         wins = float(per_82.loc[key])
         if not np.isfinite(wins):
             continue
-        rating = row.predicted + generator.normal(size=spec.test_simulations) * value_error
+        centre = row.predicted
+        if basis == "projected" and row.projected_net is not None:
+            centre = row.projected_net
+        rating = centre + generator.normal(size=spec.test_simulations) * value_error
         drawn = EVEN_RECORD + float(slopes[row.season]) * rating
         drawn = drawn + generator.normal(size=spec.test_simulations) * wins_residual
         drawn = np.clip(drawn, 0.0, FULL_SEASON_GAMES)

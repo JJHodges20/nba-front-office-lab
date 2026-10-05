@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from front_office.domain.cap_rules import PayrollLine
 from front_office.domain.optimizer import MAX_PLAYERS, BudgetMode, OptimizerRequest
 from front_office.services import OptimizerError, OptimizerReport, OptimizerStatus, RosterPlan
+from front_office.services.builder import RosterError
 from wb import components, data, formats, state
 from wb.components import ASSUMPTION, DERIVED, EMPTY_CELL, MODELED, Figure
 
@@ -69,7 +70,8 @@ def render() -> None:
 
 
 def _unavailable(status: OptimizerStatus) -> None:
-    body = status.reason or "The optimizer cannot run."
+    reason = status.reason or ""
+    body = f"{reason[0].upper()}{reason[1:]}" if reason else "The optimizer cannot run."
     if status.priced == 0 and status.payroll_season:
         body += " Salaries come from a contract file you import: fol contracts import FILE."
     components.empty("The optimizer needs more than it has", body, icon=":material/tune:")
@@ -103,7 +105,7 @@ def _form(
                 "Owner's budget ($M)",
                 min_value=1.0,
                 max_value=1000.0,
-                value=float((defaults.budget or _starting_budget(status)) / MILLION),
+                value=float((defaults.budget or 1) / MILLION),
                 step=1.0,
                 key="opt_budget",
                 help="Used when the budget is the owner's.",
@@ -216,11 +218,6 @@ def _form(
             st.error("; ".join(item["msg"] for item in error.errors()), icon=":material/error:")
             return None
     return st.session_state.get(REQUEST)
-
-
-def _starting_budget(status: OptimizerStatus) -> int:
-    rules = data.lab().rules(status.payroll_season or "")
-    return int(rules.thresholds.salary_cap) if rules is not None else 100 * MILLION
 
 
 # --- the rosters ---------------------------------------------------------------------------
@@ -402,7 +399,7 @@ def _plan(report: OptimizerReport, plan: RosterPlan) -> None:
             if st.button("Save", key=f"opt_save_{plan.number}", type="primary"):
                 try:
                     roster = data.optimizer_save(shown.index.tolist(), name, report.request)
-                except Exception as error:  # noqa: BLE001 - whatever the builder refuses is shown
+                except (OptimizerError, RosterError) as error:  # what the lab refuses is shown
                     st.error(str(error), icon=":material/error:")
                 else:
                     st.session_state[SAVED] = (plan.number, name, roster)

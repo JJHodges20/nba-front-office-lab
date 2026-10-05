@@ -152,3 +152,12 @@ for the season, the team or the roster asked about - from the file.
   checked against a bracket played a hundred thousand times.
 - The series model's parameters are stored to four decimals with 200 kept draws; the file
   is about 130 KB and is regenerated, not edited.
+
+## Amended in milestone 14
+
+The season model is also scored as a forecast reads it, from the rating the value model
+predicted before each season, averaged over its error: 0.517 in log loss for making the
+playoffs against 0.250 from the season played and 0.691 for the base rate, with every
+stage still beating its base rate. Refitting the value weights inside each window, to
+keep top-player quality out of sample, was measured at +0.003 and left; see
+[0016](0016-audit.md).

@@ -103,12 +103,15 @@ def simulate(
     development: Development = Development.EXPECTED,
     simulations: int,
     seed: int = 0,
+    intervals: bool = True,
 ) -> Simulation:
     """Draw ``simulations`` seasons for ``roster`` (:data:`ROSTER_COLUMNS`).
 
     ``steps`` are the postseason model's season steps and ``replacement`` the value
     model's replacement level. The same roster, model, steps and seed always give the
-    same seasons.
+    same seasons. Without ``intervals`` the chances come without the interval the
+    resampled steps give them, which is most of the work; a table that does not show
+    the intervals leaves them out.
     """
     generator = np.random.default_rng(seed)
     count = int(simulations)
@@ -176,7 +179,7 @@ def simulate(
     # Nobody playing - an emptied roster - is five replacement players.
     top = np.where(counted > 0, summed / np.maximum(counted, 1), replacement)
 
-    chances, intervals = _postseason(steps, rating, top)
+    chances, stage_intervals = _postseason(steps, rating, top, intervals=intervals)
     return Simulation(
         strength=strength,
         rating=rating,
@@ -184,21 +187,24 @@ def simulate(
         top_players=top,
         shares=covered,
         chances=chances,
-        intervals=intervals,
+        intervals=stage_intervals,
         players=players,
         projected=int(known.sum()),
     )
 
 
 def _postseason(
-    steps: Sequence[Step], rating: np.ndarray, top: np.ndarray
+    steps: Sequence[Step], rating: np.ndarray, top: np.ndarray, *, intervals: bool = True
 ) -> tuple[dict[str, np.ndarray], dict[str, tuple[float, float]]]:
     """The season model's chance of each stage in every season drawn, under the fitted
-    steps; and the interval the resampled steps give the mean chance."""
+    steps; and the interval the resampled steps give the mean chance, or an unknown
+    interval when none is asked for."""
     design = np.column_stack([np.ones(len(rating)), rating, top])  # (seasons, 3)
     fitted = step_weights(steps)  # (stages, 3)
     chance = np.cumprod(logistic(design @ fitted.T), axis=1)  # (seasons, stages)
     chances = {key: chance[:, position] for position, key in enumerate(BRACKET_STAGE_KEYS)}
+    if not intervals:
+        return chances, {key: (np.nan, np.nan) for key in BRACKET_STAGE_KEYS}
     draws = step_weights(steps, draws=True)  # (draws, stages, 3)
     means = np.empty((len(draws), len(BRACKET_STAGE_KEYS)))
     for number, weights in enumerate(draws):

@@ -76,7 +76,11 @@ def render_data_dictionary(
             "| Table | Domain | Purpose | Milestone |",
             "| --- | --- | --- | --- |",
         ]
-        lines += [f"| `{p.name}` | {p.domain} | {p.purpose} | {p.milestone} |" for p in planned]
+        lines += [
+            f"| `{p.name}` | {p.domain} | {p.purpose} | "
+            f"{p.milestone if p.milestone is not None else 'deferred'} |"
+            for p in planned
+        ]
 
     return "\n".join(lines) + "\n"
 

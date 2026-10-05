@@ -113,7 +113,7 @@ class TestDefaults:
 
     def test_with_cap_rules_the_cap_and_the_roster_limits(self, contract_lab: Lab) -> None:
         request = contract_lab.optimizer.defaults()
-        assert request.budget_mode is BudgetMode.SALARY_CAP and request.budget is None
+        assert request.budget_mode is BudgetMode.SALARY_CAP and request.budget == 164_961_000
         assert (request.min_players, request.max_players) == (14, 15)
         assert contract_lab.optimizer.budget_for(request) == 164_961_000
         lines = contract_lab.rules("2026-27").thresholds

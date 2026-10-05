@@ -801,7 +801,7 @@ def _series_model(model: PostseasonModel) -> None:
         f"Fitted on {model.fitted_on.playoff_games:,} playoff games, "
         f"{model.fitted_on.first_season} to {model.fitted_on.last_season}; between two sides "
         "equal on both inputs, the home side wins a game "
-        f"{1 / (1 + 2.718281828459045 ** (-game.home_advantage)):.1%} of the time. Intervals "
+        f"{game.home_court_chance():.1%} of the time. Intervals "
         f"come from refitting on {model.spec.resamples:,} resamples of whole seasons. The era "
         "rows are the same model fitted to one era alone: how far the weights have moved."
     )
@@ -971,8 +971,48 @@ def _season_model(model: PostseasonModel) -> None:
     _reliability(
         tested.reliability, key="ps_reliability_season", what="team-stage cases, every team-season"
     )
+    _before_season(model)
     st.markdown("**What else was tried for seasons**")
     _comparisons(tested.comparisons, "the season model", per_stage=True)
+
+
+def _before_season(model: PostseasonModel) -> None:
+    ahead = model.evaluation.before_season
+    if ahead is None:
+        return
+    st.markdown("**Read before the season**")
+    in_season = {item.key: item for item in model.evaluation.season.stages}
+    frame = pd.DataFrame(
+        {
+            "Stage": [stage(item.key).label for item in ahead.stages],
+            "Got there": [item.reached for item in ahead.stages],
+            "Mean chance": [formats.share(item.mean_probability) for item in ahead.stages],
+            "Log loss": [item.log_loss for item in ahead.stages],
+            "From the season played": [
+                in_season[item.key].log_loss if item.key in in_season else None
+                for item in ahead.stages
+            ],
+            "Base rate": [_baseline(item, "base_rate") for item in ahead.stages],
+        }
+    )
+    st.markdown(
+        f"Team-seasons, out of sample: {ahead.team_seasons}, {ahead.first_test_season} to "
+        f"{ahead.last_test_season}"
+    )
+    _table(frame, _four_decimals("Log loss", "From the season played", "Base rate"))
+    st.caption(
+        "The season model as a forecast reads it: each team from the net rating the value "
+        "model predicted for it before the season"
+        + (
+            " with the minutes projected, "
+            if ahead.rating_basis == "projected"
+            else " with the minutes the season played, "
+        )
+        + f"averaged over that prediction's error ({ahead.rating_error:.2f}), with the "
+        "top-player quality typical of such a rating. The table above reads the season "
+        "that was played; this one reads what could be known before it, which is what "
+        "the chances for a roster rest on."
+    )
 
 
 def _limits() -> None:

@@ -7,10 +7,10 @@ import streamlit as st
 
 from front_office.domain.metrics import MetricCatalog
 from front_office.services import DEFAULT_QUALIFICATION, METRIC_CATALOGS
+from front_office.services.players import SPAN_QUALIFICATION
 from wb import charts, components, data, formats, state
 from wb.components import DERIVED, EMPTY_CELL, ESTIMATE, MEASURED
 from wb.state import Filters
-from wb.views.players import SPAN_QUALIFICATION
 
 PLAYERS, TEAMS = "Players", "Teams"
 PLAYER_AXES = ("usage_pct", "ts_pct")
@@ -232,8 +232,9 @@ def _glossary() -> None:
         glossary = glossary[text.map(lambda entry: all(word in entry for word in words))]
     st.caption(
         f"{len(glossary)} metrics. Measured: published by the league and shown unchanged. "
-        "Derived: computed by the lab with the formula given. No modeled estimates exist in "
-        "this version."
+        "Derived: computed by the lab with the formula given. Modeled: an estimate from a "
+        "fitted model, with its evidence on the Player Value, Roster Fit and Postseason "
+        "Outlook pages."
     )
     st.dataframe(
         glossary,

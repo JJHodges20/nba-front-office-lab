@@ -7,13 +7,18 @@ rules before changing anything. The source plan is
 ## Commands (Windows)
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -n auto      # all tests except live-network ones, in parallel (~3 min)
-.\.venv\Scripts\python.exe -m pytest tests\unit -n auto  # everything but the workbench pages (~40 s)
+.\.venv\Scripts\python.exe -m pytest -n auto      # all tests except live-network ones, in parallel (~5 min)
+.\.venv\Scripts\python.exe -m pytest tests\unit -n auto  # everything but the workbench pages (~3 min)
 .\.venv\Scripts\python.exe -m pytest tests\unit\domain   # one area, serially
 .\.venv\Scripts\python.exe -m pytest -m network   # live-network tests only
 .\.venv\Scripts\python.exe -m ruff check .
 .\.venv\Scripts\python.exe -m ruff format .
 .\.venv\Scripts\fol.exe --help
+.\.venv\Scripts\fol.exe refresh                  # ingest what is new, then build
+.\.venv\Scripts\fol.exe info                     # version, data locations, configured seasons
+.\.venv\Scripts\fol.exe seasons                  # cap, tax, apron and roster rules by season
+.\.venv\Scripts\fol.exe raw                      # what the raw store holds
+.\.venv\Scripts\fol.exe contracts template       # a contract file to fill in (then import, then build)
 .\.venv\Scripts\fol.exe dictionary --write        # regenerate docs/DATA_DICTIONARY.md
 .\.venv\Scripts\fol.exe metrics --write           # regenerate docs/METRICS.md
 .\.venv\Scripts\fol.exe benchmarks --write        # regenerate docs/research/BENCHMARKS.md from the database
@@ -88,7 +93,11 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   not edit that file, and do not fit inside a build, a service or a page. Changing
   `configs/models/player_value.yaml`, a feature or a term changes nothing until the
   model is fitted again - and a test fails until it is
-  (`docs/decisions/0010-player-value.md`).
+  (`docs/decisions/0010-player-value.md`). The model is tested twice: with each season's
+  minutes as played (3.01, the measure of the rating alone and the basis of every
+  comparison with simpler methods) and with the minutes projected (3.63); a forecast -
+  the optimizer, the simulator, a chance read for a roster - carries the second figure
+  (`docs/decisions/0016-audit.md`).
 - **A model earns its place out of sample.** Anything added to the value model is run
   through the expanding-window test against the model without it, and stays only if
   the difference is clear of zero. Record what was tried and left out in the decision.
@@ -120,16 +129,19 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   decision says why. Any change to the model or its inputs goes through the expanding-window
   test and is recorded (`docs/decisions/0014-postseason-model.md`). A chance is shown with
   its 95% interval and beside what happened where the season is decided; the page's "The
-  model" tab is the evidence, and nothing calls a chance a verdict.
+  model" tab is the evidence, and nothing calls a chance a verdict. The file also scores
+  the season model as a forecast reads it (`Evaluation.before_season`), from the rating
+  predicted before each season; show both readings, never only the better one.
 - **The simulator draws from tested parts and measures nothing it cannot test.** A
   scenario (`domain/scenario.py`) is a roster plus the user's assumptions, all tagged
   "Your assumption"; a season is drawn (`modeling/simulator/monte_carlo.py`) from the
   value model's projections and tested error, the postseason model's season steps, and
-  the five figures `fol simulate fit --write` measures into
-  `configs/models/simulator.json` (a season's noise, the miss on strength, wins per
-  point, residual wins, projection misses by reliability, missed games). A roster's
-  spread is calibrated to the value model's RMSE, never to the sum of the players'
-  spreads. The field is not modelled and every page says so. No build applies it; the
+  what `fol simulate fit --write` measures into `configs/models/simulator.json`: five
+  figures (the value model's miss, a season's noise, the miss on strength, wins per
+  point, residual wins) and two distributions (projection misses by reliability band,
+  games missed by rotation players). A roster's
+  spread is calibrated to the value model's RMSE with the minutes projected, never to
+  the sum of the players' spreads. The field is not modelled and every page says so. No build applies it; the
   wins test's coverage is the evidence and a test fails if the shipped intervals drift
   from their claim (`docs/decisions/0015-simulator.md`). The invented league plays
   regular seasons from a planted game model (`tests/league.py`) for these tests.
@@ -148,6 +160,15 @@ Build one roadmap milestone at a time. A milestone is finished only when:
 - **Only `storage` touches SQL.** Other layers call `Warehouse`, `RosterRepository` or
   `OperationsLog`. Always open a `Database` in a `with` block: on Windows an open
   connection keeps the file locked.
+- **Services read fresh, and remember within one answer.** `Lab.read` goes to the
+  warehouse every time, so a rebuild in another process is seen at once. A service that
+  reads the same tables many times for one answer wraps that work in
+  `with lab.remembering():`; nothing is cached across answers below the workbench. The
+  workbench caches on the build id, and a model status on the model files' stamps as
+  well (`Lab.model_stamp`), so a refit shows without a rebuild or a restart.
+- **Refit in order.** A value refit changes the version the build applies and that the
+  other files name: `fol value fit --write`, `fol build`, `fol playoffs fit --write`,
+  `fol simulate fit --write`, `fol fit test --write`, then the research documents.
 - **Never print data through rich markup.** Use `_say` / `_tagged` in the CLI; text in
   square brackets is otherwise swallowed as a style tag.
 - **Warnings are errors** in the test suite.
@@ -184,7 +205,9 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
 - **Look at it, and click through it.** A running server keeps old modules loaded:
   restart `fol ui` after a code change, then check the page in the light and the dark
   theme and use every control you touched. Passing tests say nothing about clipped
-  labels, collisions, or a click that does the wrong thing.
+  labels, collisions, or a click that does the wrong thing. A browser pass cannot share
+  the machine with a parallel test run: Streamlit's connection-error dialog appears under
+  load and intercepts every click.
 
 ## Conventions
 

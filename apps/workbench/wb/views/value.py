@@ -734,7 +734,18 @@ def _model(filters: Filters, status: ValueStatus) -> None:
                 f"{tested.net.rmse:.2f}",
                 f"{tested.team_seasons} team-seasons",
                 help="Root mean squared error of a team's predicted net rating, out of "
-                f"sample, {tested.first_test_season} to {tested.last_test_season}.",
+                f"sample, {tested.first_test_season} to {tested.last_test_season}, given "
+                "the minutes each season played.",
+            ),
+            Figure(
+                "With minutes projected",
+                formats.MISSING if tested.projected is None else f"{tested.projected.rmse:.2f}",
+                "not in this file"
+                if tested.projected is None
+                else f"{tested.projected.share_covered:.0%} of minutes covered",
+                help="The same test with the minutes projected from earlier seasons, as a "
+                "forecast has them, and replacement level for the rest: the error the "
+                "optimizer and the simulator carry.",
             ),
             Figure(
                 "Best simpler method",
@@ -763,7 +774,8 @@ def _model(filters: Filters, status: ValueStatus) -> None:
                 help="The fitted model is a file under configs/models. A build applies it "
                 "and never fits one; every value names the revision that produced it.",
             ),
-        ]
+        ],
+        per_row=3,
     )
     _against(card)
     _left_out(card)

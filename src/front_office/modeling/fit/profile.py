@@ -134,6 +134,15 @@ def player_profiles(tables: Tables, archetypes: ArchetypeSet) -> pd.DataFrame:
     return frame[[*PROFILE_COLUMNS, *(fills_column(key) for key in archetypes.keys)]]
 
 
+def place_among(values: pd.Series, value: float) -> tuple[float, int, float]:
+    """Where ``value`` stands among ``values``: the share of them it is ahead of, ties
+    counted as half, from 0 to 100; its rank from the top; and the median of ``values``."""
+    below, equal = int((values < value).sum()), int((values == value).sum())
+    standing = 100 * (below + 0.5 * equal) / len(values)
+    rank = int((values > value).sum()) + 1
+    return standing, rank, float(values.median())
+
+
 def rotation_profile(members: pd.DataFrame, *, team_minutes: float) -> pd.Series:
     """What a group of players adds up to: one value per key in :data:`MEASURE_KEYS`.
 

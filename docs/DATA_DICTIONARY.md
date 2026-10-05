@@ -675,7 +675,5 @@ Called for by the roadmap; each gets a contract in the milestone that builds it.
 
 | Table | Domain | Purpose | Milestone |
 | --- | --- | --- | --- |
-| `lineups` | lineups | Five-player lineup identities. | 10 |
-| `lineup_stats` | lineups | Minutes and performance for lineups. | 10 |
-| `model_predictions` | modeling | Versioned postseason probability outputs. | 12 |
-| `simulation_results` | simulation | Scenario and Monte Carlo results. | 13 |
+| `lineups` | lineups | Five-player lineup identities. | deferred |
+| `lineup_stats` | lineups | Minutes and performance for lineups. | deferred |

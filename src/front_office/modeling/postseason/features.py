@@ -120,7 +120,7 @@ def _player_quality(tables: Tables, spec: PostseasonSpec) -> pd.DataFrame:
     else:
         ranked = valued.sort_values("impact", ascending=False)
         by_team = ranked.groupby(["season", "team_id"])["impact"]
-        top = by_team.apply(lambda impacts: impacts.head(spec.top_players).mean())
+        top = by_team.apply(lambda impacts: top_player_quality(impacts, spec))
         best = by_team.first()
         quality = pd.DataFrame({"top_players": top, "best_player": best})
 
@@ -129,6 +129,13 @@ def _player_quality(tables: Tables, spec: PostseasonSpec) -> pd.DataFrame:
     return quality.assign(
         season=quality["season"].astype(str), team_id=quality["team_id"].astype("int64")
     )
+
+
+def top_player_quality(impacts: pd.Series, spec: PostseasonSpec) -> float:
+    """The mean impact of the ``spec.top_players`` best of ``impacts``: what the model
+    reads a team's top players by, for a team-season or for any roster."""
+    best = impacts.dropna().sort_values(ascending=False).head(spec.top_players)
+    return float(best.mean()) if len(best) else float("nan")
 
 
 def _experience(lines: pd.DataFrame, logs: pd.DataFrame, spec: PostseasonSpec) -> pd.Series:

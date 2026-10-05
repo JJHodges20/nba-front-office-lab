@@ -19,6 +19,7 @@ import pandas as pd
 from front_office.domain.eras import Era
 from front_office.domain.postseason import (
     Baseline,
+    BeforeSeasonEvaluation,
     BracketEvaluation,
     Comparison,
     Draw,
@@ -38,6 +39,7 @@ from front_office.domain.postseason import (
 )
 from front_office.domain.seasons import Season
 from front_office.domain.stages import BRACKET_STAGE_KEYS, ROUND_STAGE_KEYS
+from front_office.domain.value_model import BacktestRow
 from front_office.modeling.postseason.bracket import (
     BracketError,
     bracket_from_series,
@@ -64,6 +66,7 @@ from front_office.modeling.postseason.fitting import (
     season_members,
 )
 from front_office.modeling.postseason.hierarchy import (
+    QUADRATURE_NODES,
     STEP_COLUMNS,
     apply_steps,
     fit_step_weights,
@@ -123,9 +126,17 @@ def fit_postseason_model(
     revision: int,
     fitted_at: datetime,
     value_model_version: str,
+    value_backtest: Sequence[BacktestRow] = (),
+    value_error: float | None = None,
+    rating_basis: str = "projected",
 ) -> PostseasonModel:
     """Fit the series model and the season model on every season on record and test both
-    out of sample; raise :class:`NotEnoughHistory` if the test cannot be run."""
+    out of sample; raise :class:`NotEnoughHistory` if the test cannot be run.
+
+    ``value_backtest`` and ``value_error`` are the value model's out-of-sample team
+    predictions and their error: with them the season model is also scored as a
+    forecast reads it, from the rating predicted before each season.
+    """
     features = team_features(tables, spec)
     decided = features[features["decided"]].reset_index(drop=True)
     games = playoff_games(tables, features, spec).dropna(subset=list(GAME_COLUMNS))
@@ -150,6 +161,9 @@ def fit_postseason_model(
     series_evaluation = _series_evaluation(games, series, test_years, eras, spec)
     bracket_evaluation = _bracket_evaluation(games, series, features, pairings, test_years, spec)
     season_evaluation = _season_evaluation(decided, test_years, spec)
+    before_season = _before_season_evaluation(
+        decided, test_years, value_backtest, value_error, rating_basis
+    )
     game = _game_model(games, spec)
     by_era = _by_era(games, eras)
     steps = fit_steps(features, spec)
@@ -177,7 +191,10 @@ def fit_postseason_model(
         steps=steps,
         typical_top=TypicalTop(slope=rounded(slope), intercept=rounded(intercept)),
         evaluation=Evaluation(
-            series=series_evaluation, bracket=bracket_evaluation, season=season_evaluation
+            series=series_evaluation,
+            bracket=bracket_evaluation,
+            season=season_evaluation,
+            before_season=before_season,
         ),
     )
 
@@ -617,6 +634,88 @@ def _season_evaluation(
             confidence=spec.confidence,
         ),
         comparisons=tuple(comparisons),
+    )
+
+
+def _before_season_evaluation(
+    decided: pd.DataFrame,
+    test_years: Sequence[int],
+    backtest: Sequence[BacktestRow],
+    error: float | None,
+    basis: str,
+) -> BeforeSeasonEvaluation | None:
+    """The season model scored from the ratings a forecast would have had.
+
+    Each tested team-season is read from the value model's out-of-sample prediction of
+    its net rating, averaged over the prediction's error by quadrature as the service
+    does, with the top-player quality typical of that rating; the steps and the typical
+    quality are fitted on the seasons before. ``None`` without predictions to read.
+    """
+    if not backtest or error is None or error < 0:
+        return None
+    ahead: dict[tuple[str, int], float] = {}
+    for row in backtest:
+        rating = row.projected_net if basis == "projected" else None
+        ahead[(row.season, int(row.team_id))] = float(row.predicted if rating is None else rating)
+    rows = decided.reset_index(drop=True)
+    keys = zip(rows["season"].astype(str), rows["team_id"].astype(int), strict=True)
+    rating = np.array([ahead.get(key, np.nan) for key in keys], dtype="float64")
+    probability = np.full((len(rows), len(BRACKET_STAGE_KEYS)), np.nan)
+    nodes, node_weights = np.polynomial.hermite.hermgauss(QUADRATURE_NODES)
+    quadrature = node_weights / np.sqrt(np.pi)
+    for year in test_years:
+        train = rows[rows["start_year"] < year].dropna(subset=list(STEP_COLUMNS))
+        testing = (rows["start_year"] == year).to_numpy() & np.isfinite(rating)
+        if train.empty or not testing.any():
+            continue
+        weights = fit_step_weights(train, STEP_COLUMNS, direct=False)
+        slope, intercept = np.polyfit(
+            train["net_rating"].to_numpy(dtype="float64"),
+            train["top_players"].to_numpy(dtype="float64"),
+            1,
+        )
+        for index in np.flatnonzero(testing):
+            ratings = rating[index] + np.sqrt(2.0) * error * nodes
+            frame = pd.DataFrame(
+                {"net_rating": ratings, "top_players": intercept + slope * ratings}
+            )
+            probability[index] = quadrature @ apply_steps(weights, frame, STEP_COLUMNS)
+    tested = ~np.isnan(probability[:, 0])
+    if not tested.any():
+        return None
+    years = rows.loc[tested, "start_year"].to_numpy()
+    stages = []
+    for position, key in enumerate(BRACKET_STAGE_KEYS):
+        p = probability[tested, position]
+        y = rows.loc[tested, key].to_numpy(dtype="float64")
+        base = np.array([rows.loc[rows["start_year"] < year, key].mean() for year in years])
+        stages.append(
+            StageEvaluation(
+                key=key,
+                cases=int(len(y)),
+                reached=int(y.sum()),
+                mean_probability=rounded(p.mean()),
+                log_loss=rounded(log_loss(p, y)),
+                brier=rounded(brier(p, y)),
+                calibration=calibration(p, y),
+                baselines=(
+                    Baseline(
+                        key="base_rate",
+                        label="The share of past teams that got there, for every team",
+                        log_loss=rounded(log_loss(base, y)),
+                        brier=rounded(brier(base, y)),
+                    ),
+                ),
+            )
+        )
+    seasons = sorted(set(rows.loc[tested, "season"].astype(str)))
+    return BeforeSeasonEvaluation(
+        team_seasons=int(tested.sum()),
+        first_test_season=seasons[0],
+        last_test_season=seasons[-1],
+        rating_basis=basis,
+        rating_error=rounded(error),
+        stages=tuple(stages),
     )
 
 

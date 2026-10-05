@@ -14,13 +14,18 @@ salary or payroll is shown as unavailable.
 ```
 
 writes `data\imports\contract_template.csv`: one row for every player on a roster today,
-with player id, name and team filled in and the salary columns empty. Fill in what you
-have, then:
+with player id, name and team filled in and the salary columns empty (`--output` names
+another file; `--seasons` sets how many seasons of salary columns it carries, six by
+default). Fill in what you have, then:
 
 ```powershell
 .\.venv\Scripts\fol.exe contracts import data\imports\contract_template.csv --source "where the figures came from"
-.\.venv\Scripts\fol.exe check
+.\.venv\Scripts\fol.exe build
 ```
+
+The import validates the file and stores it; the build rebuilds the database with the
+contracts in it, which is what every salary view reads. `fol check` validates the file
+against the rest of the data without writing anything.
 
 `--source` is required and is stored with the data, so every salary in the lab can say
 where it came from. `--as-of 2026-10-01` records the date the figures were current; it
@@ -96,9 +101,10 @@ column takes `player`, `team` or `early termination`, and `guarantee` takes `ful
    out and listed. Fix the spelling, or add a `player_id` column, and import again.
    When several players share a name, the active one is preferred, then the one on the
    team named in the row.
-3. **Stores the file unchanged** in the raw store, next to the league data. Importing
-   again replaces what the lab uses; earlier imports are kept.
-4. **Builds two tables.** `contracts` has one row per player per team per run of
+3. **Stores the file as it came** in the raw store, next to the league data (only a
+   byte-order mark and the line endings are normalised). Importing again replaces what
+   the lab uses; earlier imports are kept.
+4. **The next `fol build` makes two tables.** `contracts` has one row per player per team per run of
    consecutive seasons. `contract_years` has one row per season, with the salary's share
    of that season's cap. A gap between seasons starts a new contract.
 
@@ -107,8 +113,9 @@ Salary as a share of the cap needs that season's cap. Seasons without a rules fi
 
 ## Checks
 
-`fol check` then verifies that contract totals match their seasons, that no player has
-two active contracts in one season, and that cap shares are consistent. It warns about
+`fol check` verifies, without writing anything, that contract totals match their seasons,
+that no player has two active contracts in one season, and that cap shares are
+consistent; `fol build` runs the same checks and then writes the tables. They warn about
 salaries that look like typing slips (outside 0.02%-45% of the cap) and about teams with
-fewer than ten standard contracts in the file's first season, which usually means the
-file is incomplete.
+fewer than ten or more than 21 standard contracts in the file's first season, which
+usually means the file is incomplete or doubled up.

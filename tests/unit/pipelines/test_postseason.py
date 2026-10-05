@@ -53,6 +53,7 @@ class TestFitting:
         model = report.model
         assert (model.revision, model.fitted_at, model.value_model_version) == (1, NOW, "r1")
         assert model.spec == load_postseason_spec(played.config_dir)
+        value_model = postseason_league[1]
         direct = fit_postseason_model(
             postseason_league[2],
             model.spec,
@@ -60,6 +61,9 @@ class TestFitting:
             revision=1,
             fitted_at=NOW,
             value_model_version="r1",
+            value_backtest=value_model.backtest,
+            value_error=value_model.validation.projected.rmse,
+            rating_basis="projected",
         )
         assert model == direct
 
