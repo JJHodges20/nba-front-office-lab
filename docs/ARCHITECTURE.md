@@ -159,7 +159,7 @@ fol ui:  apps/workbench/app.py -> wb.views.<page> -> front_office.services.Lab -
 
 `services.Lab` opens the database and the season rules; the services hang off it:
 `players`, `teams`, `league`, `benchmarks`, `contracts`, `builder` (the user's rosters),
-`value`, `fit`, `optimizer` and `health`.
+`value`, `fit`, `optimizer`, `postseason` and `health`.
 A service reads tables, calls analytics, and joins the result with names. It contains
 no formulas.
 
@@ -277,6 +277,35 @@ that make rosters distinct and the diagnoses of why nothing can be found;
 `services/optimizer.py` assembles the pool, resolves a payroll line from the cap rules
 and dresses rosters with names. Nothing is fitted and nothing is cached across runs. See
 `docs/decisions/0013-roster-optimizer.md`.
+
+## The postseason model
+
+```
+fol playoffs fit --write:  database -> modeling.postseason.fit_postseason_model
+                           -> configs/models/postseason.json
+a page:                    PostseasonService.bracket / series / season_odds / outlook
+                           -> the file's parameters and kept draws, applied on request
+fol playoffs report:       the file + the database -> docs/research/POSTSEASON.md
+```
+
+`domain/stages.py` is the one list of postseason stages, read by the benchmarks and the
+model alike; `domain/postseason.py` holds the specification (`configs/models/postseason.yaml`)
+and what a fit writes down. `modeling/postseason/` holds the model: `features.py` turns the
+tables into what a team is described by (net rating and top-player quality) and into the
+games and series the model is fitted and tested on; `series.py` is the game model and a
+series enumerated through its format; `bracket.py` reads a bracket from the series played
+and carries the series model through it exactly; `hierarchy.py` is the season model, a
+chain of conditional steps; `fitting.py` the shared arithmetic (a logistic fit, scores,
+calibration, reliability, intervals from resampling seasons); `fit.py` fits both models
+and tests them one season at a time against simpler methods and the alternatives tried.
+
+The fitted model is a file written only by `fol playoffs fit --write`. No build applies
+it: `services/postseason.py` reads it and computes a chance on request, for a decided
+season's bracket and series, for every team of a season, for a real team or a built roster
+read as a team of its strength, or for a strength given by hand - every figure with the
+interval its kept parameter draws give. Tests of fitting use the invented league with its
+playoffs played by a planted game model (`tests/postseason_reference.py`). See
+`docs/decisions/0014-postseason-model.md`.
 
 ## Conventions
 

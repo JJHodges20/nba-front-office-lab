@@ -29,11 +29,17 @@ from front_office.config import (
     load_value_model,
     value_model_path,
 )
-from front_office.config.models import fit_evidence_path, load_fit_evidence
+from front_office.config.models import (
+    fit_evidence_path,
+    load_fit_evidence,
+    load_postseason_model,
+    postseason_model_path,
+)
 from front_office.config.settings import ENV_HOME
 from front_office.domain import PayrollLine, Season
 from front_office.domain.dictionary import render_data_dictionary
 from front_office.domain.fit_model import FitEvidence
+from front_office.domain.postseason import PostseasonModel
 from front_office.domain.tables import ALL_TABLES, PLANNED_TABLES
 from front_office.domain.value_model import Comparison, ValueModel
 from front_office.pipelines.build import build_database, database_status, log_fetches
@@ -57,11 +63,20 @@ from front_office.pipelines.ingest import (
     default_plan,
 )
 from front_office.pipelines.inventory import raw_inventory
+from front_office.pipelines.postseason import (
+    FIT_COMMAND as PLAYOFFS_FIT_COMMAND,
+)
+from front_office.pipelines.postseason import (
+    PostseasonFitError,
+    fit_postseason,
+    write_postseason_model,
+)
 from front_office.pipelines.value import FIT_COMMAND, ValueFitError, fit_value, write_value_model
 from front_office.services import Lab, LabNotBuilt
 from front_office.services.benchmark_report import benchmark_report
 from front_office.services.fit_report import NoFitEvidence, fit_report
 from front_office.services.glossary import METRIC_CATALOGS, metric_glossary
+from front_office.services.postseason_report import NoPostseasonModel, postseason_report
 from front_office.services.value_report import NoValueModel, value_report
 
 DATA_DICTIONARY = "docs/DATA_DICTIONARY.md"
@@ -69,6 +84,7 @@ METRIC_GLOSSARY = "docs/METRICS.md"
 BENCHMARK_REPORT = "docs/research/BENCHMARKS.md"
 VALUE_REPORT = "docs/research/PLAYER_VALUE.md"
 FIT_REPORT = "docs/research/ROSTER_FIT.md"
+POSTSEASON_REPORT = "docs/research/POSTSEASON.md"
 WORKBENCH = "apps/workbench/app.py"
 DEFAULT_PORT = 8501
 STARTUP_SECONDS = 30
@@ -91,6 +107,11 @@ fit_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(fit_app, name="fit")
+playoffs_app = typer.Typer(
+    help="The postseason model: fit it, test it, see what it rests on, write it up.",
+    no_args_is_help=True,
+)
+app.add_typer(playoffs_app, name="playoffs")
 console = Console()
 
 
@@ -915,3 +936,127 @@ def fit_report_command(
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(document, encoding="utf-8", newline="\n")
     _say(f"Wrote {target} (revision {revision} of the fit evidence)")
+
+
+# --- the postseason model ------------------------------------------------------------------
+
+
+@playoffs_app.command("fit")
+def playoffs_fit(
+    write: Annotated[
+        bool,
+        typer.Option("--write", help="Save the model so that the services apply it."),
+    ] = False,
+) -> None:
+    """Fit the postseason model on the built database and test it on seasons it had not seen.
+
+    Without --write nothing changes: the model is shown and thrown away.
+    """
+    try:
+        settings = load_settings()
+        report = fit_postseason(settings)
+    except (ConfigError, PostseasonFitError) as error:
+        raise _fail(error) from error
+    _print_postseason_model(report.model)
+    if report.previous is not None and not report.changed:
+        _say(
+            f"\nThe same as revision {report.previous.revision}, already on file. Nothing to write."
+        )
+        return
+    if not write:
+        _say(f"\nNot saved. To save it as revision {report.model.revision}: {PLAYOFFS_FIT_COMMAND}")
+        return
+    target = write_postseason_model(settings, report.model)
+    _say(f"\nWrote {target} (revision {report.model.revision}).")
+
+
+@playoffs_app.command("show")
+def playoffs_show() -> None:
+    """Show the postseason model on file: its parameters and how it did out of sample."""
+    try:
+        settings = load_settings()
+        model = load_postseason_model(settings.config_dir)
+    except ConfigError as error:
+        raise _fail(error) from error
+    if model is None:
+        _say(f"No postseason model has been fitted ({postseason_model_path(settings.config_dir)}).")
+        _say(f"Run: {PLAYOFFS_FIT_COMMAND}")
+        raise typer.Exit(code=1)
+    _say(f"Revision {model.revision}, fitted {model.fitted_at:%Y-%m-%d %H:%M} UTC.")
+    _print_postseason_model(model)
+
+
+def _print_postseason_model(model: PostseasonModel) -> None:
+    game, tested = model.game, model.evaluation
+    on = model.fitted_on
+    _say(
+        f"Fitted on {on.playoff_games:,} playoff games and {on.series} series, {on.first_season} "
+        f"to {on.last_season}, with top-player quality from value model "
+        f"{model.value_model_version}."
+    )
+    _say(
+        f"Series model: home advantage {game.home_advantage:+.3f} log-odds "
+        f"[{game.home_low:+.3f}, {game.home_high:+.3f}]; {game.net_rating:.4f} per point of net "
+        f"rating [{game.net_low:.4f}, {game.net_high:.4f}]; {game.top_players:.4f} per point of "
+        f"top-player quality [{game.top_low:.4f}, {game.top_high:.4f}]."
+    )
+    series = tested.series
+    rate = next(b for b in series.baselines if b.key == "home_court_rate")
+    _say(
+        f"Out of sample, {series.first_test_season} to {series.last_test_season}: "
+        f"{series.series} series, log loss {series.log_loss:.4f} against {rate.log_loss:.4f} for "
+        f"the home-court side's past rate; the favourite won {series.favourite_won}; "
+        f"calibration slope {series.calibration.slope:.2f}."
+    )
+    bracket = tested.bracket
+    _say(
+        f"Through the bracket: the title favourite won {bracket.favourite_won} of "
+        f"{len(bracket.favourites)} postseasons."
+    )
+    for item in bracket.stages:
+        seed = next(b for b in item.baselines if b.key == "seed_rate")
+        _say(
+            f"  {item.key}: log loss {item.log_loss:.4f} against {seed.log_loss:.4f} by seed; "
+            f"calibration slope {item.calibration.slope:.2f}"
+        )
+    season = tested.season
+    _say(f"Season model, {season.team_seasons} team-seasons out of sample:")
+    for item in season.stages:
+        base = item.baselines[0]
+        _say(
+            f"  {item.key}: log loss {item.log_loss:.4f} against {base.log_loss:.4f} for the "
+            f"base rate; calibration slope {item.calibration.slope:.2f}"
+        )
+    _say("Tried beside the series model (change in log loss; negative is better):")
+    for item in series.comparisons:
+        _say(f"  {item.label}: {item.difference:+.4f} [{item.low:+.4f}, {item.high:+.4f}]")
+    _say("Tried beside the season model (per stage):")
+    for item in season.comparisons:
+        _say(f"  {item.label}: {item.difference:+.4f} [{item.low:+.4f}, {item.high:+.4f}]")
+
+
+@playoffs_app.command("report")
+def playoffs_report_command(
+    write: Annotated[
+        bool, typer.Option("--write", help=f"Write {POSTSEASON_REPORT} instead of printing.")
+    ] = False,
+) -> None:
+    """Write up the postseason model: what it is, how it was tested, and what it found."""
+    try:
+        settings = load_settings()
+        # Opening the lab creates the database; asking a question should not.
+        if not database_status(settings).exists:
+            raise LabNotBuilt
+        with Lab(settings) as lab:
+            lab.require_built()
+            document = postseason_report(lab)
+            revision = lab.postseason.status().revision
+    except (ConfigError, LabNotBuilt, NoPostseasonModel) as error:
+        raise _fail(error) from error
+    if not write:
+        typer.echo(document, nl=False)
+        return
+    target = settings.project_root / POSTSEASON_REPORT
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(document, encoding="utf-8", newline="\n")
+    _say(f"Wrote {target} (revision {revision} of the postseason model)")

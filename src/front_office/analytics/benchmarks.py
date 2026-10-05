@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass
 from statistics import NormalDist
 
 import numpy as np
@@ -28,6 +27,27 @@ from front_office.analytics import formulas as f
 from front_office.analytics.teams import RECORD, TEAM_METRICS
 from front_office.domain.metrics import MetricCatalog, MetricFormat, MetricSpec
 from front_office.domain.schema import Provenance
+from front_office.domain.stages import STAGE_KEYS, STAGES, Stage, stage
+
+__all__ = [
+    "BENCHMARK_METRICS",
+    "EVERY_TEAM",
+    "FULL_SEASON_GAMES",
+    "RANKED_KEYS",
+    "RESEARCH_METRICS",
+    "STAGES",
+    "STAGE_KEYS",
+    "Stage",
+    "bands",
+    "rank_counts",
+    "research_frame",
+    "separation",
+    "stage",
+    "stage_counts",
+    "stage_profiles",
+    "stage_rates",
+    "wilson_interval",
+]
 
 FULL_SEASON_GAMES = 82
 
@@ -63,56 +83,6 @@ RANKED_KEYS: tuple[str, ...] = ("wins_per_82", *TEAM_METRICS.keys)
 """Metrics whose league rank within the season is carried as ``<key>_rank``."""
 
 
-@dataclass(frozen=True, slots=True)
-class Stage:
-    """A point a season can reach. Each stage contains every later one."""
-
-    key: str
-    """Column of the research frame that says whether a team reached it."""
-    label: str
-    short: str
-    description: str
-
-
-STAGES: tuple[Stage, ...] = (
-    Stage(
-        "reached_postseason",
-        "Reached the postseason",
-        "Postseason",
-        "Played in the playoffs or in the play-in tournament.",
-    ),
-    Stage(
-        "made_playoffs",
-        "Made the playoffs",
-        "Playoffs",
-        "Played at least one playoff game: one of the sixteen teams in the bracket.",
-    ),
-    Stage(
-        "won_a_round",
-        "Won a playoff series",
-        "Second round",
-        "Won the first round and reached the conference semifinals.",
-    ),
-    Stage(
-        "made_conference_finals",
-        "Reached the conference finals",
-        "Conference finals",
-        "One of the last four teams.",
-    ),
-    Stage(
-        "made_finals",
-        "Reached the NBA Finals",
-        "NBA Finals",
-        "One of the last two teams.",
-    ),
-    Stage(
-        "won_championship",
-        "Won the championship",
-        "Champion",
-        "Won the NBA Finals.",
-    ),
-)
-STAGE_KEYS: tuple[str, ...] = tuple(stage.key for stage in STAGES)
 EVERY_TEAM = "every_team"
 """The group that is not a stage: the whole field, for reference."""
 
@@ -142,13 +112,6 @@ SEPARATION_COLUMNS = (
     "reached_median_rank",
     "others_median_rank",
 )
-
-
-def stage(key: str) -> Stage:
-    for candidate in STAGES:
-        if candidate.key == key:
-            return candidate
-    raise KeyError(f"no stage named {key!r} (stages: {', '.join(STAGE_KEYS)})")
 
 
 # --- the research frame -----------------------------------------------------------------

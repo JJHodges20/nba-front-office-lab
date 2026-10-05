@@ -30,6 +30,7 @@ PAGES = (
     "builder",
     "fit",
     "optimizer",
+    "postseason",
     "health",
 )
 STATES = {
@@ -651,7 +652,7 @@ class TestLab:
         glossary = next(
             frame.value for frame in opened.dataframe if "Definition" in frame.value.columns
         )
-        assert len(glossary) == 145
+        assert len(glossary) == 152
         assert set(glossary["Group"]) == {
             "Player metrics",
             "Team metrics",
@@ -659,8 +660,9 @@ class TestLab:
             "Benchmark measures",
             "Player value",
             "Roster fit",
+            "Postseason model",
         }
-        assert "145 metrics." in texts(opened)
+        assert "152 metrics." in texts(opened)
 
     def test_the_glossary_can_be_searched(self, page, plain_home: Path) -> None:
         opened = page(plain_home, "lab", lab_glossary_search="true shooting")

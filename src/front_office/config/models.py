@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from front_office.config.settings import ConfigError, read_yaml
 from front_office.domain.fit_model import FitEvidence, FitSpec
+from front_office.domain.postseason import PostseasonModel, PostseasonSpec
 from front_office.domain.value_model import ValueModel, ValueSpec
 
 MODELS_DIR = "models"
@@ -21,6 +22,8 @@ VALUE_SPEC_FILE = "player_value.yaml"
 VALUE_MODEL_FILE = "player_value.json"
 FIT_SPEC_FILE = "roster_fit.yaml"
 FIT_EVIDENCE_FILE = "roster_fit.json"
+POSTSEASON_SPEC_FILE = "postseason.yaml"
+POSTSEASON_MODEL_FILE = "postseason.json"
 
 
 def value_spec_path(config_dir: Path) -> Path:
@@ -110,4 +113,46 @@ def save_fit_evidence(config_dir: Path, evidence: FitEvidence) -> Path:
     path = fit_evidence_path(config_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(evidence.model_dump_json(indent=1) + "\n", encoding="utf-8", newline="\n")
+    return path
+
+
+# --- the postseason model ------------------------------------------------------------------
+
+
+def postseason_spec_path(config_dir: Path) -> Path:
+    return config_dir / MODELS_DIR / POSTSEASON_SPEC_FILE
+
+
+def postseason_model_path(config_dir: Path) -> Path:
+    return config_dir / MODELS_DIR / POSTSEASON_MODEL_FILE
+
+
+def load_postseason_spec(config_dir: Path) -> PostseasonSpec:
+    """How the postseason model is to be fitted and tested."""
+    path = postseason_spec_path(config_dir)
+    try:
+        return PostseasonSpec.model_validate(read_yaml(path))
+    except ValidationError as error:
+        raise ConfigError(f"invalid postseason model specification in {path}:\n{error}") from error
+
+
+def load_postseason_model(config_dir: Path) -> PostseasonModel | None:
+    """The fitted postseason model, or ``None`` if none has been written."""
+    path = postseason_model_path(config_dir)
+    if not path.is_file():
+        return None
+    try:
+        return PostseasonModel.model_validate_json(path.read_text(encoding="utf-8"))
+    except ValidationError as error:
+        raise ConfigError(
+            f"{path} is not a fitted postseason model this version of the lab can read:\n"
+            f"{error}\nFit it again: fol playoffs fit --write"
+        ) from error
+
+
+def save_postseason_model(config_dir: Path, model: PostseasonModel) -> Path:
+    """Write the fitted postseason model where the services will find it."""
+    path = postseason_model_path(config_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(model.model_dump_json(indent=1) + "\n", encoding="utf-8", newline="\n")
     return path

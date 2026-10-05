@@ -98,7 +98,7 @@ def test_metrics_prints_the_glossary() -> None:
 def test_metrics_write_creates_the_document(project: Path) -> None:
     result = runner.invoke(app, ["metrics", "--write"])
     assert result.exit_code == 0, result.output
-    assert "145 metrics" in result.output
+    assert "152 metrics" in result.output
     written = (project / "docs" / "METRICS.md").read_text(encoding="utf-8")
     assert written.startswith("# Metric Glossary")
     assert "\r" not in written
@@ -828,3 +828,111 @@ class TestFitCommands:
         result = runner.invoke(app, ["fit", "test"])
         assert result.exit_code == 1
         assert "Error: the database has not been built" in result.output
+
+
+class TestPlayoffsCommands:
+    """fol playoffs fit, show and report."""
+
+    @pytest.fixture
+    def model_file(self, project: Path) -> Path:
+        return project / "configs" / "models" / "postseason.json"
+
+    @pytest.fixture
+    def played(self, project: Path, postseason_home: Path, model_file: Path) -> None:
+        """The invented league with its playoffs and the value model on file, and no
+        postseason model yet."""
+        shutil.copytree(postseason_home, project, dirs_exist_ok=True)
+        model_file.unlink()
+
+    @pytest.fixture
+    def prebuilt(self, project: Path, built_template) -> None:  # type: ignore[no-untyped-def]
+        """The fixture store's database in place, as if `fol build` had been run."""
+        (project / "data").mkdir(exist_ok=True)
+        for path in (built_template[0] / "data").glob("front_office.sqlite*"):
+            shutil.copy(path, project / "data" / path.name)
+
+    def test_playoffs_alone_lists_its_commands(self) -> None:
+        result = runner.invoke(app, ["playoffs"])
+        assert "fit" in result.output and "show" in result.output and "report" in result.output
+
+    def test_show_prints_the_shipped_model_and_how_it_did(self) -> None:
+        result = runner.invoke(app, ["playoffs", "show"])
+        assert result.exit_code == 0, result.output
+        flat = " ".join(result.output.split())
+        assert "Revision 1, fitted " in flat
+        assert "Series model: home advantage" in flat
+        assert "Out of sample, 2006-07 to " in flat and "Through the bracket:" in flat
+        assert "Tried beside the series model" in flat
+        assert "Winning percentage instead of net rating" in flat
+
+    def test_show_without_a_model_says_how_to_fit_one(self, model_file: Path) -> None:
+        model_file.unlink()
+        result = runner.invoke(app, ["playoffs", "show"])
+        assert result.exit_code == 1
+        assert "No postseason model has been fitted" in result.output
+        assert "Run: fol playoffs fit --write" in result.output
+
+    def test_fit_shows_the_model_and_saves_nothing_unless_asked(
+        self, played: None, model_file: Path
+    ) -> None:
+        result = runner.invoke(app, ["playoffs", "fit"])
+        assert result.exit_code == 0, result.output
+        flat = " ".join(result.output.split())
+        assert "Fitted on " in flat and " series, 2000-01 to 2013-14" in flat
+        assert "Not saved. To save it as revision 1: fol playoffs fit --write" in flat
+        assert not model_file.exists()
+
+    def test_fit_write_saves_and_a_second_run_writes_nothing(
+        self, played: None, model_file: Path
+    ) -> None:
+        result = runner.invoke(app, ["playoffs", "fit", "--write"])
+        assert result.exit_code == 0, result.output
+        assert "(revision 1)." in " ".join(result.output.split())
+        assert model_file.is_file()
+        again = runner.invoke(app, ["playoffs", "fit", "--write"])
+        assert again.exit_code == 0, again.output
+        assert "The same as revision 1, already on file. Nothing to write." in " ".join(
+            again.output.split()
+        )
+        shown = runner.invoke(app, ["playoffs", "show"])
+        assert shown.exit_code == 0 and "Revision 1, fitted " in shown.output
+
+    def test_fit_without_a_database_says_so(self) -> None:
+        result = runner.invoke(app, ["playoffs", "fit"])
+        assert result.exit_code == 1
+        assert "Error: the database has not been built" in result.output
+
+    def test_fit_on_data_that_cannot_support_it_says_what_is_missing(self, prebuilt: None) -> None:
+        # The fixture store values two teams of one season: no game has both sides known.
+        result = runner.invoke(app, ["playoffs", "fit"])
+        assert result.exit_code == 1
+        assert "Error: no decided playoff games and series with the inputs known" in result.output
+
+    def test_report_prints_the_write_up(self, project: Path, prebuilt: None) -> None:
+        result = runner.invoke(app, ["playoffs", "report"])
+        assert result.exit_code == 0, result.output
+        assert result.output.startswith("# How Far Can a Team Go?")
+        assert "## How it was tested" in result.output
+        assert "## What this does not say" in result.output
+        assert not (project / "docs" / "research" / "POSTSEASON.md").exists()
+
+    def test_report_write_creates_the_document(self, project: Path, prebuilt: None) -> None:
+        result = runner.invoke(app, ["playoffs", "report", "--write"])
+        assert result.exit_code == 0, result.output
+        written = (project / "docs" / "research" / "POSTSEASON.md").read_text(encoding="utf-8")
+        assert written.startswith("# How Far Can a Team Go?") and "\r" not in written
+        assert "of the postseason model)" in " ".join(result.output.split())
+
+    def test_report_before_anything_is_built_creates_nothing(self, project: Path) -> None:
+        result = runner.invoke(app, ["playoffs", "report"])
+        assert result.exit_code == 1
+        assert "no data has been built yet; run: fol refresh" in result.output
+        assert not (project / "data" / "front_office.sqlite").exists()
+
+    def test_report_without_a_model_says_how_to_get_one(
+        self, prebuilt: None, model_file: Path
+    ) -> None:
+        model_file.unlink()
+        result = runner.invoke(app, ["playoffs", "report"])
+        assert result.exit_code == 1
+        assert "no postseason model to report" in " ".join(result.output.split())

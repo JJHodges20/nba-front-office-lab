@@ -3,6 +3,122 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone 12 - Playoff and championship model (2026-10-05)
+
+**Built**
+
+- `domain/stages.py`: the one list of postseason stages, moved out of the benchmark
+  research so that the benchmarks and the model read the same stages.
+  `domain/postseason.py`: the specification (`configs/models/postseason.yaml`: the first
+  test season, how many top players, the neutral postseasons, the series formats and
+  when they changed, the reliability bands, the resamples) and what a fit writes down -
+  the game model with its intervals and kept draws, the season model's steps, and the
+  whole out-of-sample evaluation.
+- `modeling/postseason/`: `features.py` (a team by its regular-season net rating and
+  top-player quality; the games and series the model is fitted and tested on),
+  `series.py` (one game, enumerated through the series format), `bracket.py` (a bracket
+  read from the series played; the series model carried through it exactly; home court
+  by record, head-to-head, seed, rating), `hierarchy.py` (the season model: conditional
+  steps multiplied up, an uncertain rating integrated over by quadrature), `fitting.py`
+  (a logistic fit by Newton's method with a trace of ridge; log loss, Brier, calibration,
+  reliability with Wilson intervals, intervals from resampling seasons) and `fit.py`
+  (both models fitted on every season and tested one season at a time against simpler
+  methods and the alternatives tried).
+- `pipelines/postseason.py` and `fol playoffs fit [--write]`, `fol playoffs show`,
+  `fol playoffs report [--write]`; `configs/models/postseason.json`, revision 1, fitted
+  on 2,440 playoff games, 450 series and 892 team-seasons.
+- `services/postseason.py` - `PostseasonService`: a decided season's bracket with every
+  team's chance of every round before game 1, its series with the chance given to the
+  home-court side, every team of a season under the season model, a team of any strength
+  with its interval, a real team or a built roster read as a team of its strength (the
+  sum of the parts, with the value model's error folded in), and a stage's chance across
+  net ratings. `services/postseason_report.py` and
+  [research/POSTSEASON.md](research/POSTSEASON.md). The glossary grows to 152 metrics.
+- The **Postseason Outlook** page, in a new Forecast group: A team's chances, Every team,
+  The bracket, Series, The model. A band-line builder (an estimate with its interval as
+  a wash) joins `wb/charts.py`.
+- The invented league plays its playoffs: `tests/league.py` seeds sixteen teams, plays
+  every series game by game from a planted home advantage and two slopes, and records
+  the games, the series and every team's outcome as the real tables hold them;
+  `tests/postseason_reference.py` holds the planted parameters and reference
+  computations that share no code with the model.
+
+**Decisions** ([0014](decisions/0014-postseason-model.md))
+
+- Two inputs, both known before a playoff game is played and both things the lab can say
+  about a roster before a season: net rating and the mean impact of the three best
+  players.
+- A game model carried through the format and the bracket, exactly; a season model of
+  conditional steps, so that the thirty champions on record never carry a model of their
+  own.
+- Every test an expanding window from 2006-07; intervals from resampling whole seasons;
+  no recalibration layer, and the calibration shown instead.
+- Winning percentage, and the gap to the conference's eighth-best rating, out-predict
+  the season model on seasons already played and are left out on purpose: the model is
+  read for a roster before its season, when neither exists. Recorded with the figures.
+
+**Verification**
+
+- The series enumeration against a reference that walks every way a series can go, for
+  every format; the other side's complement; even sides split evenly. The bracket
+  arithmetic against a bracket played a hundred thousand times from the same parameters,
+  every team and every round within a hundredth; the rounds adding up to eight, four, two
+  and one; equal teams at a half, a quarter, an eighth and a sixteenth.
+- The logistic fit recovers planted weights and finishes on perfectly separated data;
+  calibration reads slope one on chances that mean what they say and a half on chances
+  sharpened twice; reliability bands, resampling and intervals by hand.
+- Fitting on the invented league finds the planted home advantage and slopes inside
+  their intervals (0.44 for 0.45, 0.13 for 0.11, 0.28 for 0.30), and the evaluation
+  covers eight test seasons - 120 series, 128 team-postseasons, 240 team-seasons - with
+  the bracket's mean chances exact.
+- The pipeline fits what the modeling fits, writes nothing unless asked, and names what
+  is missing (no value model, no database, nobody valued, too little history). The
+  service on the invented league (a bracket whose chances add up and whose first round is
+  the series model on each pair; every series against the league's own record; thirty
+  teams best first; a team and a roster read as a team of its strength) and on the
+  fixture store (two valued teams: the bracket says who is missing, most series lack an
+  input). The report, and the three commands.
+- The page: every tab against the service on the fixture store and on the invented
+  league; the empty states; the out-of-date notice; the sweep from three starts.
+- The shipped model: beats every simpler method out of sample at every stage, each input
+  earns its place, calibration slopes between 0.6 and 1.2, every reliability band covers
+  its observed share, and the file is exactly what saving it would write.
+- The page in both themes on the real data, every tab, clicked through in a browser: a
+  team, a strength set by hand, every team, the 2025-26 bracket, its series, the model.
+
+**Found on the way**
+
+- Yesterday's edit of the command-line module had turned every `"\n"` in it into a real
+  line break - a syntax error that left every `fol` command unusable. Repaired first.
+- A season without playoff game logs, and a season in which nobody has been valued, broke
+  the feature code on an empty text column; both now key on integers and give an unknown
+  quality rather than a crash. A huge log-odds overflowed the logistic function during
+  Newton's method on a nearly separated step; it is written to never overflow.
+- The season model's first step is nearly decided by net rating, so a strong team's
+  chance of the playoffs rounds to 100%; it is shown to a decimal with its interval
+  rather than as a round number.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| Automated tests | 2,806 passed, none skipped; about four minutes with `pytest -n auto` |
+| Data-quality checks | Unchanged: no table or check was added; the real database stands at build 13 (57 checks, 0 errors, 7 standing warnings) |
+| UI review | The new page in both themes on the real data, every tab; the subject switch, the inputs, the stage selectors and the tabs clicked through in a browser |
+| Architectural boundaries | `tests/architecture` passes. The stages and the model file are `domain`, the model is `modeling`, the fit on request is a `pipeline`, every chance is computed by a `service` from the file; the page computes nothing and the build applies nothing |
+| Lint | `ruff check` and `ruff format --check` clean |
+
+**Open items carried forward**
+
+- The model's chances are a little too sure of themselves at the extremes, more so in
+  recent seasons as home advantage has fallen; an era-weighted fit, or a recalibration
+  estimated out of sample, is the first refinement to test.
+- Top-player quality comes from a value model fitted on every season; a stricter test
+  would refit it inside each window.
+- The play-in is not modelled, and the season model knows nothing of the field.
+  Milestone 13's simulator will put rosters through seasons; a chance given a field is
+  where it would start.
+
 ## Milestone 11 - Roster optimizer (2026-10-04)
 
 **Built**

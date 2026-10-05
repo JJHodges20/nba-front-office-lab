@@ -302,3 +302,17 @@ describes what is on screen rather than what was once intended.
 | IMP sum | Impact, sum of parts | `impact_sum` | modeled | signed number | higher | The players' impacts added up for the minutes given: the net rating, relative to the league, a team would have if its players simply added up. |
 | P-IMP sum | Projected impact, sum of parts | `projected_sum` | modeled | signed number | higher | The same with each player's projection going into the season instead of what the season showed. |
 | MIN cov. | Minutes covered | `minutes_covered` | modeled | percentage | neither | The players' minutes as a share of the minutes a team has to fill in the season. |
+
+## Postseason model
+
+### Postseason
+
+| Metric | Name | Key | Origin | Shown as | Better | Definition |
+| --- | --- | --- | --- | --- | --- | --- |
+| Top-3 IMP | Top-player quality | `top_players` | modeled | signed number | higher | The mean impact, by the value model, of the three players with the highest impact who finished the regular season with the team: the quality of the players a playoff rotation leans on. |
+| P(series) | Series probability | `series_probability` | modeled | percentage | neither | The estimated chance that the home-court side wins the series, from the gap in net rating, the gap in top-player quality and home court, carried through the series format. |
+| P(Playoffs) | Chance: made the playoffs | `p_made_playoffs` | modeled | percentage | higher | The estimated chance that the team made the playoffs - played at least one playoff game: one of the sixteen teams in the bracket. An estimate with an interval, never a guarantee. |
+| P(Second round) | Chance: won a playoff series | `p_won_a_round` | modeled | percentage | higher | The estimated chance that the team won a playoff series - won the first round and reached the conference semifinals. An estimate with an interval, never a guarantee. |
+| P(Conference finals) | Chance: reached the conference finals | `p_made_conference_finals` | modeled | percentage | higher | The estimated chance that the team reached the conference finals - one of the last four teams. An estimate with an interval, never a guarantee. |
+| P(NBA Finals) | Chance: reached the NBA Finals | `p_made_finals` | modeled | percentage | higher | The estimated chance that the team reached the NBA Finals - one of the last two teams. An estimate with an interval, never a guarantee. |
+| P(Champion) | Chance: won the championship | `p_won_championship` | modeled | percentage | higher | The estimated chance that the team won the championship - won the NBA Finals. An estimate with an interval, never a guarantee. |

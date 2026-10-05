@@ -9,6 +9,7 @@ from front_office.analytics.teams import TEAM_METRICS
 from front_office.domain.glossary import render_metric_glossary
 from front_office.domain.metrics import MetricCatalog
 from front_office.modeling.fit.catalog import FIT_METRICS
+from front_office.modeling.postseason.catalog import POSTSEASON_METRICS
 from front_office.modeling.value.catalog import VALUE_METRICS
 
 METRIC_CATALOGS: dict[str, MetricCatalog] = {
@@ -18,6 +19,7 @@ METRIC_CATALOGS: dict[str, MetricCatalog] = {
     "Benchmark measures": RESEARCH_METRICS,
     "Player value": VALUE_METRICS,
     "Roster fit": FIT_METRICS,
+    "Postseason model": POSTSEASON_METRICS,
 }
 
 

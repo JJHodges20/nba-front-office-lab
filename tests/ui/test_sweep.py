@@ -48,6 +48,12 @@ STARTS: dict[str, dict[str, dict[str, object]]] = {
     # The roster start needs the roster the sweep creates; the team start needs a team.
     "fit": {"team": {state.TEAM: BOS}, "roster": {"fit_subject": "Built roster"}},
     "optimizer": {"open": {}},
+    # The team start reads the sidebar's team; the roster start needs the sweep's roster.
+    "postseason": {
+        "open": {},
+        "team": {state.TEAM: BOS},
+        "roster": {"ps_subject": "Built roster"},
+    },
     "health": {"open": {}},
 }
 # The one filter a page is swept through in full although it is long, from the first of

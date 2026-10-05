@@ -212,6 +212,7 @@ class TestGlossary:
             "Benchmark measures",
             "Player value",
             "Roster fit",
+            "Postseason model",
         ]
         document = metric_glossary()
         for catalog in METRIC_CATALOGS.values():

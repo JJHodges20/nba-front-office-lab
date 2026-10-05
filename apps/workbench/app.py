@@ -23,6 +23,7 @@ from wb.views import (
     league,
     optimizer,
     players,
+    postseason,
     teams,
     value,
 )
@@ -90,6 +91,14 @@ PAGES = {
             title="Roster Optimizer",
             icon=":material/tune:",
             url_path="optimizer",
+        ),
+    ],
+    "Forecast": [
+        st.Page(
+            postseason.render,
+            title="Postseason Outlook",
+            icon=":material/query_stats:",
+            url_path="postseason",
         ),
     ],
     "System": [

@@ -13,7 +13,9 @@ import streamlit as st
 
 from front_office.domain.fit_model import FitEvidence
 from front_office.domain.optimizer import OptimizerRequest
+from front_office.domain.postseason import PostseasonModel
 from front_office.services import (
+    BracketReport,
     Era,
     EraView,
     FitReport,
@@ -23,12 +25,15 @@ from front_office.services import (
     ModelCard,
     OptimizerReport,
     OptimizerStatus,
+    Outlook,
     PlayerProfile,
     PlayerTable,
+    PostseasonStatus,
     Qualification,
     Relationship,
     RosterSummary,
     StageSummary,
+    SubjectOutlook,
     TeamProfile,
     TeamTable,
     ValueForMoney,
@@ -301,6 +306,72 @@ def optimizer_pool(build: int | None) -> pd.DataFrame:
 def optimizer_solve(build: int | None, request: OptimizerRequest) -> OptimizerReport:
     """A run of the optimizer, kept for as long as the request and the build stand."""
     return lab().optimizer.solve(request)
+
+
+# --- the postseason model ---------------------------------------------------------------
+#
+# Besides the build, these are keyed on the model's revision: fitting the model again
+# changes the file without a build.
+
+
+@st.cache_data(show_spinner=False)
+def postseason_status(build: int | None) -> PostseasonStatus:
+    return lab().postseason.status()
+
+
+@st.cache_data(show_spinner=False)
+def postseason_model(build: int | None, revision: int | None) -> PostseasonModel | None:
+    return lab().postseason.model()
+
+
+@st.cache_data(show_spinner=False)
+def postseason_bracket(build: int | None, revision: int | None, season: str) -> BracketReport:
+    return lab().postseason.bracket(season)
+
+
+@st.cache_data(show_spinner=False)
+def postseason_series(build: int | None, revision: int | None, season: str) -> pd.DataFrame:
+    return lab().postseason.series(season)
+
+
+@st.cache_data(show_spinner=False)
+def postseason_odds(build: int | None, revision: int | None, season: str) -> pd.DataFrame:
+    return lab().postseason.season_odds(season)
+
+
+@st.cache_data(show_spinner=False)
+def postseason_outlook(
+    build: int | None,
+    revision: int | None,
+    net_rating: float,
+    top_players: float | None,
+    error: float | None,
+) -> Outlook:
+    return lab().postseason.outlook(net_rating, top_players, error=error)
+
+
+@st.cache_data(show_spinner=False)
+def postseason_curve(
+    build: int | None, revision: int | None, top_players: float | None
+) -> pd.DataFrame:
+    return lab().postseason.curve(top_players)
+
+
+@st.cache_data(show_spinner=False)
+def postseason_typical(build: int | None, revision: int | None, net_rating: float) -> float:
+    return lab().postseason.typical_top(net_rating)
+
+
+@st.cache_data(show_spinner=False)
+def postseason_team(
+    build: int | None, revision: int | None, team_id: int, season: str
+) -> SubjectOutlook:
+    return lab().postseason.team(team_id, season)
+
+
+def postseason_roster(roster_id: int) -> SubjectOutlook:
+    """A built roster read as a team of its strength. Rosters change, so never cached."""
+    return lab().postseason.roster(roster_id)
 
 
 def optimizer_save(player_ids: list[int], name: str, request: OptimizerRequest) -> int:

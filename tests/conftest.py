@@ -17,6 +17,8 @@ from front_office.config import (
     fit_spec_path,
     load_all_season_rules,
     load_settings,
+    postseason_model_path,
+    postseason_spec_path,
     save_value_model,
 )
 from front_office.config.settings import ENV_DATA_DIR, ENV_HOME
@@ -259,4 +261,37 @@ def optimizer_home(value_home: Path, tmp_path_factory) -> Path:  # type: ignore[
         }
         teams = {int(player): int(team) for player, team in ahead["team_id"].dropna().items()}
     pay_players(settings, season, salaries, teams)
+    return home
+
+
+QUICK_POSTSEASON_SPEC = 'first_test_season: "2006-07"\nmin_training_seasons: 3\nresamples: 100\nkept_draws: 40\nformats: []\n'
+"""A postseason specification that tests eight seasons of the invented league quickly."""
+
+
+@pytest.fixture(scope="session")
+def postseason_league():  # type: ignore[no-untyped-def]
+    """A thirty-team invented league whose playoffs were played by a planted series model:
+    the league, the planted value model it is valued by, and the frames a build would hold."""
+    from tests.postseason_reference import postseason_league
+
+    return postseason_league(VALUE_SPEC)
+
+
+@pytest.fixture(scope="session")
+def postseason_home(postseason_league, tmp_path_factory) -> Path:  # type: ignore[no-untyped-def]
+    """A project whose database is the thirty-team league with its playoffs, valued by the
+    planted model, with the postseason model fitted on it and on file under the quick
+    specification. Read from it; never write to it."""
+    from front_office.pipelines.postseason import fit_postseason, write_postseason_model
+    from tests.synthetic_lab import write_lab
+
+    league, model, _ = postseason_league
+    home = tmp_path_factory.mktemp("postseason") / "lab"
+    shutil.copytree(REPO_ROOT / "configs", home / "configs")
+    save_value_model(home / "configs", model)
+    postseason_spec_path(home / "configs").write_text(QUICK_POSTSEASON_SPEC, encoding="utf-8")
+    postseason_model_path(home / "configs").unlink()
+    settings = write_lab(home, league, model)
+    report = fit_postseason(settings, now=lambda: datetime(2026, 10, 5, 12, 0))
+    write_postseason_model(settings, report.model)
     return home

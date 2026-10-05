@@ -43,6 +43,15 @@ from front_office.services.players import (
     PlayerService,
     PlayerTable,
 )
+from front_office.services.postseason import (
+    BracketReport,
+    Outlook,
+    PostseasonError,
+    PostseasonService,
+    PostseasonStatus,
+    SubjectOutlook,
+    probability_key,
+)
 from front_office.services.teams import TeamProfile, TeamService, TeamTable
 from front_office.services.value import ModelCard, ValueForMoney, ValueService, ValueStatus
 from front_office.services.window import Window
@@ -54,6 +63,7 @@ __all__ = [
     "METRIC_CATALOGS",
     "POSTSEASON_RESULTS",
     "BenchmarkService",
+    "BracketReport",
     "BuilderService",
     "ContractService",
     "Era",
@@ -74,9 +84,13 @@ __all__ = [
     "OptimizerReport",
     "OptimizerService",
     "OptimizerStatus",
+    "Outlook",
     "PlayerProfile",
     "PlayerService",
     "PlayerTable",
+    "PostseasonError",
+    "PostseasonService",
+    "PostseasonStatus",
     "Qualification",
     "Relationship",
     "RosterCheck",
@@ -86,6 +100,7 @@ __all__ = [
     "RosterSummary",
     "SourceStatus",
     "StageSummary",
+    "SubjectOutlook",
     "SumOfParts",
     "TeamProfile",
     "TeamService",
@@ -96,5 +111,6 @@ __all__ = [
     "Window",
     "floor",
     "metric_glossary",
+    "probability_key",
     "relationship",
 ]

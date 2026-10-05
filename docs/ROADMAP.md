@@ -43,16 +43,19 @@ points-per-dollar.
 | 9 | Player value engine | Validated value features, surplus value, archetypes | Done (surplus value needs a contract file) |
 | 10 | Roster fit engine | Fit, redundancy, role coverage, weaknesses | Done (fit is description; the evidence supports no correction to the sum of the parts) |
 | 11 | Roster optimizer | Budget and roster constraints, multiple candidate rosters | Done (needs a contract file for the season ahead) |
-| 12 | Playoff/championship model | Calibrated postseason probability models | Not started |
+| 12 | Playoff/championship model | Calibrated postseason probability models | Done (tested out of sample from 2006-07; chances shown with intervals and the evidence) |
 | 13 | Simulator | Scenario and Monte Carlo analysis | Not started |
 | 14 | Full-system audit | Architecture, leakage, tests, UI, documentation, performance | Not started |
 
 Milestones 1-7 make up **v1.0 - League and Roster Analytics**, the first release target.
 All seven are done; one acceptance criterion below stays open until a contract file is
 supplied. Milestone 8 is the roadmap's version 2 (*Winning Benchmarks*), milestone 9 its
-version 3 (*Player Value Engine*), milestone 10 its version 4 (*Roster Fit Engine*) and
-milestone 11 its version 5 (*Budget Roster Optimizer*); the surplus-value half of version
-3 and the optimizer's pool both wait on the same file.
+version 3 (*Player Value Engine*), milestone 10 its version 4 (*Roster Fit Engine*),
+milestone 11 its version 5 (*Budget Roster Optimizer*) and milestone 12 its version 6
+(*Contender Probability Model*); the surplus-value half of version 3 and the optimizer's
+pool both wait on the same file. With milestone 12 the lab shows its first forecast: a
+chance of each postseason stage, with its interval, from a model validated on seasons it
+had not seen ([decisions/0014](decisions/0014-postseason-model.md)).
 
 ## Completion gate for every milestone
 

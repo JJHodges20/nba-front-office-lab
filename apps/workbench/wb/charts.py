@@ -967,3 +967,92 @@ def meter(
     figure.update_xaxes(tickformat=tickformat, range=[0, upper] if upper else None)
     figure.update_yaxes(showgrid=False, showticklabels=False)
     return figure
+
+
+def band_line(
+    frame: pd.DataFrame,
+    *,
+    x: str,
+    y: str,
+    low: str,
+    high: str,
+    text: str,
+    palette: Palette,
+    x_title: str = "",
+    y_title: str = "",
+    x_tickformat: str = "",
+    tickformat: str = "",
+    reference: float | None = None,
+    reference_label: str = "",
+    marked: Sequence[object] = (),
+    height: int = 320,
+) -> go.Figure:
+    """One estimate over an ordered numeric axis, with the interval it may lie in.
+
+    The line is the estimate; the wash behind it runs from ``low`` to ``high``, so a wide
+    band is an estimate that rests on little. ``text`` is the column of ready-made
+    tooltip values. The last point carries an end dot; ``marked`` lists x values that get
+    one too. ``reference`` draws a hairline at a value on the y-axis, named by
+    ``reference_label`` in the margin.
+    """
+    figure = _base(palette, height=height)
+    if reference is not None:
+        _reference_line(figure, palette, y=reference)
+        if reference_label:
+            figure.update_layout(margin={"r": REFERENCE_MARGIN})
+            _note(
+                figure, palette, reference_label, x=1, y=reference, xref="paper",
+                xanchor="left", yanchor="middle", xshift=6, align="left",
+            )  # fmt: skip
+    for column, fill in ((low, None), (high, "tonexty")):
+        figure.add_trace(
+            go.Scatter(
+                x=frame[x],
+                y=frame[column],
+                mode="none",
+                fill=fill,
+                fillcolor=palette.wash(palette.accent) if fill else None,
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
+    figure.add_trace(
+        go.Scatter(
+            x=frame[x],
+            y=frame[y],
+            mode="lines",
+            line={"color": palette.accent, "width": LINE_WIDTH, "shape": "linear"},
+            customdata=frame[[text]].to_numpy(),
+            hovertemplate="%{customdata[0]}<extra></extra>",
+        )
+    )
+    dots = frame[frame[x].isin(list(marked))]
+    if len(frame):
+        dots = pd.concat([dots, frame.tail(1)]).drop_duplicates(subset=x)
+    figure.add_trace(
+        go.Scatter(
+            x=dots[x],
+            y=dots[y],
+            mode="markers",
+            marker={
+                "size": MARKER_SIZE - 2,
+                "color": palette.accent,
+                "line": {"color": palette.surface, "width": RING_WIDTH},
+            },
+            hoverinfo="skip",
+            cliponaxis=False,
+        )
+    )
+    figure.update_layout(hovermode="x unified")
+    figure.update_xaxes(
+        title_text=x_title,
+        tickformat=x_tickformat,
+        showgrid=False,
+        showspikes=True,
+        spikemode="across",
+        spikethickness=HAIRLINE,
+        spikecolor=palette.axis,
+        spikedash="solid",
+    )
+    figure.update_yaxes(title_text=y_title, tickformat=tickformat)
+    return figure

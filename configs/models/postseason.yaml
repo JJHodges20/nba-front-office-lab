@@ -1,0 +1,41 @@
+# How the postseason model is fitted and tested. Nothing here is a weight: the weights
+# are fitted from the seasons on record, and every choice below was made before looking
+# (docs/decisions/0014-postseason-model.md).
+#
+# Editing this file changes nothing until the model is fitted again:
+#   fol playoffs fit --write
+
+# First season the model is scored on with only earlier seasons to learn from, and how
+# many seasons of playoffs it needs before that. The data begins in 1996-97.
+first_test_season: "2006-07"
+min_training_seasons: 5
+
+# A team's top-player quality is the mean impact, by the value model, of this many of
+# its best players at the end of the regular season.
+top_players: 3
+
+# Playoff experience - a candidate input, tested and reported - counts a player's
+# playoff games over this many previous seasons.
+experience_seasons: 3
+
+# Postseasons played with nobody at home: the 2020 bubble.
+neutral_postseasons: ["2019-20"]
+
+# Series formats: the home sequence of each round. The default is 2-2-1-1-1 (best of
+# seven); the first round was best of five (2-2-1) through 2001-02 and the Finals were
+# 2-3-2 through 2012-13.
+default_pattern: "2-2-1-1-1"
+formats:
+  - {round: 1, through_season: "2001-02", pattern: "2-2-1"}
+  - {round: 4, through_season: "2012-13", pattern: "2-3-2"}
+
+# Where predicted probabilities are grouped to compare them with what happened: a
+# grouping for the reliability table, not a threshold.
+reliability_edges: [0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 1]
+
+# Intervals come from resampling whole seasons this many times; the file keeps this many
+# of the resampled parameter sets, so that any probability can carry an interval.
+resamples: 2000
+kept_draws: 200
+seed: 0
+confidence: 0.95

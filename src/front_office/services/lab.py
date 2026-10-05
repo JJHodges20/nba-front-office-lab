@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from front_office.services.league import LeagueService
     from front_office.services.optimizer import OptimizerService
     from front_office.services.players import PlayerService
+    from front_office.services.postseason import PostseasonService
     from front_office.services.teams import TeamService
     from front_office.services.value import ValueService
 
@@ -212,3 +213,9 @@ class Lab:
         from front_office.services.optimizer import OptimizerService
 
         return OptimizerService(self)
+
+    @property
+    def postseason(self) -> PostseasonService:
+        from front_office.services.postseason import PostseasonService
+
+        return PostseasonService(self)

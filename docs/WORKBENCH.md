@@ -1,6 +1,6 @@
 # The Workbench
 
-The workbench is the lab's interface: eight pages over the database, opened in your
+The workbench is the lab's interface: twelve pages over the database, opened in your
 browser.
 
 ```powershell
@@ -180,16 +180,44 @@ runs only once one is imported for the season ahead. Any roster can be saved int
 Builder, where the Roster Fit page will describe it. Nothing here is a recommendation; see
 [decisions/0013-roster-optimizer.md](decisions/0013-roster-optimizer.md).
 
+**Postseason Outlook.** How likely each stage of the playoffs is, as a model fitted to the
+seasons on record and tested on seasons it had not seen estimates it. The model reads a
+team by two things known before a playoff game is played: its regular-season net rating
+and its *top-player quality*, the mean impact of its three best players by the value
+model. Every chance is shown with its 95% interval, from refitting the model on resampled
+seasons.
+
+- *A team's chances*: the sidebar's team, a roster you built, or a strength you set
+  yourself, read as a team of that strength entering any season - the season model, a
+  chain of steps from making the playoffs to the title. A built roster is the sum of its
+  parts with the value model's error folded in. Under it, the same chance across net
+  ratings, for the stage you pick.
+- *Every team*: all the teams of the sidebar's season under the season model, ranked by
+  the stage you pick, with what happened where the postseason is decided.
+- *The bracket*: for a decided season, the sixteen playoff teams and their chances of
+  every round as the model would have put them before the first game, from the regular
+  season alone - the series model carried through the actual matchups - beside where each
+  got to. It needs every entrant's inputs, and says who lacks them.
+- *Series*: every series of the season with the chance given to the side that held home
+  court, the favourite, and the result.
+- *The model*: what it is and how it did on seasons it had not seen - against simpler
+  methods, by round and by era, through the bracket and for every team-season - with
+  reliability charts, what else was tried, and what the model cannot tell you.
+
+The same as a document: [research/POSTSEASON.md](research/POSTSEASON.md); why it is built
+this way: [decisions/0014-postseason-model.md](decisions/0014-postseason-model.md).
+
 **Data Health.** How the last build went, the state of each source, what is missing and
 what that costs, every quality check, every adjustment the build made to source data,
 what is held of each dataset, and any fetch that is failing.
 
 ## What it does not do yet
 
-No forecast of a team's season or its postseason. That is the next roadmap stage. The
-benchmarks give historical frequencies, and player value is an estimate of what a player
-adds; nothing in the workbench presents either as a prediction of how a team will do. A
-role is a rule applied to a player's statistics, not a measurement of how they play, and
-the page says so. Roster fit describes a roster and reports what the evidence found; it
-does not score one. The optimizer's rosters are the parts added up under a budget,
-several of them, never one answer.
+No simulation of a season: what a signing, a trade or an injury would do to a team's
+chances is the next roadmap stage. The benchmarks give historical frequencies, and player
+value is an estimate of what a player adds; the postseason chances are the one forecast in
+the workbench, and they are estimates with intervals from a model whose record on past
+seasons is a tab away, never a verdict on a team. A role is a rule applied to a player's
+statistics, not a measurement of how they play, and the page says so. Roster fit describes
+a roster and reports what the evidence found; it does not score one. The optimizer's
+rosters are the parts added up under a budget, several of them, never one answer.

@@ -27,6 +27,9 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe fit test --write          # gather the roster fit evidence again (configs/models/roster_fit.json)
 .\.venv\Scripts\fol.exe fit show                  # the roster fit evidence on file
 .\.venv\Scripts\fol.exe fit report --write        # regenerate docs/research/ROSTER_FIT.md
+.\.venv\Scripts\fol.exe playoffs show             # the fitted postseason model and how it did out of sample
+.\.venv\Scripts\fol.exe playoffs fit --write      # fit it again on the built database (configs/models/postseason.json)
+.\.venv\Scripts\fol.exe playoffs report --write   # regenerate docs/research/POSTSEASON.md
 .\.venv\Scripts\fol.exe ui --no-browser           # the workbench at http://localhost:8501 (Ctrl+C stops it)
 .\.venv\Scripts\python.exe scripts\make_fixtures.py   # rebuild tests/fixtures/raw from data/raw
 ```
@@ -70,9 +73,10 @@ Build one roadmap milestone at a time. A milestone is finished only when:
 - **No thresholds.** Report how often, for how many, with what uncertainty. A band is a
   way of grouping; nothing "needs" a figure. Compare teams within their own season.
 - **Generated documents are not edited.** `docs/DATA_DICTIONARY.md`, `docs/METRICS.md`,
-  `docs/research/BENCHMARKS.md`, `docs/research/PLAYER_VALUE.md` and
-  `docs/research/ROSTER_FIT.md` come from `fol dictionary|metrics|benchmarks --write`,
-  `fol value report --write` and `fol fit report --write`. The first two are checked by
+  `docs/research/BENCHMARKS.md`, `docs/research/PLAYER_VALUE.md`,
+  `docs/research/ROSTER_FIT.md` and `docs/research/POSTSEASON.md` come from
+  `fol dictionary|metrics|benchmarks --write`, `fol value report --write`,
+  `fol fit report --write` and `fol playoffs report --write`. The first two are checked by
   tests; the research documents depend on the database, so regenerate them at a milestone
   gate after the data, a model, the evidence or the research code changes.
 - **A model is fitted on request and applied by every build.** `fol value fit --write`
@@ -101,6 +105,18 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   cut off before the next search, and names why nothing was found. It needs salaries from
   the user's contract file; tests and the demo use invented ones
   (`docs/decisions/0013-roster-optimizer.md`). SciPy's `milp` (HiGHS) is the solver.
+- **A postseason chance is read off a file, with its interval, never fitted on a page.**
+  `fol playoffs fit --write` writes `configs/models/postseason.json` (a game model carried
+  through the series format and the bracket, and a season model of conditional steps);
+  no build applies it, and `services/postseason.py` computes every chance on request from
+  the file's parameters and kept draws. The stages are the one list in `domain/stages.py`.
+  The model's inputs are the regular season's net rating and top-player quality because
+  those are what the lab can say about a roster before a season; winning percentage
+  out-predicts net rating on seasons already played and is left out on purpose, and the
+  decision says why. Any change to the model or its inputs goes through the expanding-window
+  test and is recorded (`docs/decisions/0014-postseason-model.md`). A chance is shown with
+  its 95% interval and beside what happened where the season is decided; the page's "The
+  model" tab is the evidence, and nothing calls a chance a verdict.
 - **Archetypes are rules, not findings.** They live in `configs/archetypes.yaml`; a
   player's score for a role is the weakest of their percentiles on its measures, among
   the group the role is open to, within the season. To change one: edit the file, raise

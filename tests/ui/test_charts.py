@@ -87,6 +87,21 @@ BUILDERS: dict[str, Callable[[Palette], go.Figure]] = {
         text={"y": "text", "percentile": "text"},
         palette=p,
     ),  # fmt: skip
+    "band_line": lambda p: charts.band_line(
+        RATES.assign(x=[1.0, 2.0, 3.0]),
+        x="x",
+        y="rate",
+        low="low",
+        high="high",
+        text="text",
+        palette=p,
+        x_title="Net rating",
+        y_title="Chance",
+        tickformat=".0%",
+        reference=0.5,
+        reference_label="Coin flip",
+        marked=[2.0],
+    ),  # fmt: skip
     "stacked_bars": lambda p: charts.stacked_bars(
         FRAME,
         label="name",
@@ -743,3 +758,46 @@ class TestMeter:
             value=300.0, value_text="300", thresholds={"Cap": 100.0}, palette=LIGHT
         )
         assert figure.layout.xaxis.range[1] > 300.0
+
+
+class TestBandLine:
+    def test_the_band_is_a_wash_from_low_to_high_behind_the_line(self) -> None:
+        lower, upper, line, dots = BUILDERS["band_line"](LIGHT).data
+        assert lower.mode == upper.mode == "none"
+        assert lower.fill is None and upper.fill == "tonexty"
+        assert upper.fillcolor == LIGHT.wash(LIGHT.accent)
+        assert list(lower.y) == [0.0, 0.1, 0.4] and list(upper.y) == [0.2, 0.5, 0.8]
+        assert lower.hoverinfo == upper.hoverinfo == "skip"
+        assert line.mode == "lines" and line.line.color == LIGHT.accent
+        assert list(line.y) == [0.0, 0.25, 0.6]
+        assert line.customdata[1].tolist() == ["5 of 20"]
+
+    def test_marked_points_and_the_last_point_get_a_dot(self) -> None:
+        dots = BUILDERS["band_line"](LIGHT).data[-1]
+        assert dots.mode == "markers" and sorted(dots.x) == [2.0, 3.0]
+        plain = charts.band_line(
+            RATES.assign(x=[1.0, 2.0, 3.0]), x="x", y="rate", low="low", high="high",
+            text="text", palette=LIGHT,
+        ).data[-1]  # fmt: skip
+        assert list(plain.x) == [3.0]
+
+    def test_the_reference_is_named_in_the_margin(self) -> None:
+        figure = BUILDERS["band_line"](LIGHT)
+        note = figure.layout.annotations[0]
+        assert (note.text, note.xref, note.x, note.y) == ("Coin flip", "paper", 1, 0.5)
+        assert figure.layout.margin.r == charts.REFERENCE_MARGIN
+        assert [shape.y0 for shape in figure.layout.shapes] == [0.5]
+
+    def test_hovering_reads_the_value_at_that_position(self) -> None:
+        figure = BUILDERS["band_line"](LIGHT)
+        assert figure.layout.hovermode == "x unified"
+        assert figure.layout.xaxis.showspikes and figure.layout.xaxis.spikedash == "solid"
+        assert figure.layout.yaxis.tickformat == ".0%"
+        assert figure.layout.xaxis.title.text == "Net rating"
+
+    def test_no_points(self) -> None:
+        figure = charts.band_line(
+            RATES.iloc[0:0].assign(x=[]), x="x", y="rate", low="low", high="high", text="text",
+            palette=LIGHT,
+        )  # fmt: skip
+        assert all(len(trace.x) == 0 for trace in figure.data)
