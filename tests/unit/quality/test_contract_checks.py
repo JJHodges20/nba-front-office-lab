@@ -58,7 +58,7 @@ CONTRACT_CHECKS = (
     "contract_years.contract_id_exists",
     "contract_years.player_id_exists",
     "contract_years.team_id_exists",
-    "contract_years.one_active_contract_per_player_season",
+    "contract_years.one_active_contract_per_player_team_season",
     "contract_years.cap_shares_are_consistent",
     "contract_years.salaries_are_plausible",
 )
@@ -126,28 +126,46 @@ class TestCapShare:
         assert result.failures == 30
 
 
+CHECK_ONE_ACTIVE = "contract_years.one_active_contract_per_player_team_season"
+
+
+def with_second_contract(tables, *, other_team: bool = False, **changes) -> None:
+    """Add a copy of the first contract, and of its first season, with ``changes``.
+
+    ``other_team`` moves the copy to the fixture team the first contract is not with.
+    """
+    contracts, years = tables["contracts"], tables["contract_years"]
+    first = contracts.iloc[0]
+    if other_team:
+        changes["team_id"] = NYK if first["team_id"] == BOS else BOS
+    second = contracts.iloc[[0]].assign(contract_id="second", **changes)
+    second_year = years[years["contract_id"] == first["contract_id"]].iloc[[0]]
+    second_year = second_year.assign(contract_id="second")
+    if "team_id" in changes:
+        second_year = second_year.assign(team_id=changes["team_id"])
+    tables["contracts"] = pd.concat([contracts, second], ignore_index=True)
+    tables["contract_years"] = pd.concat([years, second_year], ignore_index=True)
+
+
 class TestOneActiveContract:
-    def test_two_active_contracts_in_one_season(self, tables) -> None:
-        contracts, years = tables["contracts"], tables["contract_years"]
-        duplicate = contracts.iloc[[0]].assign(contract_id="duplicate", team_id=NYK)
-        duplicate_year = years[years["contract_id"] == contracts.iloc[0]["contract_id"]].iloc[[0]]
-        tables["contracts"] = pd.concat([contracts, duplicate], ignore_index=True)
-        tables["contract_years"] = pd.concat(
-            [years, duplicate_year.assign(contract_id="duplicate", team_id=NYK)], ignore_index=True
-        )
-        result = results(tables)["contract_years.one_active_contract_per_player_season"]
+    def test_two_active_contracts_with_one_team_in_one_season(self, tables) -> None:
+        with_second_contract(tables)
+        result = results(tables)[CHECK_ONE_ACTIVE]
         assert result.failures == 1
         assert "active_contracts=2" in result.examples[0]
 
+    def test_a_move_between_teams_within_a_season_is_allowed(self, tables) -> None:
+        """Each team owed its share; the player had one contract, carried by two teams."""
+        with_second_contract(tables, other_team=True)
+        assert results(tables)[CHECK_ONE_ACTIVE].passed
+
+    def test_a_two_way_contract_converted_to_a_standard_one_is_allowed(self, tables) -> None:
+        with_second_contract(tables, contract_type="two_way")
+        assert results(tables)[CHECK_ONE_ACTIVE].passed
+
     def test_dead_money_alongside_an_active_contract_is_allowed(self, tables) -> None:
-        contracts, years = tables["contracts"], tables["contract_years"]
-        dead = contracts.iloc[[0]].assign(contract_id="dead", team_id=NYK, status="dead_money")
-        dead_year = years[years["contract_id"] == contracts.iloc[0]["contract_id"]].iloc[[0]]
-        tables["contracts"] = pd.concat([contracts, dead], ignore_index=True)
-        tables["contract_years"] = pd.concat(
-            [years, dead_year.assign(contract_id="dead", team_id=NYK)], ignore_index=True
-        )
-        assert results(tables)["contract_years.one_active_contract_per_player_season"].passed
+        with_second_contract(tables, other_team=True, status="dead_money")
+        assert results(tables)[CHECK_ONE_ACTIVE].passed
 
 
 class TestPlausibility:

@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING
@@ -93,6 +93,8 @@ class LabStatus:
     """Seasons with configured cap rules, newest first."""
     contract_seasons: tuple[str, ...]
     """Seasons the imported contract file covers, newest first."""
+    contract_as_of: date | None = None
+    """The date the imported contract file was current, as stated at import."""
 
     @property
     def has_contracts(self) -> bool:
@@ -106,14 +108,22 @@ class LabStatus:
     def default_payroll_season(self) -> str | None:
         """The season payroll is priced in by default.
 
-        The earliest season in the contract file that has cap rules - that is the season
-        the file was current for - or, with no contract file, the newest season with cap
-        rules.
+        The season the contract file was current for: the league year (July to June) that
+        holds its as-of date, when the file covers that season and it has cap rules. A
+        file that looks ahead from a later season is priced in the earliest season it
+        covers that has rules; a history that stops before its date, in the latest. With
+        no contract file, the newest season with cap rules.
         """
         priced = [season for season in self.contract_seasons if season in self.cap_seasons]
-        if priced:
+        if not priced:
+            return self.cap_seasons[0] if self.cap_seasons else None
+        if self.contract_as_of is None:
             return priced[-1]
-        return self.cap_seasons[0] if self.cap_seasons else None
+        current = Season.league_year_on(self.contract_as_of).label
+        if current in priced:
+            return current
+        earlier = [season for season in priced if season < current]
+        return earlier[0] if earlier else priced[-1]
 
 
 class Lab:
@@ -160,6 +170,7 @@ class Lab:
             player_seasons=self._seasons("player_seasons"),
             cap_seasons=cap_seasons,
             contract_seasons=self._seasons("contract_years"),
+            contract_as_of=self._contract_as_of(),
         )
 
     def require_built(self) -> None:
@@ -233,6 +244,11 @@ class Lab:
 
     def _seasons(self, table: str) -> tuple[str, ...]:
         return tuple(sorted(self.warehouse.distinct(table, "season"), reverse=True))
+
+    def _contract_as_of(self) -> date | None:
+        """The date the contracts were current: the newest as-of date stated at import."""
+        stated = self.warehouse.distinct("contracts", "as_of_date")
+        return pd.Timestamp(max(stated)).date() if stated else None
 
     # The services import this module, so they are imported here only when asked for.
 

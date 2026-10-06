@@ -9,7 +9,7 @@ something new.
 | NBA salary-cap announcements | Cap, tax line, aprons, minimum team salary, exceptions | Read by hand, transcribed into `configs/seasons/` | In use |
 | NBA "CBA 101" | Roster limits | Read by hand, transcribed into `configs/seasons/` | In use |
 | stats.nba.com (via `nba_api`) | Player, team, game, standings and advanced statistics | Public JSON endpoints, no key | In use |
-| Contract file supplied by the user | Salaries, options, guarantees | CSV placed by hand, imported with `fol contracts import` and built in by `fol build` | In use (no file imported yet) |
+| Contract file supplied by the user | Salaries, options, guarantees | CSV placed by hand, imported with `fol contracts import` and built in by `fol build` | In use: the MrBridge salary dataset, imported 2026-10-05 (see [The contract file in use](#the-contract-file-in-use)) |
 | Basketball Reference | - | - | Not used: terms prohibit this project's use |
 | Spotrac | - | - | Not used: refuses automated requests |
 | BALLDONTLIE API | - | - | Not used: contracts are on its paid tier only |
@@ -86,3 +86,23 @@ user states the source at import, and that statement is stored on every contract
 Whoever supplies the figures is responsible for the terms they came under. Figures taken
 from a site whose terms resemble §5(k) above may not be used in the lab's modeling
 stages.
+
+## The contract file in use
+
+On 2026-10-05 the user supplied MrBridge's dataset *NBA Salary Cap & Contracts
+2016-2026* (mr-bridge.com; its README is kept with the files under
+`data/imports/nba-salary-cap-contracts-2016-2026/`). Its salaries are HoopsHype's public
+salaries data in a snapshot dated 2026-07-07; its README states the dataset is "provided
+for research and educational use" and that "underlying rights to the source data belong
+to their respective owners". The lab did not check HoopsHype's own terms: under
+[decision 0004](decisions/0004-contract-data-from-user-files.md) that responsibility
+rests with whoever supplies the file.
+
+| File in the dataset | What the lab does with it |
+| --- | --- |
+| `player_salaries.csv` | Imported. `scripts/convert_salary_dataset.py` rewrites it into the lab's long layout (the site's player and team ids dropped, the two-way and option flags carried, the four cases of one player listed twice for the same team and season added up, 38 spellings written as the league's index writes them, 15 ambiguous names given the league's id, one camp signing the index does not hold left out); `fol contracts import` matched 7,229 of its 7,283 rows and left out 54 names the league's player index does not hold, camp signings who never appeared in a game, worth $10.6M of $49.97B over twelve seasons. The source label and the as-of date (2026-07-07) are stored on every contract row. |
+| `team_payrolls.csv` | Not imported; the lab computes payrolls from its own contract tables. Used as a cross-check: all 360 team-seasons present, 311 equal to the dollar, the rest short by exactly the rows left out. |
+| `cap_tax_aprons.csv`, `max_salaries.csv` | Not imported. For 2024-25 to 2026-27 every figure equals the lab's `configs/seasons/` files. The dataset's figures for 2015-16 to 2023-24 are not transcribed: a rules file also needs the payroll floor, the exceptions and the roster limits from a cited source, and there was one apron before the 2023 CBA, which the rules schema does not yet allow. Recorded as open. |
+| `min_salaries.csv`, `rookie_scale.csv`, `two_way.csv` | Not imported: the rules schema has no field for a minimum salary, the rookie scale or the two-way salary. |
+| `salary_benchmarks.csv`, `payroll_by_roster_rank.csv`, `payrolls.csv`, `champion_payrolls.csv`, `top_contracts.csv` | Not imported: the lab derives what it shows from its own tables, and `figures_to_reverify.csv` lists figures the dataset's author flags for a recheck. |
+| `cap_projections.csv`, `french_players.csv` | Not imported: a mechanical cap path is not a league figure, and the lab has no nationality field. |

@@ -5,7 +5,9 @@ automatically for this kind of project (see [the source register](DATA_SOURCE_RE
 so salaries come from a file **you** supply, from a source you are entitled to use.
 
 Until a contract file is imported, statistics work as normal and anything involving
-salary or payroll is shown as unavailable.
+salary or payroll is shown as unavailable. The file in use is the MrBridge salary
+dataset, converted by a script in the repository; see
+[the last section](#converting-the-mrbridge-salary-dataset).
 
 ## Quick start
 
@@ -59,7 +61,7 @@ Pat Example,BOS,2027-28,32400000,player,
 | Column | Required | Meaning |
 | --- | --- | --- |
 | `player` | one of `player` / `player_id` | Player name. Accents, punctuation and suffixes such as Jr. do not affect matching. |
-| `player_id` | one of `player` / `player_id` | The league's player id. When present it decides the match and the name is ignored. |
+| `player_id` | one of `player` / `player_id` | The league's player id (stats.nba.com's), never another site's. When present it decides the match and the name is ignored. |
 | `team` | no | Abbreviation (`BOS`), full name or nickname. Blank means no team. |
 | `type` | no | `standard` (default) or `two-way`. |
 | `status` | no | `active` (default) or `dead` for salary still owed to a waived player. |
@@ -95,8 +97,10 @@ column takes `player`, `team` or `early termination`, and `guarantee` takes `ful
 ## What the import does
 
 1. **Validates the whole file first.** An unknown column, an unreadable amount or the
-   same player listed twice for one team and season rejects the file, and nothing is
-   stored. The message names the line and column.
+   same player listed twice for one team, season and kind of contract rejects the file,
+   and nothing is stored. The message names the line and column. A player who changed
+   teams within a season may be listed under each team, with what each owed; a two-way
+   contract converted to a standard one is two contracts with the same team.
 2. **Matches each row to a known player and team.** A row that cannot be matched is left
    out and listed. Fix the spelling, or add a `player_id` column, and import again.
    When several players share a name, the active one is preferred, then the one on the
@@ -114,8 +118,56 @@ Salary as a share of the cap needs that season's cap. Seasons without a rules fi
 ## Checks
 
 `fol check` verifies, without writing anything, that contract totals match their seasons,
-that no player has two active contracts in one season, and that cap shares are
-consistent; `fol build` runs the same checks and then writes the tables. They warn about
-salaries that look like typing slips (outside 0.02%-45% of the cap) and about teams with
-fewer than ten or more than 21 standard contracts in the file's first season, which
-usually means the file is incomplete or doubled up.
+that no team owes a player two active contracts of one kind in one season, and that cap
+shares are consistent; `fol build` runs the same checks and then writes the tables. They
+warn about salaries that look like typing slips (outside 0.003%-45% of the cap; a
+minimum contract prorated to a day or two sits at the bottom of that band) and about
+teams with fewer than ten or more than forty standard contracts in the file's first
+season: fewer means the file is incomplete, more that it is doubled up. A season's full
+list of everyone a team paid - ten-day contracts and mid-season moves included - runs
+past thirty in a season of many injuries, which is why the band is so wide.
+
+A player who changed teams within a season is paid by each, and the player's own salary
+for the season (on the Player Explorer, the value-for-money view and in the optimizer's
+pool) is the sum; the option, guarantee and seasons remaining shown are those of the
+contract that runs on.
+
+## Converting the MrBridge salary dataset
+
+The contract file in use came from MrBridge's *NBA Salary Cap & Contracts 2016-2026*
+dataset (HoopsHype's public salaries, snapshot of 2026-07-07; what the lab does with
+each of its files is in [the source register](DATA_SOURCE_REGISTER.md#the-contract-file-in-use)).
+Its salary table is one row per player per team per season, with the site's own ids and
+flag columns, which is not a layout the import reads. `scripts/convert_salary_dataset.py`
+rewrites it into the long layout above and prints what it did:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\convert_salary_dataset.py data\imports\nba-salary-cap-contracts-2016-2026\player_salaries.csv data\imports\contracts_mrbridge_2026-07-07.csv
+.\.venv\Scripts\fol.exe contracts import data\imports\contracts_mrbridge_2026-07-07.csv --source "MrBridge NBA Salary Cap & Contracts 2016-2026 dataset (mr-bridge.com; HoopsHype public salaries, snapshot of 2026-07-07), converted with scripts/convert_salary_dataset.py; research and educational use" --as-of 2026-07-07
+.\.venv\Scripts\fol.exe build
+```
+
+On the way the script:
+
+- leaves out the site's player and team ids (a `player_id` column means the league's
+  id), and `season_year`, `notes` and `source`, which the file has no column for;
+- writes the `two_way` flag as the contract type and a team or player option as the
+  option; a row flagged as both stops the conversion;
+- adds up the rows that list one player twice for the same team, season and kind of
+  contract - a player waived and signed again, or on successive ten-day contracts -
+  since the lab's row is what the team owed that season and the import would otherwise
+  reject the file. Four rows in the 2026-07-07 snapshot; each is reported;
+- names the Clippers as the league's team index does, spells 38 names as the league's
+  player index spells them, gives the league's id to 15 names two players share, and
+  leaves out one row - a camp signing the index does not hold, whose name, suffix
+  stripped, the lab would hand to a namesake - saying why;
+- lists the rows flagged `qualifying_offer` or `terminated`, which have no counterpart
+  in the lab's file and are written like any other.
+
+The spellings and ids live in the script and were made from the import's own
+unmatched-row report; a later snapshot may need more. The 54 rows the import still
+cannot match are camp signings who never appeared in a game and are in no league index;
+the import lists them and leaves them out ($10.6M of $49.97B over twelve seasons). The
+seasons before 2024-25 have no rules file in `configs/seasons`, so their cap shares are
+blank. The record of what the file changed in the lab, and of the one figure in doubt,
+is [decision 0017](decisions/0017-contract-history.md).

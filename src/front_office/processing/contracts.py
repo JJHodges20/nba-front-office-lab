@@ -283,18 +283,21 @@ def _read_entries(text: str) -> list[_Entry]:
     if not entries:
         raise ContractFileError("the contract file lists no salaries")
 
+    # A two-way contract converted to a standard one in the same season is two contracts
+    # with the same team, so the kind of contract is part of what makes a row distinct.
     seen: dict[tuple, int] = {}
     for entry in entries:
         key = (
             entry.player_id or normalize_name(entry.player),
             entry.team,
             entry.status,
+            entry.contract_type,
             entry.season,
         )
         if key in seen and seen[key] != entry.line:
             raise ContractFileError(
                 f"lines {seen[key]} and {entry.line} both give {entry.player} a "
-                f"{entry.season.label} salary for the same team and status"
+                f"{entry.season.label} salary for the same team, status and kind of contract"
             )
         seen[key] = entry.line
     return entries

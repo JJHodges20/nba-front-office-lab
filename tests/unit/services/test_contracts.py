@@ -14,6 +14,7 @@ from front_office.config import Settings
 from front_office.services import Lab
 from tests.unit.services.conftest import (
     BOS,
+    BRIDGES,
     BROWN,
     BRUNSON,
     HART,
@@ -253,3 +254,31 @@ def test_outlook_cap_share_counts_dead_money(contract_lab: Lab) -> None:
     """New York's 212M is 205M under contract plus 7M of dead money."""
     outlook = contract_lab.contracts.outlook(NYK)
     assert outlook.loc["2026-27", "cap_share"] == pytest.approx(212_000_000 / CAP_2026)
+
+
+class TestMidSeasonMoves:
+    """A player paid by two teams in one season, from the ``priced_lab`` fixture."""
+
+    def test_each_team_owes_its_share(self, priced_lab: Lab) -> None:
+        owed = priced_lab.contracts.table("2026-27").set_index("contract_id")
+        assert owed.loc[f"{BRIDGES}-{BOS}-2026-27", "salary"] == 10_000_000
+        assert owed.loc[f"{BRIDGES}-{NYK}-2026-27", "salary"] == 15_000_000
+        payrolls = priced_lab.contracts.team_payrolls("2026-27")
+        assert payrolls.loc[BOS, "active_salary"] == 80_000_000
+        assert payrolls.loc[NYK, "active_salary"] == 15_000_000
+
+    def test_the_players_salary_is_the_sum_and_the_contract_that_runs_on(
+        self, priced_lab: Lab
+    ) -> None:
+        salaries = priced_lab.contracts.salaries("2026-27")
+        assert salaries.index.is_unique
+        bridges = salaries.loc[BRIDGES]
+        assert bridges["salary"] == 25_000_000
+        assert bridges["salary_cap_pct"] == pytest.approx(25_000_000 / CAP_2026)
+        assert bridges["years_remaining"] == 1  # New York's contract runs into 2027-28
+        later = priced_lab.contracts.salaries("2027-28").loc[BRIDGES]
+        assert (later["salary"], later["option"], later["years_remaining"]) == (
+            16_000_000,
+            "team",
+            0,
+        )

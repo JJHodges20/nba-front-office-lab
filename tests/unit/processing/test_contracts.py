@@ -229,6 +229,15 @@ class TestContractShapes:
         assert contracts.loc[f"3-{NYK}-2026-27-dead", "status"] == "dead_money"
         assert contracts.loc[f"3-{BOS}-2026-27", "status"] == "active"
 
+    def test_a_two_way_contract_converted_to_a_standard_one_is_two_contracts(self) -> None:
+        """The same player, team and season twice is a duplicate only within one kind."""
+        text = "player,team,type,2026-27\nPat Example,BOS,two-way,350000\nPat Example,BOS,,35000\n"
+        result = build(text)
+        contracts = result.contracts.set_index("contract_id")
+        assert contracts.index.tolist() == [f"1-{BOS}-2026-27", f"1-{BOS}-2026-27-2w"]
+        assert contracts["total_salary"].tolist() == [35_000, 350_000]
+        assert not result.unmatched
+
     def test_a_row_without_a_team_is_kept_with_a_null_team(self) -> None:
         text = "player,2026-27\nPat Example,5M\n"
         contract = build(text).contracts.iloc[0]

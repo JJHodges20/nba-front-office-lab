@@ -50,6 +50,9 @@ def priced_lab(built_template, tmp_path_factory) -> Iterator[Lab]:
         # Money a team still owes a player it waived is not that player's salary.
         f"{BROWN},NYK,dead,2000000,\n"
         f"{VUCEVIC},NYK,dead,5000000,\n"
+        # A player who changed teams within the season: each team owed its share.
+        f"{BRIDGES},BOS,,10000000,\n"
+        f"{BRIDGES},NYK,,15000000,16000000 TO\n"
     )
     root = tmp_path_factory.mktemp("priced") / "lab"
     with Lab(with_contracts(built_template[0], root, contract_file)) as opened:

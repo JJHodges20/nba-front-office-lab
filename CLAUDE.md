@@ -19,6 +19,7 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe seasons                  # cap, tax, apron and roster rules by season
 .\.venv\Scripts\fol.exe raw                      # what the raw store holds
 .\.venv\Scripts\fol.exe contracts template       # a contract file to fill in (then import, then build)
+.\.venv\Scripts\python.exe scripts\convert_salary_dataset.py <player_salaries.csv> <out.csv>   # the MrBridge/HoopsHype salary table as a contract file
 .\.venv\Scripts\fol.exe dictionary --write        # regenerate docs/DATA_DICTIONARY.md
 .\.venv\Scripts\fol.exe metrics --write           # regenerate docs/METRICS.md
 .\.venv\Scripts\fol.exe benchmarks --write        # regenerate docs/research/BENCHMARKS.md from the database
@@ -63,6 +64,15 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   fails on any dollar-sized literal in source code.
 - **Verify cap figures.** Every figure in `configs/seasons/` cites a source and a
   retrieval date. Never add or change one from memory.
+- **A contract file may be history.** The file in use (`docs/DATA_SOURCE_REGISTER.md`)
+  lists every salary a team paid from 2015-16, split by team: a player who changed teams
+  within a season appears under each team with what each owed. The import's duplicate
+  rule and the quality check are per team, season and kind of contract;
+  `ContractService.salaries` adds a player's shares up; a season's cap share is blank
+  where `configs/seasons/` has no rules file (before 2024-25). A row the league's player
+  index does not hold is reported and left out, never guessed; the converter's alias and
+  id lists are the record of the spellings that differ
+  (`docs/decisions/0017-contract-history.md`).
 - **Data contracts.** Every stored table has a `TableContract` in `domain/tables/`.
   Normalisers end with `conform_frame`. After changing a contract run
   `fol dictionary --write`.

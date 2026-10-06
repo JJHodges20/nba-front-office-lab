@@ -3,6 +3,130 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Contract data - the MrBridge salary dataset (2026-10-05)
+
+Not a milestone: the contract file that the one open acceptance criterion waited on
+arrived, and the lab was changed where its shape did not fit. The user supplied
+MrBridge's *NBA Salary Cap & Contracts 2016-2026* dataset (HoopsHype's public salaries,
+snapshot of 2026-07-07): every salary a team paid from 2015-16 to 2026-27, one row per
+player per team per season, with the site's own ids and flags.
+
+**Built**
+
+- `scripts/convert_salary_dataset.py`: rewrites the dataset's salary table into the lab's
+  long layout - the site's ids left out, the two-way and option flags carried as type and
+  option, the four rows that list one player twice for the same team, season and kind
+  added up, 38 spellings and 15 ids written as the league's indexes have them, one row
+  left out with its reason - and prints every merge, flag and omission.
+  `tests/unit/test_convert_salary_dataset.py` covers each of these on small files and
+  checks that the shipped lists name real differences only.
+- The import's duplicate rule (`processing/contracts.py`) and the quality check
+  (`quality/checks.py`, now `one_active_contract_per_player_team_season`) are per team,
+  season and kind of contract: a move within a season, a two-way contract converted to a
+  standard one and dead money beside an active contract are all allowed.
+- `ContractService.salaries` adds up a player's active shares for a season and carries
+  the option, guarantee and seasons remaining of the contract that runs on; the Player
+  Explorer, the value-for-money view and the optimizer's pool read it.
+- The plausibility bands describe a season's full list: a salary is suspect below 0.003%
+  or above 45% of the cap, a team's first-season count below ten or above forty.
+- Payroll is priced by default in the league year the file was current for - the one
+  that holds its as-of date, now carried on the lab's status - instead of the earliest
+  priced season in the file, which a history put at 2024-25. The Team Explorer's
+  contract-by-contract table starts at the season on screen and leaves out the
+  contracts that ended before it.
+- Imported and built in (build 16): 4,189 contracts for 1,627 players, 7,229 contract
+  seasons from 2015-16 to 2026-27; cap shares for 2024-25 to 2026-27, blank before. The
+  54 rows the import could not match are camp signings who never appeared in a game and
+  are in no league index.
+- Documentation: the converter section of [CONTRACT_DATA.md](CONTRACT_DATA.md); the
+  source register's account of what the lab does with each of the dataset's sixteen
+  files and under what terms; the Contract Explorer's note in the workbench guide; the
+  roadmap's last acceptance criterion closed; a postscript in the audit; the rule in
+  `CLAUDE.md`; decision 0017.
+
+**Decisions** ([0017](decisions/0017-contract-history.md))
+
+- A contract file may be history, split by team; the import's rules and the checks
+  match that grain instead of the template's.
+- A player's own salary for a season is the sum of what the teams paid.
+- The dataset is converted outside the lab by a committed script that holds the record
+  of every difference; the importer is not taught the dataset's layout, because a
+  `player_id` column means the league's id for every file.
+- Only the salary table is used. The payroll table is a cross-check; the cap figures for
+  the seasons before 2024-25 are not transcribed, since a rules file needs the floor, the
+  exceptions and the roster limits from a cited source and the schema has two aprons
+  where those seasons had one.
+
+**Verification**
+
+- The converter on the real file: 7,288 rows read, 7,283 written, four merges (each
+  listed with both amounts), one row left out, every row of the report read.
+- A dry-run import before anything was stored: every one of the 738 rows the first pass
+  could not match was traced to the Clippers' name, a spelling, a shared name or a camp
+  signing, and the lists were built from that report, each target checked in the league's
+  player index.
+- The dataset's own payroll table against the lab's payrolls: all 360 team-seasons
+  present, 311 equal to the dollar, the rest short by exactly the rows left out
+  ($10,618,795 of $49,967,361,444).
+- The dataset's cap, tax and apron figures for 2024-25 to 2026-27 equal the lab's rules
+  files.
+- Tests for the per-team rule (same team rejected; a move, a two-way conversion and dead
+  money allowed), for the summed salary and the contract that runs on (a player paid by
+  two teams in the priced fixture), and for the renamed check everywhere it is named.
+- The default payroll season on five shapes of file - looking ahead, a history, a history
+  that stops before its date, a file that starts after its date, one without a date -
+  and the windowed table on a frame holding a contract that had ended.
+- Build 15 showed the old check failing 441 times, every failure a move between teams or
+  the one two-way conversion; build 16, with the rules above, has no error and the same
+  seven standing warnings as before the import.
+
+**Found on the way**
+
+- The lab's three assumptions - one contract per player per season, fourteen or fifteen
+  per team, nothing below a two-way salary - were the invented template's, not the
+  format's. A season's full list of everyone a team paid runs to 24 in the file's first
+  season and the dataset's own payroll table counts up to 36.
+- The league's team index names the Clippers "LA Clippers"; the dataset writes "Los
+  Angeles Clippers", and 476 rows went unmatched until the script named the team as the
+  index does.
+- Name matching strips suffixes, so "Marcus Thornton II", who played no NBA game, would
+  have been handed to the elder Marcus Thornton; the script leaves the row out and says
+  why. "Scottie Pippen Jr" and "Scotty Pippen Jr." differ in the first name, not the
+  suffix, and are an alias.
+- The dataset lists both of John Wall's 2022-23 amounts under Houston; the second equals
+  that season's taxpayer mid-level exception, which another team paid him. The lab
+  carries what the file states; the doubt is recorded in decision 0017.
+- Two of three full-suite runs printed a Windows access violation from inside the
+  Streamlit test harness while it read a table, under different tests. The first killed
+  its worker and failed that test, which passes on its own; the second was survived and
+  every test passed. Not the lab's code; noted so the next person does not chase it.
+- The Windows console is cp1252: the script reconfigures its output to UTF-8 before it
+  prints an accented name.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| Automated tests | 3,000 passed, none skipped; about five minutes with `pytest -n auto` |
+| Data-quality checks | `fol check`: 57 checks, 50 passed, 7 standing warnings, 0 errors; build 16 loaded 971,080 rows |
+| UI review | Contract Explorer, Player Explorer, Team Explorer, Player Value, Team Builder and Roster Optimizer in both themes through a browser on the final code, with the real contracts on screen |
+| Architectural boundaries | `tests/architecture` passes; no rule changed. The converter is a script outside the package and imports nothing from it; the summed salary is `services`; the rule and the check are `processing` and `quality` |
+| Lint | `ruff check` and `ruff format --check` clean |
+
+**Open items carried forward**
+
+- Season rules for 2015-16 to 2023-24: the floor, the exceptions and the roster limits
+  from a cited source, and a schema that allows one apron before 2023-24. Until then the
+  cap columns for those seasons are blank.
+- Payroll in the contender research, now that twelve seasons of history are in the
+  database.
+- HoopsHype's own terms were not checked; the dataset's README states research and
+  educational use, and the responsibility rests with whoever supplied the file (decision
+  0004).
+- From milestone 14: value weights refitted inside each postseason window; a wins test
+  through the simulator's own draw; the field; lineups; the long modules and duplicated
+  helpers.
+
 ## Milestone 14 - Full-system audit (2026-10-05)
 
 **Built**

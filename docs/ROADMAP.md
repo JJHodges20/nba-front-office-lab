@@ -34,26 +34,26 @@ points-per-dollar.
 | --- | --- | --- | --- |
 | 1 | Repository and architecture | Package structure, configuration, test foundation, documentation | Done |
 | 2 | NBA data ingestion | Players, teams, games, standings, advanced statistics | Done |
-| 3 | Contracts and salary-cap data | Contracts, season rules, cap-normalised salaries | Done (import path; no contract file supplied yet) |
+| 3 | Contracts and salary-cap data | Contracts, season rules, cap-normalised salaries | Done (the user's contract file - the MrBridge salary dataset, 2015-16 to 2026-27 - imported and built in on 2026-10-05; cap shares where a season's rules are configured, 2024-25 on) |
 | 4 | Database and repositories | Persistent storage and clean data-access boundaries | Done |
 | 5 | Player analytics | Reusable player calculations and comparison tools | Done |
 | 6 | Team analytics | Team efficiency, point differential, pace, historical outcomes | Done |
 | 7 | Front Office UI foundation | Navigation, filters, player/team explorers, Team Builder | Done |
-| 8 | Historical contender analysis | Playoff/championship benchmark research | Done (team level; payroll awaits contract history; where the champions' rosters stood is in the roster fit research) |
-| 9 | Player value engine | Validated value features, surplus value, archetypes | Done (surplus value needs a contract file) |
+| 8 | Historical contender analysis | Playoff/championship benchmark research | Done (team level; payroll history is in the database from 2015-16, not yet in the research; where the champions' rosters stood is in the roster fit research) |
+| 9 | Player value engine | Validated value features, surplus value, archetypes | Done (surplus value reads the imported contract file) |
 | 10 | Roster fit engine | Fit, redundancy, role coverage, weaknesses | Done (fit is description; the evidence supports no correction to the sum of the parts) |
-| 11 | Roster optimizer | Budget and roster constraints, multiple candidate rosters | Done (needs a contract file for the season ahead) |
+| 11 | Roster optimizer | Budget and roster constraints, multiple candidate rosters | Done (prices its pool from the imported 2026-27 salaries) |
 | 12 | Playoff/championship model | Calibrated postseason probability models | Done (tested out of sample from 2006-07; chances shown with intervals and the evidence) |
 | 13 | Simulator | Scenario and Monte Carlo analysis | Done (seasons drawn from tested parts; the field is not modelled) |
 | 14 | Full-system audit | Architecture, leakage, tests, UI, documentation, performance | Done ([AUDIT.md](AUDIT.md): every pass with what was found, changed and left) |
 
 Milestones 1-7 make up **v1.0 - League and Roster Analytics**, the first release target.
-All seven are done; one acceptance criterion below stays open until a contract file is
-supplied. Milestone 8 is the roadmap's version 2 (*Winning Benchmarks*), milestone 9 its
+All seven are done, and the last acceptance criterion below closed on 2026-10-05 when the
+user's contract file was imported. Milestone 8 is the roadmap's version 2 (*Winning Benchmarks*), milestone 9 its
 version 3 (*Player Value Engine*), milestone 10 its version 4 (*Roster Fit Engine*),
 milestone 11 its version 5 (*Budget Roster Optimizer*), milestone 12 its version 6
 (*Contender Probability Model*) and milestone 13 its version 7 (*Scenario Simulator*);
-the surplus-value half of version 3 and the optimizer's pool both wait on the same file.
+the surplus-value half of version 3 and the optimizer's pool both read the same file.
 With milestone 12 the lab shows its first forecast: a chance of each postseason stage,
 with its interval, from a model validated on seasons it had not seen
 ([decisions/0014](decisions/0014-postseason-model.md)). Milestone 13 lays a user's
@@ -79,11 +79,13 @@ Assessed at the milestone 7 gate (2026-10-01).
 
 - [x] Current player and team statistics can be refreshed and inspected.
   `fol refresh` fetches what is new and rebuilds; the workbench shows it.
-- [ ] Player contracts and season-specific cap information are available in the workspace.
-  **Open.** Cap rules for 2024-25 to 2026-27 are configured from cited sources and shown.
-  Contracts have a tested import path and every view that uses them, but the workspace
-  holds none: no source permits collecting them automatically, so they come from a file
-  the user supplies ([CONTRACT_DATA.md](CONTRACT_DATA.md)). Importing one closes this.
+- [x] Player contracts and season-specific cap information are available in the workspace.
+  Closed 2026-10-05. Cap rules for 2024-25 to 2026-27 are configured from cited sources
+  and shown. No source permits collecting contracts automatically, so they come from a
+  file the user supplies ([CONTRACT_DATA.md](CONTRACT_DATA.md)): the MrBridge salary
+  dataset (HoopsHype's public salaries, 2015-16 to 2026-27) is imported and built in, and
+  every salary, payroll, cap and value-for-money view and the optimizer read it. Cap shares
+  are blank for seasons before 2024-25 until their rules are configured.
 - [x] Player and team profiles expose consistent, tested metrics.
   One catalog per subject, one formula per metric, generated glossary ([METRICS.md](METRICS.md)).
 - [x] The workspace compares points scored/allowed and possession-adjusted efficiency.

@@ -401,6 +401,21 @@ def _history(filters: Filters) -> None:
     )
 
 
+def from_season(
+    owed: pd.DataFrame, seasons: list[str], season: str
+) -> tuple[pd.DataFrame, list[str]]:
+    """The commitments table from ``season`` on, and the season columns it keeps.
+
+    A contract file that is history carries every season a team paid; the seasons before
+    the one on screen are dropped, and with them the contracts that ended before it.
+    """
+    shown = [column for column in seasons if column >= season]
+    kept = owed.drop(columns=[column for column in seasons if column < season])
+    if shown:
+        kept = kept[kept[shown].notna().any(axis=1)]
+    return kept, shown
+
+
 def _payroll(filters: Filters) -> None:
     if filters.payroll_season is None:
         components.empty(
@@ -444,7 +459,11 @@ def _payroll(filters: Filters) -> None:
     components.chart(figure, summary, key="team_payroll", filename=f"payroll_{filters.team_id}")
 
     st.markdown("**What the team owes, contract by contract**")
-    seasons = [column for column in owed.columns if column in outlook.index]
+    owed, seasons = from_season(owed, [c for c in owed.columns if c in outlook.index], season)
+    st.caption(
+        f"Contracts running in {season} or later, season by season from {season}. A "
+        "contract's total covers its whole run, earlier seasons included."
+    )
     st.dataframe(
         owed.drop(columns="player_id").style.format(
             {

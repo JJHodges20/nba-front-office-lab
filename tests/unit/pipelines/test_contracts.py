@@ -143,7 +143,7 @@ class TestQualityOfImportedContracts:
         for name in (
             "contracts.totals_match_years",
             "contract_years.cap_shares_are_consistent",
-            "contract_years.one_active_contract_per_player_season",
+            "contract_years.one_active_contract_per_player_team_season",
             "contract_years.salaries_are_plausible",
             "contracts.player_id_exists",
             "contract_years.contract_id_exists",

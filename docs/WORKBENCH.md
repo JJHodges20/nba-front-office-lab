@@ -146,8 +146,14 @@ both ends, form over the season, the game log, what each player did for this tea
 season on record, and payroll against the cap lines.
 
 **Contract Explorer.** Every salary in a season, team payrolls against the cap, tax and
-aprons, and the configured cap rules with their sources. Empty until you import a
-contract file; see [CONTRACT_DATA.md](CONTRACT_DATA.md).
+aprons, and the configured cap rules with their sources. It shows the contract file in
+use - the MrBridge salary dataset, every salary a team paid from 2015-16 to 2026-27,
+split by team, so a player who changed teams within a season is listed under each
+([DATA_SOURCE_REGISTER.md](DATA_SOURCE_REGISTER.md)); the cap columns are blank for
+seasons without configured rules (before 2024-25). Payroll is priced by default in the
+league year the file was current for, the one that holds its as-of date (2026-27 for
+this file); the control at the top of the page picks another season. To replace the
+file, see [CONTRACT_DATA.md](CONTRACT_DATA.md).
 
 **Analytics Lab.** Any two metrics against each other, for players or teams, with how
 strongly they move together. How one metric is spread. The metric glossary.

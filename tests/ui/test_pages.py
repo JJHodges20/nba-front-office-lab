@@ -18,6 +18,7 @@ from tests.helpers import ABDELNABY, BOS, BROWN, NYK, PRITCHARD, TATUM, TOWNS, W
 from tests.ui.conftest import TIMEOUT, drawn, figures, texts
 from wb import state
 from wb.views import builder as builder_view
+from wb.views import teams as teams_view
 
 PAGES = (
     "league",
@@ -298,7 +299,28 @@ class TestTeams:
         assert "No contract data" in texts(without)
         with_contracts = page(contract_template, "teams", **{state.TEAM: BOS})
         assert "Payroll in 2026-27" in texts(with_contracts)
+        assert "Contracts running in 2026-27 or later" in texts(with_contracts)
         assert "No contract data" not in texts(with_contracts)
+
+    def test_the_commitments_table_starts_at_the_payroll_season(self) -> None:
+        """A history file carries earlier seasons; the table shows the one on screen and on."""
+        owed = pd.DataFrame(
+            {
+                "player_id": [1, 2, 3],
+                "player_name": ["Ended", "Running", "Later"],
+                "contract_type": ["standard"] * 3,
+                "status": ["active"] * 3,
+                "2025-26": pd.array([10, 20, None], dtype="Int64"),
+                "2026-27": pd.array([None, 21, None], dtype="Int64"),
+                "2027-28": pd.array([None, None, 32], dtype="Int64"),
+                "total_salary": [10, 41, 32],
+            }
+        )
+        kept, shown = teams_view.from_season(owed, ["2025-26", "2026-27", "2027-28"], "2026-27")
+        assert shown == ["2026-27", "2027-28"]
+        assert "2025-26" not in kept.columns
+        assert kept["player_name"].tolist() == ["Running", "Later"]
+        assert kept["total_salary"].tolist() == [41, 32]
 
 
 class TestContracts:

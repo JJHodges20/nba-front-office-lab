@@ -47,13 +47,16 @@ PLAYER_POINTS_TOLERANCE = 5
 # Three team box scores in thirty seasons disagree with their players' lines, by at most
 # seven points: one player listed with the opponent, one with four points too many.
 TEAM_POINTS_TOLERANCE = 10
-# The largest contracts start at 35% of the cap and grow 8% a year; the smallest
-# (two-way, ten-day) are a few tenths of a percent. Outside this band, suspect a typo.
+# The largest contracts start at 35% of the cap and grow 8% a year; the smallest - a
+# minimum contract prorated to a day or two at the end of a season - are a few
+# thousandths of a percent. Outside this band, suspect a typo.
 MAX_PLAUSIBLE_CAP_SHARE = 0.45
-MIN_PLAUSIBLE_CAP_SHARE = 0.0002
-# A team carries 14-15 standard contracts in season and up to 21 players in the offseason.
+MIN_PLAUSIBLE_CAP_SHARE = 0.00003
+# A team carries 14-15 standard contracts at a time, but a season's full list of everyone
+# it paid - ten-day contracts and mid-season moves included - runs past thirty in a
+# season of many injuries; beyond forty, the file is doubled up.
 MIN_PLAUSIBLE_ROSTER = 10
-MAX_PLAUSIBLE_ROSTER = 21
+MAX_PLAUSIBLE_ROSTER = 40
 # Modeled values are sums of floating-point terms; further apart than this is a fault.
 VALUE_TOLERANCE = 1e-6
 
@@ -575,11 +578,17 @@ def _cap_shares_are_consistent(tables: Tables) -> tuple[int, pd.DataFrame]:
     return len(years), failing
 
 
-def _one_active_contract_per_player_season(tables: Tables) -> tuple[int, pd.DataFrame]:
-    statuses = tables["contracts"][["contract_id", "status"]]
-    years = tables["contract_years"].merge(statuses, on="contract_id")
+def _one_active_contract_per_player_team_season(tables: Tables) -> tuple[int, pd.DataFrame]:
+    """A player who changed teams within a season is owed by each team, so the rule is
+    per team: no team owes a player two active contracts of one kind in one season."""
+    details = tables["contracts"][["contract_id", "status", "contract_type"]]
+    years = tables["contract_years"].merge(details, on="contract_id")
     active = years[years["status"] == "active"]
-    counts = active.groupby(["player_id", "season"]).size().rename("active_contracts")
+    counts = (
+        active.groupby(["player_id", "team_id", "contract_type", "season"], dropna=False)
+        .size()
+        .rename("active_contracts")
+    )
     return len(counts), counts[counts > 1].reset_index()
 
 
@@ -879,11 +888,13 @@ _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
         _contract_totals_match_years,
     ),
     Check(
-        "one_active_contract_per_player_season",
+        "one_active_contract_per_player_team_season",
         "contract_years",
-        "No player is under two active contracts in the same season.",
+        "No team owes a player two active contracts of one kind in the same season. A "
+        "player who changed teams within a season is listed under each team, with what "
+        "each owed.",
         E,
-        _one_active_contract_per_player_season,
+        _one_active_contract_per_player_team_season,
     ),
     Check(
         "cap_shares_are_consistent",
@@ -896,7 +907,7 @@ _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
     Check(
         "salaries_are_plausible",
         "contract_years",
-        f"Salaries fall between {MIN_PLAUSIBLE_CAP_SHARE:.2%} and {MAX_PLAUSIBLE_CAP_SHARE:.0%} "
+        f"Salaries fall between {MIN_PLAUSIBLE_CAP_SHARE:.3%} and {MAX_PLAUSIBLE_CAP_SHARE:.0%} "
         "of the cap; anything else is probably a typing slip.",
         W,
         _salaries_are_plausible,
@@ -906,7 +917,7 @@ _CROSS_TABLE_CHECKS: tuple[Check, ...] = (
         "contract_years",
         f"In the first season of the contract file every team has between "
         f"{MIN_PLAUSIBLE_ROSTER} and {MAX_PLAUSIBLE_ROSTER} standard contracts; fewer "
-        "means the file is incomplete.",
+        "means the file is incomplete, more that it is doubled up.",
         W,
         _teams_have_plausible_rosters,
     ),

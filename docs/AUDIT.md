@@ -178,14 +178,17 @@ standing warnings and no error.
 
 Every criterion assessed at milestone 7 still holds, with the same one open: contracts
 and cap information are in the workspace as soon as a contract file is imported and the
-database rebuilt, and no file has been supplied. The predictive stages that criterion 10
-guarded against came in milestones 9 to 13, each tested out of sample and shown with
-its interval; this audit tightened two of those tests.
+database rebuilt, and no file had been supplied; one was, later that day. The
+predictive stages that criterion 10 guarded against came in milestones 9 to 13, each
+tested out of sample and shown with its interval; this audit tightened two of those
+tests.
 
 ## What remains
 
 - A contract file. Every salary, payroll, cap and value-for-money view, and the
-  optimizer, wait on it ([CONTRACT_DATA.md](CONTRACT_DATA.md)).
+  optimizer, wait on it ([CONTRACT_DATA.md](CONTRACT_DATA.md)). *Closed later the same
+  day: the user supplied the MrBridge salary dataset, imported and built in; what that
+  changed is in the development log's entry of 2026-10-05.*
 - Refitting the value weights inside each postseason window, and building the fit
   measures from them: +0.003 log loss, measured, not worth the second fit today.
 - A wins test that runs the simulator's own draw, players' misses included, on rosters

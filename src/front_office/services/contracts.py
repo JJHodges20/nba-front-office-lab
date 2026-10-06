@@ -91,13 +91,23 @@ class ContractService:
         """Each player's own salary in one season, indexed by ``player_id``.
 
         Only contracts the player is still under count: money a team still owes a
-        player it waived is that team's cost, not the player's salary.
+        player it waived is that team's cost, not the player's salary. A player who
+        changed teams within the season was paid by each, and the sum is the player's
+        salary; the option, guarantee and seasons remaining are those of the contract
+        that runs on, the one with the most seasons left.
         """
         years = self._lab.read("contract_years", {"season": season})
         contracts = self._lab.read("contracts")[["contract_id", "status"]]
         active = years.merge(contracts, on="contract_id", validate="many_to_one")
-        active = active[active["status"] == "active"].drop_duplicates("player_id")
-        return active.set_index("player_id")[list(SALARY_COLUMNS)]
+        active = active[active["status"] == "active"]
+        if active.empty:
+            return active.set_index("player_id")[list(SALARY_COLUMNS)]
+        running = active.sort_values(
+            ["player_id", "years_remaining", "salary"], ascending=[True, False, False]
+        ).drop_duplicates("player_id")
+        running = running.set_index("player_id")[["years_remaining", "option", "guarantee"]]
+        paid = active.groupby("player_id")[["salary", "salary_cap_pct"]].sum(min_count=1)
+        return paid.join(running)[list(SALARY_COLUMNS)]
 
     def team_payrolls(self, season: str) -> pd.DataFrame:
         """Each team's payroll in one season against that season's cap lines, largest first.

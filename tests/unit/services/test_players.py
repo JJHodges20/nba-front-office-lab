@@ -25,7 +25,7 @@ from front_office.services import (
     Window,
 )
 from front_office.services.players import PLAYER_AND_VALUE_METRICS
-from tests.helpers import TOWNS
+from tests.helpers import BRIDGES, TOWNS
 
 BOS, NYK = 1610612738, 1610612752
 TATUM, BROWN, VUCEVIC, ABDELNABY = 1628369, 1627759, 202696, 76001
@@ -46,17 +46,19 @@ class TestStatus:
         assert status.player_seasons == ("2025-26",)
         assert status.cap_seasons == ("2026-27", "2025-26", "2024-25")
         assert status.contract_seasons == () and not status.has_contracts
+        assert status.contract_as_of is None
         assert status.latest_stats_season == "2025-26"
 
     def test_without_contracts_payroll_defaults_to_the_newest_cap_season(self, lab: Lab) -> None:
         assert lab.status().default_payroll_season == "2026-27"
 
-    def test_with_contracts_payroll_defaults_to_the_files_first_priced_season(
+    def test_with_contracts_payroll_defaults_to_the_league_year_the_file_was_current_in(
         self, priced_lab: Lab
     ) -> None:
         status = priced_lab.status()
         assert status.contract_seasons == ("2027-28", "2026-27")
         assert status.has_contracts
+        assert status.contract_as_of == date(2026, 10, 1)
         assert status.default_payroll_season == "2026-27"
 
     def test_an_unbuilt_lab_says_so_instead_of_failing(self, settings: Settings) -> None:
@@ -70,8 +72,24 @@ class TestStatus:
             with pytest.raises(LabNotBuilt):
                 empty.require_built()
 
-    def test_payroll_defaults_to_the_earliest_contract_season_that_has_a_cap(self) -> None:
-        """A file imported during 2025-26 is priced in 2025-26, not in a later season."""
+    @pytest.mark.parametrize(
+        ("covered", "as_of", "expected"),
+        [
+            # A file that looks ahead, imported during 2025-26, is priced in 2025-26.
+            (("2027-28", "2026-27", "2025-26"), date(2026, 3, 1), "2025-26"),
+            # A history current in 2026-27 is priced in 2026-27, not in its first season.
+            (("2026-27", "2025-26", "2024-25", "2015-16"), date(2026, 7, 7), "2026-27"),
+            # A history that stops before its date is priced in its latest priced season.
+            (("2025-26", "2024-25", "2023-24"), date(2026, 8, 1), "2025-26"),
+            # A file that starts after its date is priced in its earliest priced season.
+            (("2028-29", "2027-28", "2026-27"), date(2026, 6, 15), "2026-27"),
+            # Without a date, the earliest priced season.
+            (("2027-28", "2026-27", "2025-26"), None, "2025-26"),
+        ],
+    )
+    def test_payroll_defaults_to_the_season_the_file_was_current_for(
+        self, covered: tuple[str, ...], as_of: date | None, expected: str
+    ) -> None:
         status = LabStatus(
             is_built=True,
             is_current=True,
@@ -80,9 +98,10 @@ class TestStatus:
             team_seasons=(),
             player_seasons=(),
             cap_seasons=("2026-27", "2025-26", "2024-25"),
-            contract_seasons=("2027-28", "2026-27", "2025-26"),
+            contract_seasons=covered,
+            contract_as_of=as_of,
         )
-        assert status.default_payroll_season == "2025-26"
+        assert status.default_payroll_season == expected
 
     def test_cap_rules_by_season(self, lab: Lab) -> None:
         assert lab.rules("2026-27").salary_cap == 164_961_000
@@ -192,7 +211,9 @@ class TestContracts:
         assert (tatum["years_remaining"], brown["years_remaining"]) == (1, 0)
         assert brown["salary"] == 30_000_000
         assert priced.payroll_season == "2026-27"
-        others = priced.players.drop(index=[TATUM, BROWN])
+        # Paid by two teams within the season: the sum is his salary.
+        assert priced.players.loc[BRIDGES, "salary"] == 25_000_000
+        others = priced.players.drop(index=[TATUM, BROWN, BRIDGES])
         assert others["salary"].isna().all()
 
     def test_dead_money_is_not_shown_as_a_players_salary(self, priced_lab: Lab) -> None:
