@@ -3,6 +3,85 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone A0 - AI Research Assistant: audit, decisions, evaluation cases (2026-10-09)
+
+The first milestone of the assistant track ([ROADMAP](ROADMAP.md#ai-research-assistant-a0-a9)):
+a read-only audit of the lab against the user's assistant roadmap, the decisions it
+needed, and the cases every model will be scored on. No production code changed.
+
+**The audit**
+
+- Read the project's instructions, architecture, roadmap, audit, source register,
+  decisions and research documents; dumped every public service signature from the
+  source; checked the workbench's frame, filters, caches, charts and tags; checked the
+  data (build 16 of 2026-10-06, stats.nba.com last fetched 2026-10-01/02, the contract
+  file as of 2026-07-07, all four model files at revision 2) and this machine (Ollama
+  0.40.0 on the loopback address, an RTX 4060 with about 1.9 GB of its 8 GB already in
+  use, Docker present but not needed).
+- Three research passes verified the outside facts: Ollama's interface and its cloud
+  features; the NBA's terms, robots files and data endpoints; and every no-cost route to
+  general web search. Their findings, with the decisions, are in decision 0018 and the
+  source register.
+- One request to stats.nba.com through the lab's own provider, with the user's approval,
+  to test an upstream report of blocking: it answered (45 rows, 0.5 s). Nothing was saved.
+
+**Built**
+
+- [Decision 0018](decisions/0018-ai-research-assistant.md): an outermost `assistant`
+  layer reached by the workbench through one module; the local-only model; three kinds of
+  data in three files; typed tools with no write class; every figure from a tool; the
+  sources.
+- [AI_ASSISTANT_SPEC.md](AI_ASSISTANT_SPEC.md): the tool registry mapped to exact service
+  methods, what a result carries, what an answer must do, Quick and Deep, current data,
+  safety.
+- [AI_EVALUATION.md](AI_EVALUATION.md) and `tests/assistant/fixtures/cases.yaml`: 59 cases
+  in 17 categories, 17 of them with no answer in the usual sense, 56 frozen figures from
+  the fixture build and the invented contract file. `tests/assistant/test_cases.py` checks
+  the file and recomputes every figure through the services.
+- The source register: the assistant's sources with their terms; the NBA's section 9 on
+  the existing stats.nba.com use; the user's permission for salary rows in the local
+  model's prompts.
+- The assistant track in the roadmap.
+
+**Decisions** ([0018](decisions/0018-ai-research-assistant.md)), all approved by the user
+
+- The `assistant` layer and its import rules; the two new data files.
+- General web search through Ollama's web search on the user's free account; SearXNG,
+  DuckDuckGo scraping, and Google's and Bing's closed APIs are out.
+- Salary rows may go to the local model: the user read HoopsHype's terms.
+- Candidates for A1: `qwen3:4b`, `qwen3:8b`, `qwen3:4b-instruct`, with `qwen2.5:7b` for
+  reference.
+
+**Changed from the plan**
+
+- Recorded payloads for the current-data and web cases arrive with the adapters in A2,
+  since their shape depends on them; A0's cases carry the conversations, and two web
+  cases already end in a tool's result (an empty search; a page carrying instructions).
+- The forward-looking test that the proposed layer rules are acyclic was left out: A1
+  lands the rule itself, and `test_layer_rules_have_no_cycles` checks it there.
+- `propose_rosters` is not a tool the model calls: each roster `optimize_roster` finds
+  becomes a draft for the user to review.
+
+**Found on the way**
+
+- `qwen3:4b` now names the Qwen3-4B *thinking* model, which always reasons before
+  answering; `qwen3:4b-instruct` is the same size without it.
+- `OptimizerService.save` creates a roster and then adds each player in a separate
+  transaction. A5 adds an atomic save for approved proposals.
+- The research documents are stamped with build 14; builds 15 and 16 changed only the
+  contract tables, so their content stands.
+- The user's Ollama runs with a 16K default context (`OLLAMA_CONTEXT_LENGTH`), and cloud
+  enabled. The adapter will set the context on every request and refuse remote models.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Pass |
+| `pytest tests\assistant tests\architecture` | 81 passed |
+| Production code changed | None: `docs/` and `tests/assistant/` only |
+| UI | Not affected |
+
 ## Contract data - the MrBridge salary dataset (2026-10-05)
 
 Not a milestone: the contract file that the one open acceptance criterion waited on

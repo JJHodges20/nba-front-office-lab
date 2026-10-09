@@ -63,6 +63,28 @@ audits the whole: it found every test window clean and the forecasts' error unde
 and the forecasts now carry the error of a test that projected minutes too
 ([AUDIT.md](AUDIT.md), [decisions/0016](decisions/0016-audit.md)).
 
+## AI Research Assistant (A0-A9)
+
+An assistant that answers questions in plain language from the lab's services, current
+information and public reporting, on a local language model, with every figure traced to
+its source. The plan is the user's *NBA Front Office Lab AI Research Assistant* roadmap; the
+architecture is [decision 0018](decisions/0018-ai-research-assistant.md), the design
+[AI_ASSISTANT_SPEC.md](AI_ASSISTANT_SPEC.md), the measuring [AI_EVALUATION.md](AI_EVALUATION.md).
+Lettered so as not to clash with the milestones above; each passes the same gate.
+
+| # | Milestone | Deliverable | Status |
+| --- | --- | --- | --- |
+| A0 | Audit, decisions, evaluation cases | Decision 0018, the specification, the evaluation design, 59 frozen cases that check their own figures, the source register | Done (2026-10-09) |
+| A1 | Local model and benchmark | The Ollama adapter (loopback only, remote models refused), the `assistant` layer and its boundary rules, the typed tool registry, the routing benchmark on this machine's GPU, a default and fallback model | Planned |
+| A2 | Tools, evidence, current data, the web | Name resolution, the read tools, the evidence record and answer checker, game logs, the injury report and transactions, web search and pasted links | Planned |
+| A3 | The AI Research page | Quick and Deep, the evidence panel, tables and charts, cancel, failure states | Planned |
+| A4 | Forecasting tools | Value, fit, postseason and simulator tools; the document index | Planned |
+| A5 | Roster proposals | 2-4 options as drafts; the approved save, atomic and checked against its fingerprint | Planned |
+| A6 | Workspaces | Named, persistent research; asking from any page; export and delete | Planned |
+| A7 | Wider sources | More feeds, search quality, contract-update review | Planned |
+| A8 | Research proposals | Experiments for the models, written up, never applied | Planned |
+| A9 | Release audit | Every test, the evaluation, failure and offline runs, documentation | Planned |
+
 ## Completion gate for every milestone
 
 - Targeted automated tests pass.
