@@ -2,7 +2,9 @@
 #
 # Each case is one question (or a short conversation) with what a correct answer must do.
 # Never edit a case to make a model pass. A case is changed only when the lab's data or a
-# model file changes what is true - and then the oracle test says so first.
+# model file changes what is true - and then the oracle test says so first - or when the
+# user, reviewing a case, decides it is wrong; the development log then says which case,
+# why and when, and a comment on the case says so too.
 #
 #   database  which test database the figures come from:
 #               fixture   - the build of tests/fixtures/raw (built_readonly): real responses,
@@ -446,6 +448,9 @@ cases:
       outcome: supported
       first_call:
         - {tool: postseason_outlook, args: {view: team, team_id: 1610612738, season: "2025-26"}}
+        # Widened 2026-10-09 by the user's decision (A1): season_odds returns the same
+        # Celtics figures from the same season model, beside what happened.
+        - {tool: postseason_outlook, args: {view: season_odds, season: "2025-26"}}
       facts:
         - {call: postseason.team, args: {team_id: 1610612738, season: "2025-26"}, path: outlook.stages, match: {key: won_championship}, column: probability, value: 0.1099, tolerance: 0.00005}
         - {call: postseason.team, args: {team_id: 1610612738, season: "2025-26"}, path: outlook.stages, match: {key: won_championship}, column: low, value: 0.0303, tolerance: 0.00005}
@@ -705,6 +710,9 @@ cases:
         - {tool: web_search}
         - {tool: league_context, args: {view: champions}}
         - {tool: team_stats, args: {team_id: 1610612752, season: "2025-26"}}
+        # Widened 2026-10-09 by the user's decision (A1): the context does not resolve
+        # the Knicks, so looking the name up is what the rules ask for.
+        - {tool: resolve_entities}
       cite: [source, build]
 
   - id: W02

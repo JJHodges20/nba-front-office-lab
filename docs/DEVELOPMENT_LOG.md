@@ -3,6 +3,104 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone A1 - AI Research Assistant: the local model and its benchmark (2026-10-09)
+
+The assistant's first code: a local model it can trust to stay local, the layer it lives
+in, the typed tools it may ask for, and a measured choice of model on this machine's GPU.
+No tool runs yet and nothing reaches the workbench; no league data, model or roster
+changed.
+
+**Built**
+
+- `configs/assistant.yaml`, validated by `domain/assistant.py` and loaded by
+  `config/assistant.py`: Ollama's loopback address, the default and fallback models, and
+  for Quick and Deep the context length, thinking and output limit. An address off this
+  machine, a cloud model or an unknown field (a key) is refused.
+- `providers/ollama.py`: Ollama's HTTP interface through `requests`. Loopback only;
+  refuses a model named as a cloud model or listed as remote; sends the context length
+  with every request; streams an answer and puts it back together with Ollama's counts and
+  timings and the time to the first token; reads capabilities, licences and where a loaded
+  model sits in memory.
+- The `assistant` layer: `tools.py` (the registry - 20 tools, each with a Pydantic
+  arguments model, a permission class and the milestone that builds it; enumerations read
+  from the lab, not written twice; schemas flattened for small models), `policy.py` (ten
+  versioned rules and the context the model reads), `routing.py` (the first move, checked,
+  with one repair; tool results quoted as data), `evaluation.py` (the cases typed and
+  scored), `api.py` (whether the assistant can answer, and what to do if not).
+- Boundary rules: the `assistant` layer in `LAYER_RULES` and `ARCHITECTURE.md`; the
+  workbench may import `front_office.assistant.api` alone; the assistant may use only
+  `providers.ollama`, `providers.web` and `pipelines.current` of those layers.
+- `scripts/benchmark_ollama.py` and its generated report,
+  [ASSISTANT_MODELS.md](research/ASSISTANT_MODELS.md). A `pytest -m ollama` marker for the
+  tests that need the real model, deselected by default.
+
+**The benchmark** (59 cases, each in its own mode, 8,192-token context, every model cold
+first; then 12 cases at 4,096). Verdicts as re-scored after the user widened P01 and W01
+(below); the moves are the run's own.
+
+| Model | Passed | Right tool when needed | Quick median | Deep median | On the GPU |
+| --- | --- | --- | --- | --- | --- |
+| `qwen3:8b` | 46/59 | 32/37 | 2.2 s | 14.9 s | 5.76 GB, none in RAM |
+| `qwen3:4b-instruct` | 41/59 | 25/37 | 1.5 s | 2.2 s | 3.61 GB |
+| `qwen2.5:7b` | 38/59 | 28/37 | 1.9 s | 4.5 s | 4.78 GB |
+| `qwen3:4b` | 21/59 | 13/37 | 20.2 s | 62.2 s | 3.61 GB |
+
+**Decisions**
+
+- **Default `qwen3:8b`.** The most first moves right, no forbidden call, nothing cut off,
+  wholly on the GPU at 8,192 tokens (7.4 of 8.0 GB in use with the desktop's 1.6), a quick
+  first move in about two seconds.
+- **Fallback `qwen3:4b-instruct`.** Next best, every call valid at the first try, the
+  fastest, half the memory - for when the desktop needs the GPU.
+- **Not `qwen3:4b`.** The tag is now Qwen3-4B-Thinking-2507: it thinks whatever it is
+  told, so 36 of 59 first moves ran out of room at Quick's 1,024-token limit, at about 20
+  seconds each.
+- **Not `qwen2.5:7b`.** It followed the instructions planted in a page (W03): it called
+  the optimizer with the planted budget of 999 million.
+- **8,192 tokens in both modes.** The rules and the twenty tool definitions take about
+  2,600 tokens; 4,096 left `qwen3:8b` 10 of 12 right but little room to think, and 16K
+  would push it into system memory beside the desktop.
+
+**What the model gets wrong** - A2's work, recorded in [AI_EVALUATION.md](AI_EVALUATION.md):
+ambiguous names (0 or 1 of 4 for every model: the pre-pass will answer them before the
+model is asked), ids the context does not hold (`team_id: 1` for the Bulls), methodology
+questions without `research_docs`, the optimizer's budget mode, an extra field repeated on
+repair, postseason views. No model meets the 95% routing gate alone.
+
+**Two cases widened, by the user's decision** - questioned after the results were seen,
+set out for review, and widened by the user on 2026-10-09: P01 now also accepts the
+`season_odds` view, which gives the same Celtics figures as the expected `team` view
+(checked on the fixture database); W01 now also accepts `resolve_entities`, since its
+context does not resolve the Knicks. The rule for changing a case says so now (the case
+file's header, AI_EVALUATION.md, CLAUDE.md), each widened case carries a comment, and
+`judge_choice` and `passes` in `assistant/evaluation.py` let the benchmark judge a saved
+run again (`--rescore`) without asking the models again. Re-scored, `qwen3:8b` went from
+44 to 46 of 59; no other verdict changed. A0's commit keeps the cases as first frozen.
+
+**Found on the way**
+
+- The first background download of the models died with the network; the second hung
+  after one model and was stopped; pulled one at a time, all four arrived (Apache-2.0
+  each, as Ollama reports).
+- The boundary test reads any literal over 9,999,999 as a cap figure, nanoseconds per
+  second included; it is written `1_000**3`, with a comment.
+- `qwen3:4b-instruct` lists a thinking capability, and its template renders the tools in
+  about 650 more tokens than the others.
+- Ollama on this machine runs with cloud enabled (`OLLAMA_NO_CLOUD` unset); the adapter
+  refuses remote models regardless. Setting it is the user's choice.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Pass |
+| `pytest -n auto` (everything but live-network and live-model tests) | 3,181 passed in 3 min 44 s. The run before it had one failure, `tests/ui/test_optimizer_page.py::TestThePage::test_submitting_the_form_runs_the_request_as_set`, a page A1 does not touch; it passed alone and in the full rerun, and its cause was not captured. |
+| `pytest -m ollama` (the live model) | 3 passed |
+| The benchmark on the RTX 4060 | Done; report generated |
+| Ollama stopped | The facade returns "Ollama is not running at http://127.0.0.1:11434. Start the Ollama app (or run: ollama serve)..." (tested with a stopped transport) |
+| Cloud dependency | None: loopback only, remote models refused, no key field |
+| UI | Not affected (no page yet) |
+
 ## Milestone A0 - AI Research Assistant: audit, decisions, evaluation cases (2026-10-09)
 
 The first milestone of the assistant track ([ROADMAP](ROADMAP.md#ai-research-assistant-a0-a9)):

@@ -137,7 +137,7 @@ Every source is re-verified when the milestone that first uses it begins.
 | Source | Use | Finding |
 | --- | --- | --- |
 | Ollama, on this machine | Runs the language model | Listens on 127.0.0.1:11434 only (checked). Cloud models answer through the same local interface once signed in and are billed beyond a free allowance; cloud is on by default (`OLLAMA_NO_CLOUD` unset here). The lab's adapter refuses any host but the loopback address and any model Ollama marks as remote. |
-| Model weights from the Ollama library | `qwen3:4b`, `qwen3:8b`, `qwen3:4b-instruct`, `qwen2.5:7b` | Licences as each model reports them through Ollama, recorded at A1. |
+| Model weights from the Ollama library | `qwen3:4b`, `qwen3:8b`, `qwen3:4b-instruct`, `qwen2.5:7b` | Each reports the Apache License 2.0 through Ollama (read at A1, 2026-10-09). Pulled once; nothing is sent back. |
 | stats.nba.com league game logs | Completed games of the season in progress | The existing source and provider, refetched more often for the current season. Terms as above: private, non-commercial, credited to NBA.com. |
 | stats.nba.com player movement (`/js/data/playermovement/NBA_Player_Movement.json`) | Transactions | Public and undocumented; carries the league's player and team ids. Same terms. No robots.txt is published for the host. |
 | Official injury report (official.nba.com, PDF files) | Injury status with the report's time | Personal download allowed; "no portion... may be duplicated, redistributed or manipulated". The page's robots rules allow it; the PDF host's could not be read. Published about every 15 minutes in season. Needs `pypdf`. |

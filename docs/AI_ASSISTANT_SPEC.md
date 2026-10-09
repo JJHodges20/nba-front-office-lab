@@ -5,6 +5,13 @@ architecture and its reasons are [decision 0018](decisions/0018-ai-research-assi
 how it is tested is [AI_EVALUATION.md](AI_EVALUATION.md). This document describes the
 design as approved at milestone A0; each milestone notes here what it built.
 
+## Built so far
+
+| Milestone | What exists |
+| --- | --- |
+| A0 | This specification, [decision 0018](decisions/0018-ai-research-assistant.md), the evaluation design and its 59 cases. |
+| A1 | `configs/assistant.yaml` and its validation (`domain/assistant.py`, `config/assistant.py`); the Ollama adapter (`providers/ollama.py`); the `assistant` layer: the tool registry with every tool's arguments model (`tools.py`), the rules and context (`policy.py`), the first move and its one repair (`routing.py`), scoring (`evaluation.py`), and the facade's readiness check (`api.py`); the boundary tests; the benchmark and its report. Default model `qwen3:8b`, fallback `qwen3:4b-instruct`, an 8,192-token context in both modes. No tool runs yet. |
+
 ## Purpose and scope
 
 Ask a basketball question in plain words; get back an answer whose every figure comes

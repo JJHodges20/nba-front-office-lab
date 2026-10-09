@@ -41,10 +41,21 @@ LAYER_RULES: dict[str, set[str]] = {
     },
     "services": {"domain", "config", "storage", "analytics", "quality", "modeling"},
     "interfaces": {"domain", "config", "pipelines", "services"},
+    "assistant": {"domain", "config", "providers", "pipelines", "services"},
 }
 
-# The user interface displays what services return; it never reaches past them.
-APP_RULES: set[str] = {"domain", "services"}
+# The user interface displays what services return; it never reaches past them. The
+# assistant is the one outer layer it may call, through a single module.
+APP_RULES: set[str] = {"domain", "services", "assistant"}
+APP_ASSISTANT_MODULES: set[str] = {"front_office.assistant.api"}
+
+# Of the layers that touch the network or the data, the assistant may use only these
+# modules: the local model and the web, and the current-data refresh - never the
+# stats.nba.com ingest, a build, a fit or a contract import (decision 0018).
+ASSISTANT_REACH: dict[str, set[str]] = {
+    "providers": {"front_office.providers.ollama", "front_office.providers.web"},
+    "pipelines": {"front_office.pipelines.current"},
+}
 
 # Third-party libraries that belong to exactly one place. "apps" is the Streamlit UI.
 LIBRARY_OWNERS: dict[str, set[str]] = {
@@ -224,7 +235,58 @@ def test_apps_only_import_services_and_domain() -> None:
             target = layer_of(imported)
             if imported == PACKAGE or (target is not None and target not in APP_RULES):
                 problems.append(f"{path.relative_to(REPO_ROOT)}:{line} apps -> {imported}")
-    assert not problems, "the UI may only import services and domain:\n" + "\n".join(problems)
+    assert not problems, (
+        "the UI may only import services, domain and the assistant's facade:\n"
+        + "\n".join(problems)
+    )
+
+
+def _within(module: str, allowed: set[str]) -> bool:
+    return any(module == name or module.startswith(f"{name}.") for name in allowed)
+
+
+def test_apps_reach_the_assistant_only_through_its_facade() -> None:
+    if not APPS_DIR.is_dir():
+        pytest.skip("no user interface yet")
+    problems = [
+        f"{path.relative_to(REPO_ROOT)}:{line} apps -> {imported}"
+        for path in python_files(APPS_DIR)
+        for imported, line in imported_modules(path, None)
+        if layer_of(imported) == "assistant" and not _within(imported, APP_ASSISTANT_MODULES)
+    ]
+    assert not problems, "the UI may import only front_office.assistant.api:\n" + "\n".join(
+        problems
+    )
+
+
+def test_the_assistant_reaches_providers_and_pipelines_only_through_named_modules() -> None:
+    """``from front_office.providers import x`` names the whole layer, and is refused too."""
+    problems = []
+    for path in python_files(PACKAGE_DIR / "assistant"):
+        module = module_name(path)
+        for imported, line in imported_modules(path, module):
+            target = layer_of(imported)
+            if target in ASSISTANT_REACH and not _within(imported, ASSISTANT_REACH[target]):
+                problems.append(f"{path.relative_to(REPO_ROOT)}:{line} assistant -> {imported}")
+    assert not problems, (
+        "the assistant may use only these provider and pipeline modules "
+        f"{sorted(set().union(*ASSISTANT_REACH.values()))}:\n" + "\n".join(problems)
+    )
+
+
+def test_a_named_module_is_matched_by_name_not_by_prefix() -> None:
+    allowed = {"front_office.providers.ollama"}
+    assert _within("front_office.providers.ollama", allowed)
+    assert _within("front_office.providers.ollama.parts", allowed)
+    assert not _within("front_office.providers", allowed)
+    assert not _within("front_office.providers.ollama_cloud", allowed)
+
+
+def test_the_named_assistant_modules_belong_to_their_layers() -> None:
+    for layer, modules in ASSISTANT_REACH.items():
+        assert layer in LAYER_RULES["assistant"]
+        assert all(layer_of(module) == layer for module in modules)
+    assert all(layer_of(module) == "assistant" for module in APP_ASSISTANT_MODULES)
 
 
 def test_third_party_libraries_stay_in_their_layer() -> None:

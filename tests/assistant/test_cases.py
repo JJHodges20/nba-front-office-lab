@@ -18,6 +18,7 @@ from typing import Any
 import pandas as pd
 import pytest
 
+from front_office.assistant.tools import BY_NAME
 from front_office.config import load_settings
 from front_office.config.settings import read_yaml
 from front_office.pipelines.build import BuildReport
@@ -32,29 +33,8 @@ NO_ANSWER = {"insufficient", "clarify", "refuse"}
 MODES = {"quick", "deep"}
 CITES = {"build", "model", "interval", "as_of", "source", "nba"}
 
-# The tools of the first registry (docs/AI_ASSISTANT_SPEC.md).
-TOOLS = {
-    "resolve_entities",
-    "data_status",
-    "player_stats",
-    "compare_players",
-    "team_stats",
-    "league_context",
-    "historical_benchmarks",
-    "metric_definition",
-    "contract_info",
-    "player_value",
-    "roster_fit",
-    "postseason_outlook",
-    "simulate_scenario",
-    "optimize_roster",
-    "current_games",
-    "injury_report",
-    "transactions",
-    "web_search",
-    "read_source",
-    "research_docs",
-}
+# The tools the model may be asked to call (docs/AI_ASSISTANT_SPEC.md).
+TOOLS = set(BY_NAME)
 
 # The least each category must hold: the plan approved at milestone A0.
 COVERAGE = {

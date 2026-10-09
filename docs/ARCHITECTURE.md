@@ -41,11 +41,17 @@ it, and nothing else in the project (decision
 | `pipelines` | Orchestrates provider -> rawstore -> processing -> storage, and applies the fitted models. | `domain`, `config`, `providers`, `rawstore`, `processing`, `storage`, `quality`, `modeling` |
 | `services` | What the UI and CLI call: repositories + analytics, returned display-ready. | `domain`, `config`, `storage`, `analytics`, `quality`, `modeling` |
 | `interfaces` | The `fol` command line. Thin. | `domain`, `config`, `pipelines`, `services` |
-| `apps/` (UI) | Streamlit workbench. Displays what services return. | `domain`, `services` |
+| `assistant` | The AI research assistant: typed tools over the services, a local language model. Outermost. | `domain`, `config`, `providers`, `pipelines`, `services` |
+| `apps/` (UI) | Streamlit workbench. Displays what services return. | `domain`, `services`, `assistant` |
 
 The lower layers (`providers` through `modeling`) take plain values as arguments rather
-than reading configuration themselves. Only `pipelines`, `services` and `interfaces` load
-settings, which keeps everything beneath them trivially testable.
+than reading configuration themselves. Only `pipelines`, `services`, `interfaces` and
+`assistant` load settings, which keeps everything beneath them trivially testable.
+
+Two rules are narrower than a layer (decision 0018). The workbench reaches the assistant
+through `front_office.assistant.api` alone. The assistant uses only `providers.ollama`
+and `providers.web` of the providers and `pipelines.current` of the pipelines, so it
+cannot reach the stats.nba.com ingest, a build, a fit or a contract import.
 
 Third-party libraries are confined the same way: `nba_api` and `requests` only in
 `providers`; `sqlalchemy` and `sqlite3` only in `storage`; `yaml` only in `config`; `typer` and `rich`
@@ -348,6 +354,32 @@ after, and dresses the comparison; `FitService.lineup` places the roster's fit m
 for any set of players and shares. No build applies any of it; the invented league plays
 regular seasons from a planted game model so the measurements can be checked. See
 `docs/decisions/0015-simulator.md`.
+
+## The AI research assistant
+
+```
+a question:  domain.assistant.Context (sidebar, resolved names, sources)
+             -> assistant.routing.first_move: the rules (assistant.policy), the context,
+                the tool registry (assistant.tools)
+             -> providers.ollama: a model on this machine
+             -> a tool call checked against the registry and its Pydantic model, or none
+             (from A2: the tool runs over the services; the answer is checked against it)
+scripts/benchmark_ollama.py:  tests/assistant/fixtures/cases.yaml -> each candidate model
+             -> assistant.evaluation.score -> docs/research/ASSISTANT_MODELS.md
+```
+
+The assistant is the outermost layer, beside `interfaces` (decision 0018). Its settings are
+`configs/assistant.yaml` (`domain/assistant.py` validates them, `config/assistant.py` loads
+them): the loopback address of Ollama, the default and fallback models, and for Quick and
+Deep the context length, thinking and output limit. `providers/ollama.py` refuses any
+address off this machine and any model Ollama marks as remote, and sends the context
+length with every request. `assistant/tools.py` is the registry: every tool's name, its
+arguments as a Pydantic model, its permission class (read, compute, net, draft - no
+write) and the milestone that builds it; enumerations come from the domain and the
+services rather than being written twice. `assistant/routing.py` asks the model for its
+first move and checks it, sending an invalid call back once. `assistant/evaluation.py`
+reads the frozen cases and scores a move. `assistant/api.py` is what the workbench calls.
+See [AI_ASSISTANT_SPEC.md](AI_ASSISTANT_SPEC.md) and [AI_EVALUATION.md](AI_EVALUATION.md).
 
 ## Conventions
 

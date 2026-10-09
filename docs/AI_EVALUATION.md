@@ -5,7 +5,10 @@ design is [AI_ASSISTANT_SPEC.md](AI_ASSISTANT_SPEC.md); the decision is
 [0018](decisions/0018-ai-research-assistant.md).
 
 > A case is never edited to make a model pass. A failure is a finding: fix the assistant,
-> or record why the case stays failed. Cases are added for every failure seen in use.
+> or record why the case stays failed. A case the user, on review, decides is wrong is
+> changed by that decision alone, and the development log says which, why and when; a
+> saved run is then judged again (`--rescore`), never run again until it passes. Cases are
+> added for every failure seen in use.
 
 ## The cases
 
@@ -95,10 +98,50 @@ Proposed at A0, to be revisited with A1's numbers:
 | Calls a page asked for | 0 |
 | Answer time | set by the user from A1's measurements |
 
+## Where A1 left it
+
+The first benchmark (2026-10-09, [ASSISTANT_MODELS.md](research/ASSISTANT_MODELS.md)) measured
+the model's first move alone, with nothing behind the tools and no pre-pass. The figures
+below are after the re-scoring of P01 and W01 (see the end of this section):
+
+| Measure | Target | `qwen3:8b` (default) | `qwen3:4b-instruct` (fallback) |
+| --- | --- | --- | --- |
+| Right first tool, cases that need one | at least 95% | 86% (32/37) | 68% (25/37) |
+| Arguments right when the tool is right | at least 98% | 92% (35/38) | 97% (28/29) |
+| No call where none is right (clarify, refuse, answer from a result in hand) | 100% | 67% (8/12) | 75% (9/12) |
+| Calls a page asked for | 0 | 0 | 0 |
+| Cut off | - | 0 | 0 |
+| Quick answer, median | set by the user | 2.2 s | 1.5 s |
+
+No model meets the routing gates on its own, and none was expected to: four of the
+misses are the ambiguous-name cases, which A2's pre-pass answers before the model is
+asked. The rest are A2's work, each against a named failure:
+
+- **Ids the context does not hold.** `qwen3:8b` called `team_stats` with `team_id: 1` for
+  the unresolved Bulls (E03). The executor will check every id against the lab's name
+  tables and send an unknown one back for repair.
+- **Methodology.** No model reached for `research_docs` reliably (`qwen3:8b` 0 of 3). A rule
+  and a deterministic route for "how is ... computed / tested" questions will follow.
+- **The optimizer's budget.** Every model set `budget_millions: 150` with the salary-cap mode
+  (R01). The arguments model will refuse an amount without the custom mode, so that the
+  repair loop corrects it.
+- **Extra fields.** `qwen3:8b` sent `view` to `compare_players` and repeated it on repair
+  (T02). The repair message will list the tool's fields.
+- **Postseason views.** `season_odds` for a strength (P02). The views will be described more clearly.
+
+Two cases were widened on 2026-10-09 by the user's decision, after the results had been
+seen and set out for review: **P01** also accepts the `season_odds` view, which returns the
+same Celtics figures from the same season model, beside what happened (checked on the
+fixture database); **W01** also accepts `resolve_entities`, since its context does not
+resolve the Knicks and looking the name up is what the rules ask for. The saved run was
+judged again against the widened cases: `qwen3:8b` moved from 44 to 46 of 59, and no other
+model's verdict changed.
+
 ## Running it
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\assistant           # the cases and their figures
 .\.venv\Scripts\python.exe -m pytest -m ollama                  # the model tests (Ollama running)
 .\.venv\Scripts\python.exe scripts\benchmark_ollama.py --help   # the model benchmark (A1)
+.\.venv\Scripts\python.exe scripts\benchmark_ollama.py --report RUN.json --rescore --write   # a saved run judged again
 ```

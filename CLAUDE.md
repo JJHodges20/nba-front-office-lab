@@ -40,6 +40,9 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe simulate fit --write      # measure them again on the built database (configs/models/simulator.json)
 .\.venv\Scripts\fol.exe simulate report --write   # regenerate docs/research/SIMULATOR.md
 .\.venv\Scripts\fol.exe ui --no-browser           # the workbench at http://localhost:8501 (Ctrl+C stops it)
+.\.venv\Scripts\python.exe -m pytest tests\assistant  # the assistant's evaluation cases, their figures recomputed
+.\.venv\Scripts\python.exe -m pytest -m ollama    # the assistant against the local model (Ollama running)
+.\.venv\Scripts\python.exe scripts\benchmark_ollama.py --write   # benchmark the candidate models (docs/research/ASSISTANT_MODELS.md)
 .\.venv\Scripts\python.exe scripts\make_fixtures.py   # rebuild tests/fixtures/raw from data/raw
 ```
 
@@ -92,10 +95,11 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   way of grouping; nothing "needs" a figure. Compare teams within their own season.
 - **Generated documents are not edited.** `docs/DATA_DICTIONARY.md`, `docs/METRICS.md`,
   `docs/research/BENCHMARKS.md`, `docs/research/PLAYER_VALUE.md`,
-  `docs/research/ROSTER_FIT.md`, `docs/research/POSTSEASON.md` and
-  `docs/research/SIMULATOR.md` come from `fol dictionary|metrics|benchmarks --write`,
-  `fol value report --write`, `fol fit report --write`, `fol playoffs report --write` and
-  `fol simulate report --write`. The first two are checked by tests; the research
+  `docs/research/ROSTER_FIT.md`, `docs/research/POSTSEASON.md`,
+  `docs/research/SIMULATOR.md` and `docs/research/ASSISTANT_MODELS.md` come from
+  `fol dictionary|metrics|benchmarks --write`, `fol value report --write`,
+  `fol fit report --write`, `fol playoffs report --write`, `fol simulate report --write`
+  and `scripts/benchmark_ollama.py --write`. The first two are checked by tests; the research
   documents depend on the database, so regenerate them at a milestone gate after the
   data, a model, the evidence or the research code changes.
 - **A model is fitted on request and applied by every build.** `fol value fit --write`
@@ -179,6 +183,22 @@ Build one roadmap milestone at a time. A milestone is finished only when:
 - **Refit in order.** A value refit changes the version the build applies and that the
   other files name: `fol value fit --write`, `fol build`, `fol playoffs fit --write`,
   `fol simulate fit --write`, `fol fit test --write`, then the research documents.
+- **The assistant is the outermost layer** (`docs/decisions/0018-ai-research-assistant.md`).
+  The workbench imports only `front_office.assistant.api`; of providers and pipelines the
+  assistant uses only `providers.ollama`, `providers.web` and `pipelines.current`. Tests
+  enforce both. Its model is local: `providers/ollama.py` accepts the loopback address
+  only, refuses models Ollama marks remote or names as cloud, and sends the context length
+  with every request; `configs/assistant.yaml` has no field for a key.
+- **No tool writes.** The registry (`assistant/tools.py`) has read, compute, net and draft
+  tools only. Saving a roster is the user's click on a reviewed proposal. Never give the
+  model table reads, SQL, code, files, a URL it composed, a fit, a build, an import or a
+  setting; outside text reaches it quoted as data.
+- **The evaluation cases are frozen.** `tests/assistant/fixtures/cases.yaml`: never edit a
+  case to make a model pass. `tests/assistant/test_cases.py` recomputes every figure in it
+  through the services; when a rebuild or refit changes one, update it deliberately and
+  say why in the development log. A case the user decides is wrong changes by that
+  decision alone, logged and commented; a saved benchmark is then judged again with
+  `--rescore`, not run again until it passes (`docs/AI_EVALUATION.md`).
 - **Never print data through rich markup.** Use `_say` / `_tagged` in the CLI; text in
   square brackets is otherwise swallowed as a style tag.
 - **Warnings are errors** in the test suite.

@@ -38,9 +38,10 @@ testpaths = ["tests"]
 pythonpath = ["src", ".", "apps/workbench"]
 # worksteal: with -n, an idle worker takes queued tests from a busy one. The page sweeps
 # run for half a minute each, and the default hands them out in batches that pile up.
-addopts = "-q -m 'not network' --dist worksteal"
+addopts = "-q -m 'not network and not ollama' --dist worksteal"
 markers = [
     "network: calls a live external service; deselected by default (run with -m network)",
+    "ollama: needs Ollama running on this machine with the assistant's model; deselected by default (run with -m ollama)",
 ]
 # A warning is a defect we have not looked at yet. Add a targeted ignore here, with a
 # reason, only for warnings raised inside third-party code.

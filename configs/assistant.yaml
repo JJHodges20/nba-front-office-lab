@@ -1,0 +1,32 @@
+# The AI research assistant: which local model answers, and within what limits.
+# See docs/decisions/0018-ai-research-assistant.md and docs/AI_ASSISTANT_SPEC.md.
+#
+# The model runs on this machine through Ollama. The address must be the loopback one, a
+# cloud model is refused, and there is no field for a key: an unknown field is an error.
+# The default and fallback models were chosen by the benchmark of 2026-10-09 on this
+# machine (scripts/benchmark_ollama.py, docs/research/ASSISTANT_MODELS.md, the A1 entry of
+# docs/DEVELOPMENT_LOG.md); run it again before changing them. An 8,192-token context
+# keeps qwen3:8b wholly on the RTX 4060 with the desktop's share in use.
+
+version: 1
+
+ollama:
+  host: "http://127.0.0.1:11434"
+  timeout_seconds: 180
+  # How long Ollama keeps the model loaded after a question.
+  keep_alive: "10m"
+
+default_model: "qwen3:8b"
+fallback_model: "qwen3:4b-instruct"
+temperature: 0
+
+# Quick: one fact or one comparison. Deep: several sources, with thinking.
+# The context length is sent with every request, never inherited from Ollama.
+quick:
+  context_tokens: 8192
+  think: false
+  max_output_tokens: 1024
+deep:
+  context_tokens: 8192
+  think: true
+  max_output_tokens: 3072
