@@ -76,7 +76,7 @@ Lettered so as not to clash with the milestones above; each passes the same gate
 | --- | --- | --- | --- |
 | A0 | Audit, decisions, evaluation cases | Decision 0018, the specification, the evaluation design, 59 frozen cases that check their own figures, the source register | Done (2026-10-09) |
 | A1 | Local model and benchmark | The Ollama adapter (loopback only, remote models refused), the `assistant` layer and its boundary rules, the typed tool registry, the routing benchmark on this machine's GPU, a default and fallback model | Done (2026-10-09: `qwen3:8b`, fallback `qwen3:4b-instruct`; [ASSISTANT_MODELS.md](research/ASSISTANT_MODELS.md)) |
-| A2 | Tools, evidence, current data, the web | Name resolution, the read tools, the evidence record and answer checker, game logs, the injury report and transactions, web search and pasted links | Planned |
+| A2 | Tools, evidence, current data, the web | Name resolution, the read tools, the evidence record and answer checker, game logs, the injury report and transactions, web search and pasted links | Done (2026-10-09; whole answers end to end, [ASSISTANT_ANSWERS.md](research/ASSISTANT_ANSWERS.md); web search checked live) |
 | A3 | The AI Research page | Quick and Deep, the evidence panel, tables and charts, cancel, failure states | Planned |
 | A4 | Forecasting tools | Value, fit, postseason and simulator tools; the document index | Planned |
 | A5 | Roster proposals | 2-4 options as drafts; the approved save, atomic and checked against its fingerprint | Planned |

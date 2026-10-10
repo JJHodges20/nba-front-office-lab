@@ -119,3 +119,44 @@ sources and contract-update review; A8 research proposals; A9 the release audit.
   added in turn). A5 adds an atomic save for approved proposals.
 - Ollama, the web and the NBA's sources change. Each provider is re-verified when the
   milestone that needs it begins, and the register updated.
+
+## Settled while building A2 (2026-10-09)
+
+- **Current information is kept in a file of its own**, `data/current.sqlite`, with a log
+  of every attempt. The season's game logs go through the existing ingest, so their
+  snapshots also reach the raw store and the next build; the player-movement file and the
+  injury report are kept only in the cache, with their address, time and fingerprint -
+  the report may not be redistributed, and neither is needed to rebuild anything.
+- **An absence a source confirms is an answer, a qualified one.** No game played yet, no
+  report published, no move in the window: the tool succeeds, returns nothing, and
+  carries a *limit* - what an answer resting on it must say. An absence in the lab's own
+  data (a season it does not hold) is a result that found nothing, and the answer is
+  insufficient. A source never reached is unavailable.
+- **The page fetch is the lab's own, not Ollama's.** Ollama also offers a fetch API; the
+  lab fetches pages itself, so that the address checks, the robots rules for AI agents and
+  the refused sites are its own code and tests, and nothing but the query leaves for
+  ollama.com. Reading a page needs no key.
+- **nba.com is refused to the page fetch,** whole: the league's data comes through the
+  lab's providers, and www.nba.com's robots rules shut AI agents out.
+- **`pipelines.web` joins the assistant's reach.** Turning a page into text is processing,
+  which the assistant may not import; a pipeline composes the provider and the processing
+  as everywhere else, and the boundary test names it.
+- **The lab's language is checked like its figures.** A chance where no result is a chance,
+  a verdict anywhere, and a claim to have saved or changed something are sent back once and
+  then cut with their sentence. The end-to-end runs saw a benchmark's frequency called "a
+  0% chance" (B01) and "The roster for Option B has been saved" (R02).
+- **A citation must point at a result.** The model copied an earlier turn's "[table r1]"
+  as "[table r2]" without calling anything (T01). A citation of a result no tool returned
+  is sent back once with the tools offered, then the sentence is cut.
+- **A promise is held to.** A small model sometimes writes "Let me check..." and stops; it
+  is asked once to make the call.
+- **The outcome reads the words as well as the results.** With nothing called, saying no
+  is a refusal and anything else is insufficient. With results, an answer that says it
+  cannot, or that the data lacks something, is insufficient if it states no figure and
+  qualified if it does.
+- **A year names a season only when it can.** "The 2026 playoffs" are 2025-26's; "the 2026
+  draft" names no season. Only a year that could be either season is asked about.
+- **Robots rules are read for AI agents, and kept.** Checked live, ESPN's and AP's rules
+  turn away ChatGPT-User and Claude-User, so their pages are not read - only their search
+  snippets show. Judging pages as the lab's own agent alone would read them; the user chose
+  on 2026-10-09 to keep honouring the sites' stated wishes.

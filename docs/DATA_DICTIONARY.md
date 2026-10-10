@@ -54,6 +54,10 @@ measured statistics, modeled estimates and user assumptions visibly apart.
 | [`build_issues`](#build_issues) | operations | One row per issue from the most recent build. | V1 |
 | [`check_results`](#check_results) | operations | One row per check. | V1 |
 | [`raw_snapshots`](#raw_snapshots) | operations | One row per dataset slice. | V1 |
+| [`current_games`](#current_games) | current | One row per team per game (two rows per game). | A2 |
+| [`transactions`](#transactions) | current | One row per line of the league's file. | A2 |
+| [`injury_reports`](#injury_reports) | current | One row per player, or per team not yet submitted, in one report. | A2 |
+| [`current_refreshes`](#current_refreshes) | current | One row per attempt. | A2 |
 
 ### teams
 
@@ -668,6 +672,102 @@ The newest raw snapshot of every dataset slice, as of the most recent build.
 | `season` | string | no | operational |  | Season, if the dataset is seasonal. |
 | `fetched_at` | datetime | yes | operational |  | When the newest snapshot was fetched. |
 | `versions` | integer | yes | operational |  | How many distinct snapshots of this slice are stored. |
+
+### current_games
+
+The season in progress's team box scores as last fetched from stats.nba.com: the games the assistant can report before a build takes them in. Kept in data/current.sqlite, not the lab's database.
+
+- **Grain:** One row per team per game (two rows per game).
+- **Primary key:** `game_id`, `team_id`
+- **Indexes:** `season`, `season_type`; `team_id`, `game_date`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `game_id` | string | yes | identifier |  | Game id: ten digits, kept as text because it starts with zeros. |
+| `team_id` | integer | yes | identifier |  | Team id. References `teams.team_id`. |
+| `season` | string | yes | identifier |  | Season label, e.g. 2025-26. |
+| `season_type` | string | yes | identifier |  | Phase of the season. One of: `regular`, `playoffs`, `playin`. |
+| `game_date` | date | yes | measured |  | Date the game was played. |
+| `opponent_team_id` | integer | yes | identifier |  | The other team in the game. References `teams.team_id`. |
+| `is_home` | boolean | yes | measured |  | Whether the team played at home. False for both teams at a neutral site. |
+| `is_neutral_site` | boolean | yes | measured |  | Whether the game was played at a neutral site, with neither team at home. |
+| `won` | boolean | no | measured |  | Whether the team won. Null if the game is unfinished. |
+| `minutes` | integer | yes | measured | player-minutes | Player-minutes credited to the team (240 in regulation, 25 more per overtime). |
+| `fgm` | integer | yes | measured |  | Field goals made. |
+| `fga` | integer | yes | measured |  | Field goals attempted. |
+| `fg3m` | integer | yes | measured |  | Three-point field goals made. |
+| `fg3a` | integer | yes | measured |  | Three-point field goals attempted. |
+| `ftm` | integer | yes | measured |  | Free throws made. |
+| `fta` | integer | yes | measured |  | Free throws attempted. |
+| `oreb` | integer | yes | measured |  | Offensive rebounds. |
+| `dreb` | integer | yes | measured |  | Defensive rebounds. |
+| `reb` | integer | yes | measured |  | Total rebounds. |
+| `ast` | integer | yes | measured |  | Assists. |
+| `tov` | integer | yes | measured |  | Turnovers. |
+| `stl` | integer | yes | measured |  | Steals. |
+| `blk` | integer | yes | measured |  | Blocks. |
+| `pf` | integer | yes | measured |  | Personal fouls. |
+| `pts` | integer | yes | measured |  | Points. |
+| `opp_pts` | integer | yes | measured |  | Points scored by the opponent. |
+
+### transactions
+
+Signings, trades, waivers and other moves as the league's player-movement file lists them. Kept in data/current.sqlite, not the lab's database.
+
+- **Grain:** One row per line of the league's file.
+- **Primary key:** `transaction_key`
+- **Indexes:** `transaction_date`; `team_id`; `player_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `transaction_key` | string | yes | identifier |  | Fingerprint of the line: its date, type, description, team and player. |
+| `transaction_date` | date | yes | measured |  | Date the league gives the move. |
+| `transaction_type` | string | yes | measured |  | The league's type: Signing, Trade, Waive... |
+| `description` | string | yes | measured |  | The league's description, as written. |
+| `team_id` | integer | no | identifier |  | Team, by the league's id. |
+| `player_id` | integer | no | identifier |  | Player, by the league's id. |
+| `group_key` | string | no | identifier |  | The league's grouping of the lines that make one move. |
+| `retrieved_at` | datetime | yes | operational |  | When the lab fetched the file. |
+
+### injury_reports
+
+The league's official injury report - the latest one fetched - line by line. Kept in data/current.sqlite, not the lab's database.
+
+- **Grain:** One row per player, or per team not yet submitted, in one report.
+- **Primary key:** `report_time`, `row_number`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `report_time` | datetime | yes | measured |  | When the report was issued, in UTC; the league names its reports in Eastern time. |
+| `row_number` | integer | yes | identifier |  | Position in the report. |
+| `game_date` | date | yes | measured |  | Day of the game, as the report gives it. |
+| `game_time` | string | no | measured |  | Tip-off as the report writes it, Eastern time. |
+| `matchup` | string | no | measured |  | Away@Home, as the report writes it. |
+| `team_name` | string | yes | measured |  | Team, as the report names it. |
+| `player_name` | string | no | measured |  | Player as the report writes it: last name, first name. |
+| `status` | string | yes | measured |  | The player's status that day. One of: `Out`, `Doubtful`, `Questionable`, `Probable`, `Available`, `Not Yet Submitted`. |
+| `reason` | string | no | measured |  | Reason, as the report writes it. |
+| `source_url` | string | yes | operational |  | The report file's address. |
+| `retrieved_at` | datetime | yes | operational |  | When the lab fetched it. |
+
+### current_refreshes
+
+Every attempt to refresh a current source: when, what happened, from where. Never dropped. Kept in data/current.sqlite, not the lab's database.
+
+- **Grain:** One row per attempt.
+- **Primary key:** `refresh_id`
+- **Indexes:** `source`, `attempted_at`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `refresh_id` | integer | yes | operational |  | Attempt id, assigned when recorded. |
+| `source` | string | yes | operational |  | Which source. One of: `games`, `transactions`, `injuries`. |
+| `attempted_at` | datetime | yes | operational |  | When the attempt was made. |
+| `status` | string | yes | operational |  | What happened. One of: `stored`, `unchanged`, `none`, `failed`. |
+| `rows` | integer | no | operational |  | Rows stored. |
+| `detail` | string | no | operational |  | What the attempt found, or why it failed. |
+| `url` | string | no | operational |  | Where it fetched from. |
+| `content_hash` | string | no | operational |  | Fingerprint of what was fetched. |
 
 ## Planned tables
 

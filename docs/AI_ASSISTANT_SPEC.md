@@ -11,6 +11,7 @@ design as approved at milestone A0; each milestone notes here what it built.
 | --- | --- |
 | A0 | This specification, [decision 0018](decisions/0018-ai-research-assistant.md), the evaluation design and its 59 cases. |
 | A1 | `configs/assistant.yaml` and its validation (`domain/assistant.py`, `config/assistant.py`); the Ollama adapter (`providers/ollama.py`); the `assistant` layer: the tool registry with every tool's arguments model (`tools.py`), the rules and context (`policy.py`), the first move and its one repair (`routing.py`), scoring (`evaluation.py`), and the facade's readiness check (`api.py`); the boundary tests; the benchmark and its report. Default model `qwen3:8b`, fallback `qwen3:4b-instruct`, an 8,192-token context in both modes. No tool runs yet. |
+| A2 | The assistant answers. Names first (`services/entities.py`, `assistant/names.py`): an ambiguous name is asked about before the model runs. The lab's read tools over the services (`assistant/lab_tools.py`); the executor (`executor.py`), which refuses an id the lab does not hold; the loop (`orchestrator.py`) within each mode's calls, time and context; the answer checker (`checker.py`): a figure no result holds, a chance where none was given, a verdict, a claim to have saved something or a citation of nothing is sent back once, then cut out. Current information (`pipelines/current.py` into `data/current.sqlite`, read by `services/current.py`; `fol current refresh`, `fol current status`) and its tools (`current_tools.py`). The web (`providers/web.py`, `processing/web.py`, `pipelines/web.py`, `web_tools.py`): Ollama's web search with the user's own key, and pages - search results and pasted links - read by id after every check. The end-to-end evaluation (`scripts/evaluate_answers.py`, [ASSISTANT_ANSWERS.md](research/ASSISTANT_ANSWERS.md)). The forecasting tools are A4's; the page is A3's. |
 
 ## Purpose and scope
 
@@ -42,8 +43,12 @@ makes to data, models, settings or rosters on its own; a fitted "fit score".
    (one repair attempt on failure), checks the permission class and the mode's limits,
    runs the tool with a timeout, and stores the result under an id.
 5. **The answer.** The model writes from the results only. A checker compares every
-   number in the text with the cited results as displayed; an unmatched figure is sent
-   back once for repair, then removed, and the answer is marked *qualified*.
+   number in the text with what the model was given, as displayed (dates and years are
+   labels, not figures); it also catches a chance where no result is one, a verdict, a
+   claim to have saved or changed something, and a citation of a result no tool returned.
+   Each is sent back once for repair, then cut with its sentence, and the answer is marked
+   *qualified*. A model that says it will look something up and stops, or cites a result
+   it never fetched, is asked once to make the call.
 6. **Display.** The workbench shows the text, then tables and charts drawn from the stored
    results, then the evidence: sources with their dates, the build, model revisions,
    assumptions and warnings.
@@ -120,7 +125,11 @@ current, stale data); and the user's assumptions, tagged as theirs.
   data is).
 - **Three outcomes:** *supported* (answered from results), *qualified* (part answered,
   the rest named as missing, stale or estimated), *insufficient* (nothing invented; what
-  is missing is said). A question back to the user and a refusal are answers too.
+  is missing is said). A question back to the user and a refusal are answers too. The
+  outcome is code's call, from the results and the words: a result that holds nothing new
+  but was checked - no game played yet, no report published - carries a limit and makes
+  the answer qualified; a lab table without the season makes it insufficient; an answer
+  that says it cannot is insufficient without a figure and qualified with one.
 - **The lab's language.** A benchmark is a frequency among past teams, with its count and
   interval, never a team's chance. A chance comes only from the postseason model or the
   simulator, with its 95% interval and the model's record. Ratings over a span carry "≈".
@@ -142,15 +151,20 @@ run.
 
 ## Current information
 
-| Source | Refreshed when older than (starting values) | Notes |
+| Source | Fetched again when older than | Notes |
 | --- | --- | --- |
-| This season's league game logs (stats.nba.com) | 1 hour on game days, 12 hours otherwise | Preseason games are labelled preseason and never counted as regular season. |
-| Injury report (official PDF) | 30 minutes on game days | A player not listed is "not on the report", never "healthy". Teams not yet submitted are said so. |
-| Transactions (stats.nba.com player movement) | 3 hours | Shown with the transaction date; a move newer than the build is flagged against the lab's rosters, which are not changed. |
+| The season in progress's league game logs (stats.nba.com) | 60 minutes | Regular season, play-in and playoffs, through the existing provider; the snapshots go to the raw store, where the next build finds them. A game the build already holds is marked. Preseason games are not fetched, and the tool says so. |
+| Injury report (official PDF) | 30 minutes | The latest report of the last four quarter hours, found by its published name. A player not listed is "not on the report", never "healthy"; a team not yet submitted is said so. Times are the league's, Eastern. |
+| Transactions (stats.nba.com player movement) | 3 hours | Each with the league's date; a move dated after the lab's build is flagged, since the lab's rosters do not show it. Kept unchanged when the file has not changed. |
 
-At launch the workbench checks once per session and fetches only what is due, showing
-*checking*, *updated*, *unavailable* or *cached as of*. A manual refresh is on the page.
-`fol refresh` stays a separate, explicit step; nothing refits a model.
+The intervals are starting values in `configs/assistant.yaml` (`current:`), to be set from
+how often each source changes in season. A question fetches only what is due; a source
+that fails is logged and its last copy used, dated. Everything fetched is kept in
+`data/current.sqlite`, apart from the lab's database: a refresh never touches what a build
+made, and nothing refits a model. `fol current refresh` fetches by hand, `fol current
+status` shows each source's state; at A3 the page checks once per session, showing
+*checking*, *updated*, *unavailable* or *cached as of*. `fol refresh` stays a separate,
+explicit step.
 
 ## Settings and failure
 
@@ -166,11 +180,20 @@ Without a network the lab's own questions still work; current and web tools say
   tool result, never in the instructions. The model cannot compose a URL: `read_source`
   takes a source id. No tool writes. A page that asks for anything is ignored, and the
   evaluation includes such pages.
-- **Fetching.** http and https only; every address, after every redirect, must be public
-  (no loopback, private, link-local or reserved ranges); size and time limits; no cookies
-  or credentials; robots.txt honoured, judged as an AI agent; no paywall or bot-check
-  workarounds. Sports Reference and Spotrac are refused; www.nba.com pages are not
-  fetched.
+- **Fetching.** http and https on the standard ports only; no credentials in an address;
+  every address the name resolves to, after every redirect, must be public (no loopback,
+  private, link-local, shared or reserved ranges), and so must the one connected to; 2 MB
+  and 20 seconds a page; no cookies or credentials sent; robots.txt honoured for the lab and
+  for AI agents (ChatGPT-User, Claude-User, Perplexity-User, GPTBot, ClaudeBot,
+  PerplexityBot) - rules that cannot be read allow nothing; no login, payment or bot-check
+  workarounds (401, 402, 403, 407, 429, 451 end it). Sports Reference's sites and Spotrac
+  are refused, and so is nba.com: the league's data comes through the lab's own sources. A
+  search result from a refused site is left out, and the result says so.
+- **Budgets.** A question may search the web once and read two pages in Quick mode, four
+  and eight in Deep; a page read twice is fetched once.
 - **Local only.** See decision 0018: loopback model host, remote models refused, no keys
-  in configuration; the web search key is read from the environment by the web provider
-  alone.
+  in configuration. The web search key is read by the web provider alone, from the
+  environment variable `FOL_OLLAMA_API_KEY` or that line of the project's git-ignored
+  `.env`, sent only to ollama.com, and never shown, logged or put in an error. Never
+  `OLLAMA_API_KEY`, which Ollama's own tools pick up by themselves. Without a key,
+  `web_search` says it is not set up and pasted links can still be read.

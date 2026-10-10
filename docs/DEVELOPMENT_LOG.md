@@ -3,6 +3,120 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone A2 - AI Research Assistant: tools, evidence, current data, the web (2026-10-09)
+
+The assistant answers: names resolved by code, the lab's data through typed tools, current
+games, transactions and the injury report, the web through the user's own search key and
+a guarded page fetch, and every answer checked before it is shown. Nothing reaches the
+workbench yet (A3). No league table, model, setting or roster changed; nothing was
+refitted.
+
+**Built**
+
+- **Names first** (`services/entities.py`, `assistant/names.py`): seasons, years, players
+  and teams found in the question against the lab's own name tables, a franchise by the
+  name it had that season. An ambiguous name is asked about and the model is not called; a
+  year names a season only when it can ("the 2026 playoffs" are 2025-26's, "the 2026
+  draft" names none).
+- **The read tools** (`assistant/lab_tools.py`): `resolve_entities`, `data_status`,
+  `player_stats`, `compare_players`, `team_stats`, `league_context`,
+  `historical_benchmarks`, `metric_definition`, `contract_info` - service calls written as
+  the workbench writes them, each with its evidence (the build, NBA.com's credit, the
+  contract file's date). An empty read of the lab carries the build too.
+- **The loop** (`assistant/executor.py`, `orchestrator.py`, `toolbox.py`): ids the lab does
+  not hold refused before anything runs; each mode's calls, seconds, context and web
+  budget; results quoted to the model as data; a model that says "let me check" and stops,
+  or cites a result it never fetched, asked once to call.
+- **The checker** (`assistant/checker.py`): every figure must be in what the model was
+  given at the written precision (dates and years are labels); a chance where no result is
+  one, a verdict, a claim to have saved something and a citation of nothing are caught
+  too. Sent back once, then cut with the sentence. The outcome reads the results and the
+  words.
+- **Current information** (`domain/tables/current.py`, `providers/nba_current.py`,
+  `processing/current.py`, `storage/current.py`, `pipelines/current.py`,
+  `services/current.py`, `assistant/current_tools.py`; `fol current refresh`, `fol current
+  status`): the season's game logs through the existing ingest, the league's
+  player-movement file, and the latest injury report read from its PDF with `pypdf`, into
+  `data/current.sqlite` beside the lab's database, each source fetched only when its
+  interval has passed and every attempt logged. A source checked and found empty is a
+  dated, qualified answer; "not on the report" is never "healthy"; moves after the build
+  are flagged.
+- **The web** (`providers/web.py`, `processing/web.py`, `pipelines/web.py`,
+  `assistant/web_tools.py`): Ollama's web search with the user's key from
+  `FOL_OLLAMA_API_KEY` (environment or `.env`), refused sites left out; pages read by id
+  only - a search result or a pasted link - after the address, redirect, connection,
+  robots (for AI agents too), size and type checks.
+- **The evaluation** (`assistant/evaluation.score_answer`, `scripts/evaluate_answers.py`,
+  `tests/assistant/recorded.py`, [ASSISTANT_ANSWERS.md](research/ASSISTANT_ANSWERS.md)):
+  whole answers to the 42 cases A2's tools can answer, in a recorded world dated the case
+  file's day; an end-to-end smoke test in the `ollama` marker.
+- The data dictionary lists the current tables; `pypdf` is confined to `processing`;
+  `pipelines.web` joins the assistant's reach (decision 0018's A2 section says why); the
+  test suite's environment never carries the search key.
+
+**The evaluation** - six runs, 29, 34, 36, 37, 38 and 39 of 42 passed; every fix was to
+the assistant, none to a case ([AI_EVALUATION.md](AI_EVALUATION.md) lists them run by
+run). At the end: the right first tool in 22 of the 23 cases that need one, nothing called
+in all 10 clarify and refuse cases, every call valid, nothing forbidden, no figure cut, a
+quick answer in 3.3 seconds at the median. The three still failing are the model's: a
+routing choice (E03), a view (N04), and a refusal of Spotrac that does not go on to
+answer from the lab's contract file (K03).
+
+**Live checks** (in a scratch project, never the real `data/`)
+
+- `fol current refresh`: the season's game logs (none yet: the 2026-27 regular season had
+  not started), the player-movement file (9,943 lines, 10 repeats kept once, the newest
+  2026-10-07), the injury report (none published in the preseason). The parser read the
+  report of 2026-04-17 8:30 PM line for line earlier in the milestone (29 lines over two
+  pages); that file is not committed.
+- The page fetch: Wikipedia read (published 2002, updated 2026-10-02 - both now shown);
+  ESPN and AP refused by their robots rules for AI agents (ChatGPT-User, Claude-User);
+  Basketball Reference refused by name; `localhost` refused.
+- Ollama's web search, with the key the user put in `.env` (only its presence was
+  checked): five results in 0.9 s; RotoWire's page read. Then two whole answers with the
+  real model, current sources and web: the Knicks' injuries (qualified - no report in the
+  preseason, with its source and "not the same as healthy"), and the Knicks' preseason in
+  the press (search, then the first result read by its id, then an answer citing it).
+  Three searches in all.
+- The live answers found four faults the recorded world had not: an icon's `<title>`
+  joined a page's title; the model asked `read_source` for "r1", a result's id; the
+  checker read a numbered list's markers as figures and sent a good answer back; and the
+  model answered the repair note itself ("Therefore, they cannot be cited..."). Each has
+  a fix and a test (AI_EVALUATION.md), and the second live answer came out right.
+
+**Decisions** - recorded in decision 0018's "Settled while building A2": the cache file
+of its own; an absence a source confirms is a qualified answer; the lab's own page fetch
+rather than Ollama's; nba.com refused to the fetch; `pipelines.web` in the assistant's
+reach; the language, citation and promise checks; how a year names a season; and, by the
+user on 2026-10-09, robots rules read for AI agents too, though they shut ESPN and AP out.
+
+**Found on the way**
+
+- Shell heredocs mangle backslashes, as CLAUDE.md warns: twice a `"\n"` became a line
+  break and once `\b` became a backspace character in a regular expression; all were
+  found and rewritten with the editor.
+- The fixture's real game logs serve as a season still to be played only once their
+  payload's own season is moved too: the raw store checks a snapshot's echo against where
+  it is filed.
+- The robots rules for AI agents shut out ESPN and AP: the assistant can show their
+  search snippets but cannot read their pages. The user chose to keep the rule.
+- The user's `.env.exmample` (an example file, misspelt) is not git-ignored; it holds only
+  the empty placeholder, checked without printing any value, and is left out of the
+  commit for the user to rename or drop.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Pass |
+| `pytest -n auto` (everything but live-network and live-model tests) | 3,499 passed in 4 min 4 s |
+| `pytest -m ollama` (the live model) | 6 passed, three of them whole answers in the recorded world |
+| The end-to-end evaluation | 39/42 on the final run; report generated |
+| Data quality | The current tables have contracts and pass `conform_frame`; the data dictionary lists them (`fol dictionary --write`); the build is untouched |
+| Network in the test suite | None: fakes for the league's files, stats.nba.com, the web and Ollama; the search key is removed from every test's environment |
+| Live web search | Checked: three searches; Wikipedia, RotoWire and a Substack newsletter read; two whole answers (above) |
+| UI | Not affected (the page is A3) |
+
 ## Milestone A1 - AI Research Assistant: the local model and its benchmark (2026-10-09)
 
 The assistant's first code: a local model it can trust to stay local, the layer it lives

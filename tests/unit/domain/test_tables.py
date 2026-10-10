@@ -6,7 +6,7 @@ import pytest
 
 from front_office.domain.dictionary import _PROVENANCE_MEANING, render_data_dictionary
 from front_office.domain.schema import Provenance
-from front_office.domain.tables import ALL_TABLES, PLANNED_TABLES, table
+from front_office.domain.tables import ALL_TABLES, DOCUMENTED_TABLES, PLANNED_TABLES, table
 
 # Tables the roadmap's "Core Database Design" section calls for.
 ROADMAP_TABLES = {
@@ -74,8 +74,8 @@ def test_every_provenance_is_explained_in_the_dictionary() -> None:
 
 
 def test_dictionary_lists_every_table_and_column() -> None:
-    document = render_data_dictionary(ALL_TABLES, PLANNED_TABLES)
-    for contract in ALL_TABLES:
+    document = render_data_dictionary(DOCUMENTED_TABLES, PLANNED_TABLES)
+    for contract in DOCUMENTED_TABLES:
         assert f"### {contract.name}" in document
         for field in contract.fields:
             assert f"| `{field.name}` |" in document
@@ -86,4 +86,4 @@ def test_dictionary_lists_every_table_and_column() -> None:
 def test_committed_dictionary_matches_the_registry(repo_root: Path) -> None:
     """docs/DATA_DICTIONARY.md is generated; regenerate it with `fol dictionary --write`."""
     committed = (repo_root / "docs" / "DATA_DICTIONARY.md").read_text(encoding="utf-8")
-    assert committed == render_data_dictionary(ALL_TABLES, PLANNED_TABLES)
+    assert committed == render_data_dictionary(DOCUMENTED_TABLES, PLANNED_TABLES)

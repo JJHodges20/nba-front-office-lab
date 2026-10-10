@@ -156,6 +156,8 @@ lab derived or estimated, and which you assumed.
 .\.venv\Scripts\fol.exe simulate show    # the simulator's measured parameters and the wins test
 .\.venv\Scripts\fol.exe simulate fit     # measure them again on the built database (--write to save)
 .\.venv\Scripts\fol.exe simulate report  # the simulator research, with the season ahead drawn for every team
+.\.venv\Scripts\fol.exe current refresh  # for the AI assistant: this season's games, transactions and the injury report, when due
+.\.venv\Scripts\fol.exe current status   # when each of them was last fetched
 .\.venv\Scripts\fol.exe ui --port 8600 --no-browser   # the workbench on another port
 ```
 
@@ -195,6 +197,7 @@ tests/              unit, architecture, integration and interface tests
 - [Postseason research](docs/research/POSTSEASON.md) - the postseason model, how it was tested and how its chances have come out
 - [Simulator research](docs/research/SIMULATOR.md) - what a season is drawn from, the figures measured, the wins test, and the season ahead as drawn
 - [Full-system audit](docs/AUDIT.md) - what the audit of milestone 14 found, changed and left
+- [The AI research assistant](docs/AI_ASSISTANT_SPEC.md) - a local model answering from the lab's tools, in progress; [how it is evaluated](docs/AI_EVALUATION.md), [the models tried](docs/research/ASSISTANT_MODELS.md), [its answers end to end](docs/research/ASSISTANT_ANSWERS.md)
 - [Architecture](docs/ARCHITECTURE.md) - the layers and the rules between them
 - [Data dictionary](docs/DATA_DICTIONARY.md) - generated from the table contracts
 - [Metric glossary](docs/METRICS.md) - every player, team and roster metric, generated from the catalogs

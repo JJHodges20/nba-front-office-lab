@@ -936,3 +936,65 @@ class TestPlayoffsCommands:
         result = runner.invoke(app, ["playoffs", "report"])
         assert result.exit_code == 1
         assert "no postseason model to report" in " ".join(result.output.split())
+
+
+class TestCurrent:
+    @pytest.fixture
+    def prebuilt(self, project: Path, built_template) -> None:  # type: ignore[no-untyped-def]
+        """The fixture store's database in place, as if `fol build` had been run."""
+        (project / "data").mkdir(exist_ok=True)
+        for path in (built_template[0] / "data").glob("front_office.sqlite*"):
+            shutil.copy(path, project / "data" / path.name)
+
+    @pytest.fixture
+    def asked(self, monkeypatch: pytest.MonkeyPatch) -> list[dict]:
+        """Stands in for the refresh: nothing is fetched, and what it was asked is kept."""
+        from front_office.pipelines.current import CurrentRefresh, SourceRefresh
+
+        calls: list[dict] = []
+
+        def fake(settings, *, sources, force):  # type: ignore[no-untyped-def]
+            calls.append({"sources": tuple(sources), "force": force})
+            failed = "transactions" in sources and force
+            return CurrentRefresh(
+                tuple(
+                    SourceRefresh(s, "failed" if failed else "stored", 3, f"[{s}] 3 lines")
+                    for s in sources
+                )
+            )
+
+        monkeypatch.setattr(cli, "refresh_current", fake)
+        return calls
+
+    def test_refresh_says_what_happened_to_each_source(self, asked: list[dict]) -> None:
+        result = runner.invoke(app, ["current", "refresh"])
+        assert result.exit_code == 0, result.output
+        assert asked == [{"sources": ("games", "transactions", "injuries"), "force": False}]
+        assert "injuries: [injuries] 3 lines" in result.output, "data is never read as markup"
+
+    def test_refresh_one_source_by_force_and_a_failure_exits_non_zero(
+        self, asked: list[dict]
+    ) -> None:
+        result = runner.invoke(app, ["current", "refresh", "-s", "transactions", "--force"])
+        assert result.exit_code == 1
+        assert asked == [{"sources": ("transactions",), "force": True}]
+        assert "failed" in result.output
+
+    def test_an_unknown_source_is_an_error_before_anything_is_fetched(self) -> None:
+        result = runner.invoke(app, ["current", "refresh", "--source", "rumours"])
+        assert result.exit_code == 1
+        assert "no current source called ['rumours']" in result.output
+
+    def test_status_before_anything_is_built(self, project: Path) -> None:
+        result = runner.invoke(app, ["current", "status"])
+        assert result.exit_code == 1
+        assert "no data has been built yet" in result.output
+        assert not (project / "data" / "front_office.sqlite").exists()
+
+    def test_status_lists_every_source(self, prebuilt: None, project: Path) -> None:
+        result = runner.invoke(app, ["current", "status"])
+        assert result.exit_code == 0, result.output
+        for source in ("games", "transactions", "injuries"):
+            assert source in result.output
+        assert "Never fetched." in result.output
+        assert not (project / "data" / "current.sqlite").exists(), "reading creates nothing"

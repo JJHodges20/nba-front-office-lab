@@ -50,11 +50,11 @@ APP_RULES: set[str] = {"domain", "services", "assistant"}
 APP_ASSISTANT_MODULES: set[str] = {"front_office.assistant.api"}
 
 # Of the layers that touch the network or the data, the assistant may use only these
-# modules: the local model and the web, and the current-data refresh - never the
-# stats.nba.com ingest, a build, a fit or a contract import (decision 0018).
+# modules: the local model and the web, the current-data refresh and the reading of a web
+# page - never the stats.nba.com ingest, a build, a fit or a contract import (decision 0018).
 ASSISTANT_REACH: dict[str, set[str]] = {
     "providers": {"front_office.providers.ollama", "front_office.providers.web"},
-    "pipelines": {"front_office.pipelines.current"},
+    "pipelines": {"front_office.pipelines.current", "front_office.pipelines.web"},
 }
 
 # Third-party libraries that belong to exactly one place. "apps" is the Streamlit UI.
@@ -68,6 +68,7 @@ LIBRARY_OWNERS: dict[str, set[str]] = {
     "rich": {"interfaces"},
     "streamlit": {"apps"},
     "plotly": {"apps"},
+    "pypdf": {"processing"},
 }
 
 # Whole-dollar amounts this large in source code are almost certainly a cap figure that

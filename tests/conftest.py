@@ -31,6 +31,7 @@ from front_office.domain.value_model import ValueModel, ValueSpec
 from front_office.pipelines.build import BuildReport, build_database
 from front_office.pipelines.contracts import import_contract_file
 from front_office.pipelines.normalize import NormalizedTables, normalize
+from front_office.providers.web import KEY_VARIABLE
 from front_office.rawstore import RawStore
 from tests.helpers import CONTRACT_FILE
 
@@ -52,9 +53,11 @@ for _logger, _phrase in BARE_MODE_NOISE.items():
 
 @pytest.fixture(autouse=True)
 def _isolated_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep the developer's own FOL_* variables from steering a test."""
+    """Keep the developer's own FOL_* variables from steering a test - the web search key
+    among them: no test may search the web with the user's account."""
     monkeypatch.delenv(ENV_HOME, raising=False)
     monkeypatch.delenv(ENV_DATA_DIR, raising=False)
+    monkeypatch.delenv(KEY_VARIABLE, raising=False)
 
 
 @pytest.fixture(scope="session")

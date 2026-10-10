@@ -43,6 +43,9 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\python.exe -m pytest tests\assistant  # the assistant's evaluation cases, their figures recomputed
 .\.venv\Scripts\python.exe -m pytest -m ollama    # the assistant against the local model (Ollama running)
 .\.venv\Scripts\python.exe scripts\benchmark_ollama.py --write   # benchmark the candidate models (docs/research/ASSISTANT_MODELS.md)
+.\.venv\Scripts\python.exe scripts\evaluate_answers.py --write   # the assistant's whole answers, end to end (docs/research/ASSISTANT_ANSWERS.md)
+.\.venv\Scripts\fol.exe current refresh            # fetch what is due: this season's games, transactions, the injury report
+.\.venv\Scripts\fol.exe current status             # when each current source was last fetched, and what is held
 .\.venv\Scripts\python.exe scripts\make_fixtures.py   # rebuild tests/fixtures/raw from data/raw
 ```
 
@@ -96,10 +99,12 @@ Build one roadmap milestone at a time. A milestone is finished only when:
 - **Generated documents are not edited.** `docs/DATA_DICTIONARY.md`, `docs/METRICS.md`,
   `docs/research/BENCHMARKS.md`, `docs/research/PLAYER_VALUE.md`,
   `docs/research/ROSTER_FIT.md`, `docs/research/POSTSEASON.md`,
-  `docs/research/SIMULATOR.md` and `docs/research/ASSISTANT_MODELS.md` come from
+  `docs/research/SIMULATOR.md`, `docs/research/ASSISTANT_MODELS.md` and
+  `docs/research/ASSISTANT_ANSWERS.md` come from
   `fol dictionary|metrics|benchmarks --write`, `fol value report --write`,
-  `fol fit report --write`, `fol playoffs report --write`, `fol simulate report --write`
-  and `scripts/benchmark_ollama.py --write`. The first two are checked by tests; the research
+  `fol fit report --write`, `fol playoffs report --write`, `fol simulate report --write`,
+  `scripts/benchmark_ollama.py --write` and `scripts/evaluate_answers.py --write`. The
+  first two are checked by tests; the research
   documents depend on the database, so regenerate them at a milestone gate after the
   data, a model, the evidence or the research code changes.
 - **A model is fitted on request and applied by every build.** `fol value fit --write`
@@ -185,20 +190,43 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   `fol simulate fit --write`, `fol fit test --write`, then the research documents.
 - **The assistant is the outermost layer** (`docs/decisions/0018-ai-research-assistant.md`).
   The workbench imports only `front_office.assistant.api`; of providers and pipelines the
-  assistant uses only `providers.ollama`, `providers.web` and `pipelines.current`. Tests
-  enforce both. Its model is local: `providers/ollama.py` accepts the loopback address
+  assistant uses only `providers.ollama`, `providers.web`, `pipelines.current` and
+  `pipelines.web`. Tests enforce both. Its model is local: `providers/ollama.py` accepts the loopback address
   only, refuses models Ollama marks remote or names as cloud, and sends the context length
   with every request; `configs/assistant.yaml` has no field for a key.
 - **No tool writes.** The registry (`assistant/tools.py`) has read, compute, net and draft
   tools only. Saving a roster is the user's click on a reviewed proposal. Never give the
   model table reads, SQL, code, files, a URL it composed, a fit, a build, an import or a
   setting; outside text reaches it quoted as data.
+- **A handler formats; the services compute.** A tool's handler (`assistant/*_tools.py`)
+  calls service methods and writes what they return as the workbench shows it, with the
+  evidence: the build, the contract file's date, a source's address and times. It never
+  computes a metric, ranks, or fits. Every figure in an answer must be in a result the
+  model was given (`assistant/checker.py`); an empty read of the lab carries the build.
+- **Current information is a cache beside the lab.** `data/current.sqlite`
+  (`storage/current.py`) holds what `pipelines/current.py` fetched: the season's games,
+  the league's transactions, the latest injury report, and a log of every attempt. A
+  refresh never touches the lab's database and a build never drops the cache. A source is
+  fetched only when its interval (`configs/assistant.yaml`, `current:`) has passed; a
+  failure keeps the last copy and says how old it is. "Not on the report" is never
+  "healthy". The league's injury report may not be redistributed: never commit one - the
+  tests draw their own (`tests/injury_pdf.py`).
+- **The web goes through `providers/web.py` alone, and never with a URL the model wrote.**
+  `read_source` takes an id: a search result's or a pasted link's. Every address, every
+  redirect and the address connected to must be public; robots.txt is read for AI agents
+  too; refused sites (Sports Reference's, Spotrac, nba.com) are left out of results. The
+  search key is the user's own: `FOL_OLLAMA_API_KEY`, from the environment or the
+  git-ignored `.env` - never `OLLAMA_API_KEY`, never printed, never in a test (the
+  conftest removes it). Tests use `tests/web_fakes.py`; nothing in the suite reaches the
+  network outside the `network` and `ollama` markers.
 - **The evaluation cases are frozen.** `tests/assistant/fixtures/cases.yaml`: never edit a
   case to make a model pass. `tests/assistant/test_cases.py` recomputes every figure in it
   through the services; when a rebuild or refit changes one, update it deliberately and
   say why in the development log. A case the user decides is wrong changes by that
   decision alone, logged and commented; a saved benchmark is then judged again with
-  `--rescore`, not run again until it passes (`docs/AI_EVALUATION.md`).
+  `--rescore`, not run again until it passes (`docs/AI_EVALUATION.md`). The end-to-end
+  run's current and web tools see `tests/assistant/recorded.py`, an invented world dated
+  the case file's day; change it only to fix what it gets wrong about that day.
 - **Never print data through rich markup.** Use `_say` / `_tagged` in the CLI; text in
   square brackets is otherwise swallowed as a style tag.
 - **Warnings are errors** in the test suite.

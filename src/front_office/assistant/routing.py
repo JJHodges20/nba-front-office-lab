@@ -72,7 +72,11 @@ def check(call: ToolCall, specs: Mapping[str, ToolSpec] = BY_NAME) -> Call:
     try:
         spec.args.model_validate(dict(call.arguments))
     except ValidationError as error:
-        return Call(call.name, call.arguments, _reasons(error))
+        reasons = _reasons(error)
+        if any(problem.get("type") == "extra_forbidden" for problem in error.errors()):
+            # A1 saw a model send the same unknown field again; it is told the real ones.
+            reasons += f". {call.name} takes only: {', '.join(spec.args.model_fields)}"
+        return Call(call.name, call.arguments, reasons)
     return Call(call.name, call.arguments, None)
 
 

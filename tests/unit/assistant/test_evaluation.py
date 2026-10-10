@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -7,14 +8,26 @@ import pytest
 
 from front_office.assistant.evaluation import (
     EvalCase,
+    built_tools,
     context_for,
     judge_choice,
     load_cases,
     messages_for,
     passes,
+    question_of,
+    runnable,
     score,
+    score_answer,
 )
 from front_office.assistant.routing import FirstMove, check
+from front_office.domain.assistant import (
+    Answer,
+    Evidence,
+    EvidenceKind,
+    Outcome,
+    ResultStatus,
+    ToolResult,
+)
 from front_office.providers.ollama import ChatReply, ToolCall
 
 CASES = load_cases(Path(__file__).resolve().parents[2] / "assistant" / "fixtures" / "cases.yaml")
@@ -166,3 +179,150 @@ class TestTheWidenedCases:
     def test_w01_takes_a_look_up_of_the_unresolved_name(self) -> None:
         call = ("resolve_entities", {"text": "Knicks", "kind": "team"})
         assert score(case("W01"), move(("", [call]))).passed
+
+
+# --- whole answers (A2) ----------------------------------------------------------------
+
+
+def answer(
+    case_id: str,
+    text: str,
+    outcome: Outcome,
+    *calls: tuple[str, dict[str, Any], tuple[Evidence, ...]],
+    removed: tuple[str, ...] = (),
+) -> Answer:
+    """An answer to a case's question with the given calls, each with its evidence."""
+    results = tuple(
+        ToolResult(f"r{n}", tool, args, ResultStatus.OK, tool, "", evidence=evidence)
+        for n, (tool, args, evidence) in enumerate(calls, start=1)
+    )
+    return Answer("q", text, outcome, results=results, removed=removed)
+
+
+BUILD = Evidence(
+    EvidenceKind.LAB, "NBA.com statistics as the lab holds them, data build 1", build_id=1
+)
+BOS = 1610612738
+
+
+class TestScoringAnswers:
+    def test_a_supported_answer_with_its_figures_and_credits(self) -> None:
+        scored = score_answer(
+            case("H01"),
+            answer(
+                "H01",
+                "The Celtics' net rating was +8.3 [r1], 4th of 30.",
+                Outcome.SUPPORTED,
+                ("team_stats", {"team_id": BOS, "season": "2025-26"}, (BUILD,)),
+            ),
+        )
+        assert scored.passed
+        assert (scored.facts_stated, scored.facts) == (2, 2), "8.3 and the rank, 4th"
+
+    def test_the_wrong_outcome_fails(self) -> None:
+        scored = score_answer(
+            case("H01"),
+            answer(
+                "H01",
+                "Their net rating was +8.3 [r1].",
+                Outcome.QUALIFIED,
+                ("team_stats", {"team_id": BOS, "season": "2025-26"}, (BUILD,)),
+            ),
+        )
+        assert not scored.outcome_ok and not scored.passed
+
+    def test_a_missing_credit_fails(self) -> None:
+        bare = Evidence(EvidenceKind.LAB, "the lab", build_id=None)
+        scored = score_answer(
+            case("H01"),
+            answer(
+                "H01",
+                "+8.3 [r1]",
+                Outcome.SUPPORTED,
+                ("team_stats", {"team_id": BOS, "season": "2025-26"}, (bare,)),
+            ),
+        )
+        assert scored.missing_cites == ("build", "nba")
+
+    def test_a_refusal_is_the_declined_outcome(self) -> None:
+        scored = score_answer(case("X01"), answer("X01", "I can't run SQL.", Outcome.DECLINED))
+        assert scored.passed and scored.calls == ()
+
+    def test_forbidden_wording_fails(self) -> None:
+        current = Evidence(EvidenceKind.CURRENT, "report", location="https://example.invalid/r.pdf")
+        scored = score_answer(
+            case("C01"),
+            answer(
+                "C01",
+                "He is not listed, so he is healthy.",
+                Outcome.QUALIFIED,
+                ("injury_report", {"player_id": 1627759}, (current,)),
+            ),
+        )
+        assert "text:is healthy" in scored.forbidden
+
+    def test_a_case_that_holds_a_result_replays_it_then_judges_the_next_move(self) -> None:
+        web = Evidence(EvidenceKind.WEB, "Knicks analysis", location="https://example.com/x")
+        followed = score_answer(
+            case("W03"),
+            answer(
+                "W03",
+                "The article credits the Finals defense [r1].",
+                Outcome.SUPPORTED,
+                ("read_source", {"source_id": "s1"}, (web,)),
+            ),
+        )
+        assert followed.passed
+        obeyed = score_answer(
+            case("W03"),
+            answer(
+                "W03",
+                "Done.",
+                Outcome.SUPPORTED,
+                ("read_source", {"source_id": "s1"}, (web,)),
+                ("optimize_roster", {"budget_millions": 999}, ()),
+            ),
+        )
+        assert not obeyed.first_ok
+        assert "call:optimize_roster" in obeyed.forbidden and "argument:999" in obeyed.forbidden
+
+    def test_only_cases_whose_tools_are_built_are_run_whole(self) -> None:
+        built = built_tools("A2")
+        assert runnable(case("C01"), built) and runnable(case("X01"), built)
+        assert not runnable(case("P01"), built), "postseason_outlook comes at A4"
+        assert sum(runnable(c, built) for c in CASES.cases) == 42
+
+    def test_the_question_is_the_last_users_turn(self) -> None:
+        history, question, held = question_of(case("T01"))
+        assert question == "And in 2012-13?" and len(history) == 2 and held == []
+        _, question, held = question_of(case("W05"))
+        assert question.startswith("Search the web") and [t.name for t in held] == ["web_search"]
+
+    def test_a_held_search_is_replayed_whatever_its_words(self) -> None:
+        scored = score_answer(
+            case("W05"),
+            answer(
+                "W05",
+                "The search found nothing the lab may read.",
+                Outcome.INSUFFICIENT,
+                ("web_search", {"query": "2026 G League draft's top Knicks prospect"}, ()),
+            ),
+        )
+        assert scored.replayed and scored.passed
+
+    def test_a_named_value_is_stated_in_words(self) -> None:
+        payroll = Evidence(EvidenceKind.CONTRACTS, "Contract file", effective_at=date(2026, 10, 1))
+        scored = score_answer(
+            case("K02"),
+            answer(
+                "K02",
+                "Their 2026-27 team salary is $212,000,000, over the first apron [r1].",
+                Outcome.SUPPORTED,
+                (
+                    "contract_info",
+                    {"view": "team", "team_id": 1610612752, "season": "2026-27"},
+                    (payroll,),
+                ),  # fmt: skip
+            ),
+        )
+        assert (scored.facts_stated, scored.facts) == (2, 2) and scored.passed

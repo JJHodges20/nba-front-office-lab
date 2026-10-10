@@ -1,9 +1,13 @@
 """The frozen evaluation cases, read and scored (docs/AI_EVALUATION.md).
 
 ``tests/assistant/fixtures/cases.yaml`` is read into typed cases; a case becomes the
-context and conversation the model sees; a model's first move is scored against what the
-case accepts. Scoring is plain code: the right tool or rightly none, the expected
-argument values, arguments that validate, nothing forbidden, nothing cut off.
+context and conversation the model sees. Two things are scored, both by plain code:
+
+- a model's **first move** (A1): the right tool or rightly none, the expected argument
+  values, arguments that validate, nothing forbidden, nothing cut off;
+- a whole **answer** (from A2): the outcome the case expects, the first call, nothing
+  forbidden in what was called or said, the evidence the case asks to be cited, and how
+  many of the case's frozen figures the answer states.
 """
 
 from __future__ import annotations
@@ -17,10 +21,19 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from front_office.assistant.checker import Figure, figures, supports
 from front_office.assistant.routing import Call, FirstMove, check
-from front_office.assistant.tools import BY_NAME
+from front_office.assistant.tools import BY_NAME, REGISTRY
 from front_office.config.settings import read_yaml
-from front_office.domain.assistant import Context, Message, Mode, NameCandidate, Source
+from front_office.domain.assistant import (
+    Answer,
+    Context,
+    EvidenceKind,
+    Message,
+    Mode,
+    NameCandidate,
+    Source,
+)
 
 Outcome = Literal["supported", "qualified", "insufficient", "clarify", "refuse"]
 NONE = "none"
@@ -263,3 +276,151 @@ def _forbidden(expect: Expect, move: FirstMove) -> tuple[str, ...]:
         said = move.text.lower()
         found.extend(f"text:{phrase}" for phrase in expect.forbid if phrase.lower() in said)
     return tuple(dict.fromkeys(found))
+
+
+# --- whole answers (A2) ------------------------------------------------------------------
+
+OUTCOME_NAMES = {"refuse": "declined"}
+"""A case's expected outcome as the assistant names it."""
+
+
+def built_tools(milestone: str) -> frozenset[str]:
+    return frozenset(spec.name for spec in REGISTRY if spec.milestone <= milestone)
+
+
+def runnable(case: EvalCase, built: frozenset[str]) -> bool:
+    """Whether every tool the case accepts as a first call is built: only then can its
+    answer be judged whole."""
+    return all(option.tool in built for option in case.expect.calls)
+
+
+def question_of(case: EvalCase) -> tuple[list[Message], str, list[ToolTurn]]:
+    """The turns before the question, the question, and the tool turns after it - results
+    the case already holds, which an end-to-end run has the tools return instead."""
+    last = max(index for index, turn in enumerate(case.turns) if turn.user is not None)
+    question = case.turns[last].user
+    assert question is not None
+    after = [turn.tool for turn in case.turns[last + 1 :] if turn.tool is not None]
+    return [turn.message() for turn in case.turns[:last]], question, after
+
+
+@dataclass(frozen=True, slots=True)
+class AnswerScore:
+    """How one whole answer measured up to its case."""
+
+    case_id: str
+    category: str
+    expected: str
+    outcome: str
+    calls: tuple[str, ...]
+    """The tools called, in order."""
+    replayed: bool
+    """Whether the calls began with those the case already holds (true when it holds none)."""
+    first_ok: bool
+    """The first call after those is acceptable, or rightly none."""
+    args_ok: bool | None
+    forbidden: tuple[str, ...]
+    missing_cites: tuple[str, ...]
+    facts_stated: int
+    facts: int
+    removed: int
+    """Figures the checker took out."""
+
+    @property
+    def outcome_ok(self) -> bool:
+        return self.outcome == OUTCOME_NAMES.get(self.expected, self.expected)
+
+    @property
+    def passed(self) -> bool:
+        return (
+            self.outcome_ok
+            and self.replayed
+            and self.first_ok
+            and self.args_ok is not False
+            and not self.forbidden
+            and not self.missing_cites
+        )
+
+
+def score_answer(case: EvalCase, answer: Answer) -> AnswerScore:
+    expect = case.expect
+    _, _, held = question_of(case)
+    made = [(result.tool, result.arguments) for result in answer.results]
+    replayed = len(made) >= len(held) and all(
+        _replays(turn, tool, arguments) for (tool, arguments), turn in zip(made, held, strict=False)
+    )
+    following = made[len(held)] if len(made) > len(held) else None
+    choice_ok, args_ok = judge_choice(
+        case,
+        None if following is None else following[0],
+        None if following is None else following[1],
+    )
+    forbidden = [f"call:{tool}" for tool, _ in made if tool in expect.forbid_calls]
+    for _, arguments in made:
+        written = json.dumps(arguments or {}).lower()
+        forbidden += [f"argument:{text}" for text in expect.forbid_args if text.lower() in written]
+    said = answer.text.lower()
+    forbidden += [f"text:{phrase}" for phrase in expect.forbid if phrase.lower() in said]
+    stated = [fact for fact in expect.facts if "value" in fact]
+    return AnswerScore(
+        case_id=case.id,
+        category=case.category,
+        expected=expect.outcome,
+        outcome=answer.outcome.value,
+        calls=tuple(tool for tool, _ in made),
+        replayed=replayed,
+        first_ok=choice_ok,
+        args_ok=args_ok,
+        forbidden=tuple(dict.fromkeys(forbidden)),
+        missing_cites=tuple(need for need in expect.cite if not _cited(need, answer)),
+        facts_stated=facts_stated(case, answer.text),
+        facts=len(stated),
+        removed=len(answer.removed),
+    )
+
+
+def _cited(need: str, answer: Answer) -> bool:
+    """Whether the answer carries what the case asks it to cite: in its evidence, or for an
+    interval in its words."""
+    evidence = answer.evidence
+    if need == "build":
+        return any(item.kind is EvidenceKind.LAB and item.build_id is not None for item in evidence)
+    if need == "nba":
+        return any("NBA.com" in item.label for item in evidence)
+    if need == "as_of":
+        return any(item.kind is EvidenceKind.CONTRACTS and item.effective_at for item in evidence)
+    if need == "source":
+        return any(
+            item.kind in (EvidenceKind.CURRENT, EvidenceKind.WEB) and item.location
+            for item in evidence
+        )
+    if need == "model":
+        return any(item.kind is EvidenceKind.MODEL for item in evidence)
+    if need == "interval":
+        return "interval" in answer.text.lower()
+    raise ValueError(f"no citation called {need!r}")
+
+
+def _replays(turn: ToolTurn, tool: str, arguments: Mapping[str, Any] | None) -> bool:
+    """Whether a call is the one a held result came from: the same tool, and the same ids.
+    A search's words are the model's own and need not be the case's."""
+    ids = {key: value for key, value in turn.arguments.items() if key.endswith(("_id", "_ids"))}
+    return tool == turn.name and _matches(ids, arguments or {})
+
+
+def _stated(value: Any, text: str) -> bool:
+    """Whether the answer states a frozen figure - at the precision it writes it - or a
+    frozen name (``first_apron`` is written "first apron")."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return str(value).replace("_", " ").lower() in text.lower()
+    given = Figure(str(value), float(value), 0.0, False, False)
+    # A written zero holds no figure but zero: "0%" is not 27.8% rounded.
+    return any(
+        supports(given, written) and (written.value != 0 or float(value) == 0)
+        for written in figures(text)
+    )
+
+
+def facts_stated(case: EvalCase, text: str) -> int:
+    """How many of the case's frozen figures and names the answer states."""
+    return sum(_stated(fact["value"], text) for fact in case.expect.facts if "value" in fact)

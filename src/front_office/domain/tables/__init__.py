@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from front_office.domain.schema import TableContract
 from front_office.domain.tables import (
+    current,
     finance,
     fit,
     operations,
@@ -48,6 +49,15 @@ _BY_NAME = {contract.name: contract for contract in ALL_TABLES}
 if len(_BY_NAME) != len(ALL_TABLES):
     raise RuntimeError("two table contracts share a name")
 
+# Current information since the build, for the AI research assistant: kept in its own file,
+# data/current.sqlite, never in the lab's database (decision 0018).
+CURRENT_TABLES: tuple[TableContract, ...] = current.TABLES
+
+# Every table the data dictionary describes: the lab's database, then the current cache.
+DOCUMENTED_TABLES: tuple[TableContract, ...] = (*ALL_TABLES, *CURRENT_TABLES)
+if len({contract.name for contract in DOCUMENTED_TABLES}) != len(DOCUMENTED_TABLES):
+    raise RuntimeError("two table contracts share a name")
+
 
 @dataclass(frozen=True, slots=True)
 class PlannedTable:
@@ -79,4 +89,11 @@ def table(name: str) -> TableContract:
         raise KeyError(f"no table contract named {name!r}; known: {sorted(_BY_NAME)}") from None
 
 
-__all__ = ["ALL_TABLES", "PLANNED_TABLES", "PlannedTable", "table"]
+__all__ = [
+    "ALL_TABLES",
+    "CURRENT_TABLES",
+    "DOCUMENTED_TABLES",
+    "PLANNED_TABLES",
+    "PlannedTable",
+    "table",
+]

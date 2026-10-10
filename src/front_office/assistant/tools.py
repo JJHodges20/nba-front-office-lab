@@ -86,6 +86,12 @@ class ComparePlayers(ToolArgs):
     player_ids: list[int] = Field(min_length=2, max_length=5)
     season: Season
     season_type: SeasonPhase = "regular"
+    # The other statistics tools take a view, and a model sent one here again and again (A1,
+    # A2); it is given a meaning rather than refused.
+    view: Literal["season", "form"] = Field(
+        "season",
+        description="season: the season so far; form: the last games (10 unless last_games).",
+    )
     metrics: list[str] = Field(default_factory=list, max_length=8, description="Metric keys.")
     last_games: LastGames | None = None
 
@@ -121,7 +127,9 @@ class MetricDefinition(ToolArgs):
 
 class ContractInfo(ToolArgs):
     view: Literal["player", "team", "league", "cap_rules"]
-    season: Season | None = None
+    season: Season | None = Field(
+        None, description="The season the question names; without one, the contract file's."
+    )
     player_id: int | None = None
     team_id: int | None = None
 
@@ -148,7 +156,12 @@ class RosterFit(ToolArgs):
 
 
 class PostseasonOutlook(ToolArgs):
-    view: Literal["team", "roster", "strength", "bracket", "season_odds", "model_record"]
+    view: Literal["team", "roster", "strength", "bracket", "season_odds", "model_record"] = Field(
+        description="team: one team in a season (team_id, season); roster: a built roster "
+        "(roster_id); strength: any team of a net rating (net_rating); bracket: a season's "
+        "playoff teams; season_odds: every team of a season; model_record: how the model "
+        "did on seasons it had not seen."
+    )
     team_id: int | None = None
     season: Season | None = None
     roster_id: int | None = None
@@ -196,6 +209,9 @@ class OptimizeRoster(ToolArgs):
     def _a_custom_budget_names_its_amount(self) -> OptimizeRoster:
         if self.budget_mode == BudgetMode.CUSTOM.value and self.budget_millions is None:
             raise ValueError("a custom budget needs budget_millions")
+        if self.budget_millions is not None and self.budget_mode != BudgetMode.CUSTOM.value:
+            # Every model in the A1 benchmark sent an amount with the salary-cap mode.
+            raise ValueError("budget_millions is for a custom budget: set budget_mode to custom")
         return self
 
 
@@ -223,7 +239,9 @@ class WebSearch(ToolArgs):
 
 class ReadSource(ToolArgs):
     source_id: str = Field(
-        pattern=r"^[a-z]{1,2}\d{1,4}$", description="A source id such as s1 or u1, never a URL."
+        pattern=r"^[a-z]{1,2}\d{1,4}$",
+        description="A source's id: s1, s2... from web_search, u1... from a pasted link. Never "
+        "a result id like r1, never a URL.",
     )
 
 
@@ -250,10 +268,10 @@ REGISTRY: tuple[ToolSpec, ...] = (
     ToolSpec("player_stats", "One player's statistics: a season, a career, a game log or recent form.", PlayerStats, R, "A2"),
     ToolSpec("compare_players", "Several players side by side on chosen metrics in one season.", ComparePlayers, R, "A2"),
     ToolSpec("team_stats", "One team's season: record, ratings and league ranks, history, games, form or rotation.", TeamStats, R, "A2"),
-    ToolSpec("league_context", "The league: standings, every team's ranks, league averages, champions, a season's playoff series.", LeagueContext, R, "A2"),
+    ToolSpec("league_context", "The league: standings, every team's ranks, league averages, every champion with its record and net rating rank (to compare champions), a season's playoff series.", LeagueContext, R, "A2"),
     ToolSpec("historical_benchmarks", "How often past teams in each band of a measure reached a playoff stage: frequencies with counts and intervals, not chances.", HistoricalBenchmarks, R, "A2"),
     ToolSpec("metric_definition", "What a metric means, its unit and where it comes from.", MetricDefinition, R, "A2"),
-    ToolSpec("contract_info", "Salaries and payrolls from the user's contract file, with its date; the cap rules.", ContractInfo, R, "A2"),
+    ToolSpec("contract_info", "Salaries and payrolls from the user's contract file, with its date: a player's salary by season; a team's payroll against the cap, the tax line and the aprons; every team's payroll; the cap rules.", ContractInfo, R, "A2"),
     ToolSpec("player_value", "The value model: a player's impact and wins, season leaders, projections for next season, roles, value for money, the model's tested error.", PlayerValue, R, "A4"),
     ToolSpec("roster_fit", "How a team's or built roster's players fit together, as description; the evidence on whether fit predicts anything.", RosterFit, R, "A4"),
     ToolSpec("postseason_outlook", "The postseason model's chance of each playoff stage, with intervals, for a team, a built roster or a net rating; its record.", PostseasonOutlook, R, "A4"),

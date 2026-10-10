@@ -50,12 +50,14 @@ than reading configuration themselves. Only `pipelines`, `services`, `interfaces
 
 Two rules are narrower than a layer (decision 0018). The workbench reaches the assistant
 through `front_office.assistant.api` alone. The assistant uses only `providers.ollama`
-and `providers.web` of the providers and `pipelines.current` of the pipelines, so it
-cannot reach the stats.nba.com ingest, a build, a fit or a contract import.
+and `providers.web` of the providers, and `pipelines.current` (fetching current
+information) and `pipelines.web` (reading a page) of the pipelines, so it cannot reach the
+stats.nba.com ingest, a build, a fit or a contract import.
 
 Third-party libraries are confined the same way: `nba_api` and `requests` only in
-`providers`; `sqlalchemy` and `sqlite3` only in `storage`; `yaml` only in `config`; `typer` and `rich`
-only in `interfaces`; `streamlit` and `plotly` only in `apps/`.
+`providers`; `sqlalchemy` and `sqlite3` only in `storage`; `yaml` only in `config`; `pypdf`
+only in `processing`; `typer` and `rich` only in `interfaces`; `streamlit` and `plotly` only
+in `apps/`.
 
 These rules are enforced by `tests/architecture/test_layer_boundaries.py`. A forbidden
 import fails the test suite. To change a rule, change this document and that test in the
@@ -359,13 +361,26 @@ regular seasons from a planted game model so the measurements can be checked. Se
 
 ```
 a question:  domain.assistant.Context (sidebar, resolved names, sources)
-             -> assistant.routing.first_move: the rules (assistant.policy), the context,
-                the tool registry (assistant.tools)
-             -> providers.ollama: a model on this machine
-             -> a tool call checked against the registry and its Pydantic model, or none
-             (from A2: the tool runs over the services; the answer is checked against it)
-scripts/benchmark_ollama.py:  tests/assistant/fixtures/cases.yaml -> each candidate model
-             -> assistant.evaluation.score -> docs/research/ASSISTANT_MODELS.md
+             -> assistant.names: names resolved by code (services.entities); an
+                ambiguous one is asked about and the model is not called
+             -> assistant.orchestrator: the rules (assistant.policy), the context, the
+                tools this build can run (assistant.toolbox, assistant.tools)
+                -> providers.ollama: a model on this machine asks for a tool
+                -> assistant.executor: the call checked (routing), its ids checked
+                   against the lab, its handler run:
+                     assistant.lab_tools      -> services
+                     assistant.current_tools  -> pipelines.current (when due) -> services.current
+                     assistant.web_tools      -> providers.web (search) | pipelines.web (a page)
+                -> each result back to the model, quoted as data
+             -> assistant.checker: every figure in the answer held by a result, or
+                sent back once and then cut -> domain.assistant.Answer
+current information:  pipelines.current: stats.nba.com game logs (through the ingest, into
+             the raw store), the player-movement file and the injury report
+             (providers.nba_current, processing.current) -> data/current.sqlite
+             (storage.current) -> services.current
+scripts/benchmark_ollama.py:  each candidate model's first move -> ASSISTANT_MODELS.md
+scripts/evaluate_answers.py:  whole answers on the test databases, in a recorded world
+             -> assistant.evaluation.score_answer -> docs/research/ASSISTANT_ANSWERS.md
 ```
 
 The assistant is the outermost layer, beside `interfaces` (decision 0018). Its settings are
@@ -378,7 +393,30 @@ arguments as a Pydantic model, its permission class (read, compute, net, draft -
 write) and the milestone that builds it; enumerations come from the domain and the
 services rather than being written twice. `assistant/routing.py` asks the model for its
 first move and checks it, sending an invalid call back once. `assistant/evaluation.py`
-reads the frozen cases and scores a move. `assistant/api.py` is what the workbench calls.
+reads the frozen cases and scores a move and a whole answer. `assistant/api.py` is what
+the workbench calls.
+
+From A2 the assistant answers. Names are resolved by code before the model is asked
+(`services/entities.py` over the lab's name tables, `assistant/names.py` over the
+question). The orchestrator (`assistant/orchestrator.py`) runs the loop within the mode's
+calls, seconds and context; the executor (`assistant/executor.py`) refuses a player or
+team id the lab does not hold and turns a handler's failure into a result that says so.
+Every handler only calls service methods and formats what they return the way the
+workbench shows it: `lab_tools.py` for the lab's data, `current_tools.py` for what
+happened since the build, `web_tools.py` for the web. The answer checker
+(`assistant/checker.py`) reads every figure of the answer and keeps it only if something
+the model was given holds it at the written precision; it reads the lab's language too (a
+chance where no result is one, a verdict, a claim to have saved something) and every
+citation, which must name a result this answer holds.
+
+Current information lives in `data/current.sqlite`, apart from the lab's database
+(`storage/current.py`, contracts in `domain/tables/current.py`): a refresh replaces a
+source's table whole and logs every attempt; a build never drops it and it never touches
+what a build made. The season's game logs go through the existing ingest, so their
+snapshots land in the raw store for the next build. The web provider
+(`providers/web.py`) is the only code that reaches arbitrary addresses, after the checks
+of the spec's Safety section; `processing/web.py` turns a page into text with the standard
+library's HTML parser.
 See [AI_ASSISTANT_SPEC.md](AI_ASSISTANT_SPEC.md) and [AI_EVALUATION.md](AI_EVALUATION.md).
 
 ## Conventions

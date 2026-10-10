@@ -5,16 +5,22 @@ address that is not the loopback one and a model whose name says it runs in a cl
 context is what the workbench hands the assistant with a question: the sidebar's filters,
 the names a deterministic pre-pass resolved, and sources the user supplied. Every figure
 in it is the lab's or the user's, never the model's.
+
+A tool's result carries the rows it rests on and the evidence for them - where they came
+from and how fresh they are - and an answer carries every result it used, so that a page
+can show the evidence and a test can check it.
 """
 
 from __future__ import annotations
 
 import ipaddress
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import urlsplit
 
+import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, PositiveFloat, field_validator
 
 LOCAL_NAMES = frozenset({"localhost"})
@@ -82,6 +88,24 @@ class ModeSettings(_Settings):
     max_output_tokens: int = Field(ge=128, le=8192)
 
 
+class CurrentSettings(_Settings):
+    """How old each kind of current information may get before a question fetches it
+    again. Starting values, to be set from how often each source changes in season."""
+
+    games_minutes: int = Field(60, ge=5)
+    transactions_minutes: int = Field(180, ge=15)
+    injuries_minutes: int = Field(30, ge=15)
+    injury_slots: int = Field(4, ge=1, le=12)
+    """Quarter hours back to look for the latest injury report."""
+
+    def minutes(self, source: str) -> int:
+        return {
+            "games": self.games_minutes,
+            "transactions": self.transactions_minutes,
+            "injuries": self.injuries_minutes,
+        }[source]
+
+
 class AssistantSettings(_Settings):
     """``configs/assistant.yaml``: which local model answers, and within what limits.
 
@@ -96,6 +120,7 @@ class AssistantSettings(_Settings):
     temperature: float = Field(0.0, ge=0.0, le=1.0)
     quick: ModeSettings
     deep: ModeSettings
+    current: CurrentSettings = CurrentSettings()
 
     @field_validator("default_model", "fallback_model")
     @classmethod
@@ -161,3 +186,129 @@ class Message(BaseModel):
     """For a tool turn: the tool that produced the content."""
     arguments: dict | None = None
     """For a tool turn: the arguments the tool was called with."""
+
+
+class EvidenceKind(StrEnum):
+    """Where something an answer rests on came from."""
+
+    LAB = "lab"
+    """The lab's database: league statistics as the build holds them."""
+    MODEL = "model"
+    """A fitted model file, read by the services."""
+    CONTRACTS = "contracts"
+    """The contract file the user supplied."""
+    CURRENT = "current"
+    """Current information fetched from the league since the build: games, injuries, moves."""
+    WEB = "web"
+    """A page, a search result or a link the user pasted: reporting, not the lab's data."""
+
+
+@dataclass(frozen=True, slots=True)
+class Evidence:
+    """One source behind a result, with its dates."""
+
+    kind: EvidenceKind
+    label: str
+    """What it is, in words: "NBA.com statistics, data build 16 of 2026-10-06"."""
+    location: str | None = None
+    """Where: a table of the lab, a model file, or an address."""
+    retrieved_at: datetime | None = None
+    """When the lab fetched it (UTC)."""
+    published_at: datetime | None = None
+    """When the source says it was published, if it says."""
+    effective_at: date | None = None
+    """When what it reports took effect: a transaction's date, a report's game day."""
+    build_id: int | None = None
+    version: str | None = None
+    """The model revision or the source's own version, where there is one."""
+
+
+class ResultStatus(StrEnum):
+    OK = "ok"
+    EMPTY = "empty"
+    """The tool ran and found nothing: no such season, no such row."""
+    UNAVAILABLE = "unavailable"
+    """The tool cannot answer now: no contract file, no network, not built yet."""
+    ERROR = "error"
+    """The call was refused or failed; nothing it says is a fact."""
+
+
+@dataclass(frozen=True, slots=True)
+class ToolResult:
+    """What one tool call returned: the text the model reads, the rows a page shows."""
+
+    result_id: str
+    """``r1``, ``r2``...: how an answer cites it."""
+    tool: str
+    arguments: dict[str, Any]
+    status: ResultStatus
+    title: str
+    text: str
+    """Exactly what the model was given: bounded, formatted as the lab displays."""
+    table: pd.DataFrame | None = None
+    """Every row the result rests on, for the page; the model may have seen fewer."""
+    evidence: tuple[Evidence, ...] = ()
+    warnings: tuple[str, ...] = ()
+    kinds: tuple[str, ...] = ()
+    """The kinds of number in it: measured, derived, estimate, modeled, assumption,
+    reported."""
+    limits: tuple[str, ...] = ()
+    """What the result cannot tell, which an answer resting on it must say: a source
+    checked and found holding nothing - no report published, no game played yet - is an
+    answer, but a qualified one."""
+
+    @property
+    def usable(self) -> bool:
+        return self.status is ResultStatus.OK
+
+
+class Outcome(StrEnum):
+    """What kind of answer the user got (docs/AI_ASSISTANT_SPEC.md)."""
+
+    SUPPORTED = "supported"
+    """Answered from tool results, every figure checked."""
+    QUALIFIED = "qualified"
+    """Part answered; what is missing, stale, estimated or removed is said."""
+    INSUFFICIENT = "insufficient"
+    """Nothing to answer from; what is missing is said and nothing is invented."""
+    CLARIFY = "clarify"
+    """A question back: which player, team or season is meant."""
+    DECLINED = "declined"
+    """Asked for something the assistant does not do: SQL, files, saving, refitting."""
+
+
+@dataclass(frozen=True, slots=True)
+class Step:
+    """One thing the assistant did on the way to an answer."""
+
+    kind: Literal["clarify", "model", "tool", "repair", "check"]
+    detail: str
+    seconds: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class Answer:
+    question: str
+    text: str
+    outcome: Outcome
+    results: tuple[ToolResult, ...] = ()
+    options: tuple[NameCandidate, ...] = ()
+    """For a question back: the readings to choose from."""
+    removed: tuple[str, ...] = ()
+    """Figures taken out of the answer because no result supports them."""
+    warnings: tuple[str, ...] = ()
+    steps: tuple[Step, ...] = ()
+    model: str | None = None
+    policy: str | None = None
+    seconds: float = 0.0
+
+    @property
+    def evidence(self) -> tuple[Evidence, ...]:
+        """Every source the answer used, once each, in the order first used - including
+        what a result that found nothing looked in: "nothing for 1989-90" rests on a build."""
+        seen: dict[tuple, Evidence] = {}
+        for result in self.results:
+            if result.status in (ResultStatus.OK, ResultStatus.EMPTY):
+                for item in result.evidence:
+                    seen.setdefault((item.kind, item.label, item.location), item)
+        return tuple(seen.values())

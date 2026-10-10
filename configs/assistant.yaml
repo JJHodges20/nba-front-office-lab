@@ -30,3 +30,12 @@ deep:
   context_tokens: 8192
   think: true
   max_output_tokens: 3072
+
+# Current information (data/current.sqlite): how many minutes each source may age before a
+# question fetches it again, and how many quarter hours back to look for the latest
+# injury report. Starting values; set them from how often each source changes in season.
+current:
+  games_minutes: 60
+  transactions_minutes: 180
+  injuries_minutes: 30
+  injury_slots: 4

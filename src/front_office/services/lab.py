@@ -35,6 +35,8 @@ if TYPE_CHECKING:
     from front_office.services.benchmarks import BenchmarkService
     from front_office.services.builder import BuilderService
     from front_office.services.contracts import ContractService
+    from front_office.services.current import CurrentDataService
+    from front_office.services.entities import EntityService
     from front_office.services.fit import FitService
     from front_office.services.health import HealthService
     from front_office.services.league import LeagueService
@@ -275,6 +277,18 @@ class Lab:
         from front_office.services.contracts import ContractService
 
         return ContractService(self)
+
+    @property
+    def current(self) -> CurrentDataService:
+        from front_office.services.current import CurrentDataService
+
+        return CurrentDataService(self)
+
+    @property
+    def entities(self) -> EntityService:
+        from front_office.services.entities import EntityService
+
+        return EntityService(self)
 
     @property
     def builder(self) -> BuilderService:

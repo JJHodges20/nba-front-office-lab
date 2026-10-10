@@ -10,7 +10,7 @@ import time
 import urllib.error
 import urllib.request
 import webbrowser
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -43,7 +43,8 @@ from front_office.domain.dictionary import render_data_dictionary
 from front_office.domain.fit_model import FitEvidence
 from front_office.domain.postseason import PostseasonModel
 from front_office.domain.simulator import SimulatorModel
-from front_office.domain.tables import ALL_TABLES, PLANNED_TABLES
+from front_office.domain.tables import DOCUMENTED_TABLES, PLANNED_TABLES
+from front_office.domain.tables.current import SOURCES
 from front_office.domain.value_model import Comparison, ValueModel
 from front_office.pipelines.build import build_database, database_status, log_fetches
 from front_office.pipelines.check import CheckSeverity, DataReport, check_raw_data
@@ -53,6 +54,7 @@ from front_office.pipelines.contracts import (
     import_contract_file,
     write_contract_template,
 )
+from front_office.pipelines.current import refresh_current
 from front_office.pipelines.fit import (
     FIT_TEST_COMMAND,
     FitTestError,
@@ -130,6 +132,11 @@ simulate_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(simulate_app, name="simulate")
+current_app = typer.Typer(
+    help="Current information since the build, for the assistant: games, moves, injuries.",
+    no_args_is_help=True,
+)
+app.add_typer(current_app, name="current")
 console = Console()
 
 
@@ -221,7 +228,7 @@ def dictionary(
     ] = False,
 ) -> None:
     """Render the data dictionary from the table contracts."""
-    document = render_data_dictionary(ALL_TABLES, PLANNED_TABLES)
+    document = render_data_dictionary(DOCUMENTED_TABLES, PLANNED_TABLES)
     if not write:
         typer.echo(document, nl=False)
         return
@@ -231,7 +238,7 @@ def dictionary(
         raise _fail(error) from error
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(document, encoding="utf-8", newline="\n")
-    _say(f"Wrote {target} ({len(ALL_TABLES)} tables)")
+    _say(f"Wrote {target} ({len(DOCUMENTED_TABLES)} tables)")
 
 
 @app.command()
@@ -1199,3 +1206,82 @@ def simulate_report_command(
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(document, encoding="utf-8", newline="\n")
     _say(f"Wrote {target} (revision {revision} of the simulator)")
+
+
+_REFRESH_STYLE = {
+    "stored": "green",
+    "unchanged": "cyan",
+    "none": "dim",
+    "skipped": "dim",
+    "failed": "bold red",
+}
+
+
+@current_app.command("refresh")
+def current_refresh_command(
+    source: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--source",
+            "-s",
+            help=f"One of {', '.join(SOURCES)}. Repeat for several. Default: all of them.",
+        ),
+    ] = None,
+    force: Annotated[
+        bool, typer.Option("--force", help="Fetch even what was fetched within its interval.")
+    ] = False,
+) -> None:
+    """Fetch what is due of the current sources into data/current.sqlite.
+
+    Never touches the lab's database: a build takes in the season's games from the raw store
+    as before. Each source is fetched at most once in its interval (configs/assistant.yaml).
+    """
+    try:
+        settings = load_settings()
+        report = refresh_current(settings, sources=tuple(source or SOURCES), force=force)
+    except (ConfigError, ValueError) as error:
+        raise _fail(error) from error
+    for result in report.results:
+        _tagged(
+            f"{result.status:<9}",
+            _REFRESH_STYLE.get(result.status, ""),
+            f"{result.source}: {result.detail}",
+        )
+    if report.failed:
+        raise typer.Exit(code=1)
+
+
+@current_app.command("status")
+def current_status_command() -> None:
+    """Show when each current source was last fetched and what is held from it."""
+    try:
+        settings = load_settings()
+        # Opening the lab creates the database; asking a question should not.
+        if not database_status(settings).exists:
+            raise LabNotBuilt
+        with Lab(settings) as lab:
+            sources = lab.current.status()
+    except (ConfigError, LabNotBuilt) as error:
+        raise _fail(error) from error
+    _say(f"Current information: {settings.current_path}")
+    table = Table()
+    table.add_column("Source", style="bold")
+    table.add_column("State")
+    table.add_column("Rows", justify="right")
+    table.add_column("Worked (UTC)", no_wrap=True)
+    table.add_column("Tried (UTC)", no_wrap=True)
+    table.add_column("Detail", overflow="fold")
+    for item in sources:
+        table.add_row(
+            item.source,
+            item.state,
+            f"{item.rows:,}",
+            _minute(item.stored_at),
+            _minute(item.checked_at),
+            escape(item.detail),
+        )
+    console.print(table)
+
+
+def _minute(moment: datetime | None) -> str:
+    return "-" if moment is None else f"{moment:%Y-%m-%d %H:%M}"

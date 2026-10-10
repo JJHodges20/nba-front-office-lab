@@ -123,6 +123,11 @@ class Settings(_Section):
         return self.data_dir / "front_office.sqlite"
 
     @property
+    def current_path(self) -> Path:
+        """The AI research assistant's cache of current information (decision 0018)."""
+        return self.data_dir / "current.sqlite"
+
+    @property
     def history_start(self) -> Season:
         return Season.parse(self.seasons.history_start)
 
