@@ -104,6 +104,7 @@ class Executor:
             warnings=found.warnings,
             kinds=found.kinds,
             limits=found.limits,
+            charts=found.charts,
         )
 
     def _refused(

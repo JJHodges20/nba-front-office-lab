@@ -22,7 +22,7 @@ from typing import Any
 
 from front_office.assistant import checker
 from front_office.assistant.executor import Executor
-from front_office.assistant.names import clarification, find_mentions
+from front_office.assistant.names import Mention, clarification, find_mentions
 from front_office.assistant.policy import POLICY_VERSION, render_context
 from front_office.assistant.routing import check, conversation, quoted
 from front_office.assistant.toolbox import Toolbox
@@ -116,7 +116,11 @@ class Assistant:
                 on_step(step)
 
         with self._lab.remembering():
-            mentions = find_mentions(question, self._lab.entities, season=context.season)
+            found = find_mentions(question, self._lab.entities, season=context.season)
+        mentions = _settled(found, context.resolved)
+        # A name the user has chosen a reading for is written out in the question the model
+        # reads: told "Brown" is Jaylen Brown, a model was seen looking "Brown" up again.
+        asked = _with_names(question, found, mentions)
         unclear = next((mention for mention in mentions if mention.ambiguous), None)
         if unclear is not None:
             text = clarification(unclear)
@@ -142,8 +146,8 @@ class Assistant:
         tools = tool_schemas(specs)
         mode = self._settings.mode(context.mode)
         calls_left, seconds = LIMITS[context.mode]
-        messages = conversation(context, [*history, Message(role="user", content=question)])
-        given = [question, render_context(context), *(turn.content for turn in history)]
+        messages = conversation(context, [*history, Message(role="user", content=asked)])
+        given = [question, asked, render_context(context), *(turn.content for turn in history)]
         results: list[ToolResult] = []
         stopped = False
         full = False
@@ -313,6 +317,29 @@ def for_model(result: ToolResult) -> str:
     if sources:
         lines.append(f"Source: {sources}")
     return "\n".join(lines)
+
+
+def _settled(mentions: Sequence[Mention], resolved: Sequence[NameCandidate]) -> tuple[Mention, ...]:
+    """The mentions, with an ambiguous one narrowed to the reading the context already
+    names for the same words: the user's answer to the question back."""
+    chosen = {(name.text.casefold(), name.kind, name.id) for name in resolved}
+    settled = []
+    for mention in mentions:
+        kept = tuple(
+            c for c in mention.candidates if (mention.text.casefold(), c.kind, c.id) in chosen
+        )
+        settled.append(Mention(mention.text, kept) if mention.ambiguous and kept else mention)
+    return tuple(settled)
+
+
+def _with_names(question: str, found: Sequence[Mention], settled: Sequence[Mention]) -> str:
+    """The question with each name the user settled written out in full: "How did Brown
+    shoot?" becomes "How did Jaylen Brown shoot?", "the 2013 Knicks" the 2012-13 ones."""
+    for before, after in zip(found, settled, strict=True):
+        if before.ambiguous and not after.ambiguous:
+            pattern = rf"(?<!\w){re.escape(before.text)}(?!\w)"
+            question = re.sub(pattern, after.candidates[0].name.replace("\\", ""), question)
+    return question
 
 
 def _merge(*groups: Sequence[NameCandidate]) -> tuple[NameCandidate, ...]:

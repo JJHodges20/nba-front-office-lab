@@ -413,10 +413,12 @@ def _stated(value: Any, text: str) -> bool:
     frozen name (``first_apron`` is written "first apron")."""
     if isinstance(value, bool) or not isinstance(value, int | float):
         return str(value).replace("_", " ").lower() in text.lower()
-    given = Figure(str(value), float(value), 0.0, False, False)
-    # A written zero holds no figure but zero: "0%" is not 27.8% rounded.
+    # A frozen figure is a value, which an answer may write as a number or as a place (a
+    # rank of 4 is "4th"); a written zero holds no figure but zero: "0%" is not 27.8%.
+    frozen = [Figure(str(value), float(value), 0.0, False, False, place) for place in (False, True)]
     return any(
         supports(given, written) and (written.value != 0 or float(value) == 0)
+        for given in frozen
         for written in figures(text)
     )
 

@@ -1,6 +1,6 @@
 # The Workbench
 
-The workbench is the lab's interface: thirteen pages over the database, opened in your
+The workbench is the lab's interface: fourteen pages over the database, opened in your
 browser.
 
 ```powershell
@@ -13,8 +13,8 @@ no data yet it says so and tells you to run `fol refresh`. Stop it with Ctrl+C.
 
 ## The frame
 
-**Navigation** is at the top of the sidebar, in five groups: League, Explore, Build,
-Forecast and System. **Filters** are below it, and a choice you make on one page still
+**Navigation** is at the top of the sidebar, in six groups: League, Explore, Build,
+Forecast, Ask and System. **Filters** are below it, and a choice you make on one page still
 holds on the next. Each page reads the filters it can use: the League Overview, the
 explorers and the Analytics Lab read them all; Player Value reads the season, the team
 and the player; the Contract Explorer and the Scenario Simulator read the team; Roster
@@ -249,6 +249,38 @@ any season, so a trade that strengthens one team does not weaken another here. T
 as a document: [research/SIMULATOR.md](research/SIMULATOR.md); why it is built this way:
 [decisions/0015-simulator.md](decisions/0015-simulator.md).
 
+**AI Research.** Ask in plain words, and see what every answer rests on. A language model
+on this machine (through Ollama) answers from the lab's tools - its statistics, its models'
+files as later milestones add them, the contract file, this season's games, the league's
+transactions and injury report fetched since the build, and pages on the web - and every
+figure in an answer is checked against what the tools returned before you see it.
+
+- *Above the conversation*: whether the assistant can answer (and, when it cannot, what to
+  do: start Ollama, or pull the model), whether web search is set up, and how fresh each
+  current source is. *Fetch current information* fetches what is due by hand; a question
+  fetches what it needs anyway.
+- *Quick or Deep*: Quick for one fact or one comparison, Deep for a longer look - more
+  tool calls, more time, the model thinking first. A question under way shows its steps
+  as they come, and *Stop* ends it at the next step, keeping what was gathered.
+- *Each answer* opens with its kind: supported, qualified (part answered; what is missing,
+  limited or estimated is said), not enough to answer, a question back, or declined. A
+  name with several readings - two players called Brown, a year that could be either
+  season - is asked about before anything runs; choose one and the question is asked
+  again with it. Under the answer: notes and limits, the kinds of number it rests on, each
+  result's rows with the chart its tool chose and a CSV, the evidence (every source with
+  its address and its dates: published, effective, fetched), and how it was answered
+  (each step, the model, the rules' version, the time).
+- *Names and sidebar*: names, seasons and teams are read from the question; the sidebar's
+  season and team stand in where it names none. A link pasted into a question can be read.
+
+The conversation lasts until the tab is closed or reloaded, and nothing is saved. Web
+search needs your own Ollama account's key, in the project's `.env` file as
+`FOL_OLLAMA_API_KEY` (copy `.env.example` to `.env` and fill it in); without it the page
+says so, and pasted links are still read. Some
+sites ask AI agents not to read their pages, and the assistant does as they ask. Why it is
+built this way: [decisions/0018-ai-research-assistant.md](decisions/0018-ai-research-assistant.md);
+how it is measured: [AI_EVALUATION.md](AI_EVALUATION.md).
+
 **Data Health.** How the last build went, the state of each source, what is missing and
 what that costs, every quality check, every adjustment the build made to source data,
 what is held of each dataset, and any fetch that is failing.
@@ -265,4 +297,6 @@ whose record on past seasons is a tab away, never a verdict on a team. A role is
 applied to a player's statistics, not a measurement of how they play, and the page says
 so. Roster fit describes a roster and reports what the evidence found; it does not score
 one. The optimizer's rosters are the parts added up under a budget, several of them,
-never one answer.
+never one answer. The AI Research assistant cannot yet use the value model, roster fit,
+the postseason model or the simulator, or keep a conversation past the session; those come
+with the assistant's later milestones.

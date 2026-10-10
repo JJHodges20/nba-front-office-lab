@@ -19,6 +19,7 @@ DERIVED = "derived"
 ESTIMATE = "estimate"
 MODELED = "modeled"
 ASSUMPTION = "assumption"
+REPORTED = "reported"
 
 # What each kind of number is, how it is tagged, and what the tag means. Colour never
 # carries the meaning alone: every tag has an icon and a word.
@@ -57,6 +58,14 @@ PROVENANCE = {
         ":material/edit_note:",
         "violet",
         "Entered or chosen by you: a roster you built, or a salary you typed in.",
+    ),
+    REPORTED: (
+        "Reported",
+        ":material/newspaper:",
+        "yellow",
+        "Said by a source outside the lab's data: the league's transactions and injury "
+        "report, or a page on the web. Dated and linked, and never checked against the "
+        "lab's figures.",
     ),
 }
 

@@ -56,6 +56,8 @@ STARTS: dict[str, dict[str, dict[str, object]]] = {
     },
     # The roster start needs the roster the sweep creates.
     "simulator": {"open": {}, "roster": {"sim_subject": "roster"}},
+    # Offline, as every page test is: the controls are the mode and the two buttons.
+    "research": {"open": {}},
     "health": {"open": {}},
 }
 # The one filter a page is swept through in full although it is long, from the first of

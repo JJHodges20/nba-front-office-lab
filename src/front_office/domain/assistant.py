@@ -223,6 +223,46 @@ class Evidence:
     """The model revision or the source's own version, where there is one."""
 
 
+ChartKind = Literal["line", "bars", "intervals", "percentiles", "comparison"]
+
+
+@dataclass(frozen=True, slots=True)
+class Chart:
+    """A chart a result is drawn as on the page: the tool chooses it for its own rows, and
+    the workbench draws it with its own builders (decision 0018, A3). The model plays no
+    part in it, and nothing in it is computed: ``frame`` holds the result's own figures,
+    with ``text`` each figure as the lab writes it.
+
+    - ``line``: ``y`` over the ordered ``x`` (a season, a date);
+    - ``bars``: ``y`` for each ``x``, either side of zero, in the frame's order;
+    - ``intervals``: ``y`` for each ``x`` with the interval from ``low`` to ``high``;
+    - ``percentiles``: the percentile ``y`` of each metric ``x``;
+    - ``comparison``: the percentile ``y`` of each metric ``x`` for each of ``who``.
+    """
+
+    kind: ChartKind
+    title: str
+    """What is drawn, for the page's caption and the exported file's name."""
+    frame: pd.DataFrame
+    x: str
+    y: str
+    text: str
+    y_title: str = ""
+    low: str | None = None
+    high: str | None = None
+    who: str | None = None
+    metric: str | None = None
+    """The catalog key of ``y`` when it is a metric: its axis is written as the metric is."""
+    tickformat: str = ""
+    """The axis format when ``y`` is no metric: a share, say."""
+    y_range: tuple[float, float] | None = None
+    """The value axis's span when it has natural ends: a share runs from 0 to 1."""
+    reference: float | None = None
+    reference_label: str = ""
+    estimate: bool = False
+    """Whether the figures are the lab's estimates (marked ≈ on the page)."""
+
+
 class ResultStatus(StrEnum):
     OK = "ok"
     EMPTY = "empty"
@@ -256,6 +296,8 @@ class ToolResult:
     """What the result cannot tell, which an answer resting on it must say: a source
     checked and found holding nothing - no report published, no game played yet - is an
     answer, but a qualified one."""
+    charts: tuple[Chart, ...] = ()
+    """How the page draws the result, as its tool chose."""
 
     @property
     def usable(self) -> bool:

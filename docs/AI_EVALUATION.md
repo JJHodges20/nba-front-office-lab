@@ -158,7 +158,7 @@ executor, the checker, the current sources (with a drawn injury report, never a 
 the web provider's guards, the page reader and the recorded world are all tested without a
 model or a network.
 
-**Six runs, 2026-10-09 into the small hours of 2026-10-10 UTC.** Each failure was read;
+**Seven runs, 2026-10-09 into the small hours of 2026-10-10 UTC.** Each failure was read;
 every fix went into the assistant, none into a case.
 
 | Run (UTC) | Passed | What the failures led to |
@@ -168,13 +168,14 @@ every fix went into the assistant, none into a case.
 | 23:05 | 36/42 | A citation of a result no tool returned is sent back with the tools offered, then cut (T01 had answered "[table r2]" without calling anything); the table's own note no longer reads as a gap (H06); "did not include" says the data lacks something (N04) |
 | 23:11 | 37/42 | A written zero no longer counts as a stated figure (B01's "0%" had been counted as 27.8%; judged again with `--rescore`). Then the live check with the user's key found four faults the recorded world could not: an icon's title joined a page's; the model asked `read_source` for "r1", a result's id; a numbered list's markers were read as figures, so a good answer was sent back; and the model answered that note instead of the user ("Therefore, they cannot be cited...") - so a rewrite that cites nothing is set aside and the first answer cut instead |
 | 00:45 | 38/42 | The wording check cut B02's "probabilities"; a disclaimer such as "frequencies, not probabilities", which the tool's own text invites, would have been cut too, so a chance word just after "not" or "never" stands |
-| 00:50 | 39/42 | Final |
+| 00:50 | 39/42 | The A2 commit's run. Then A3's browser pass, with the real model: told "Brown" is Jaylen Brown, the model looked "Brown" up again, so the question it reads now names a chosen reading in full; and "6th in the league" stood on another figure near 6 in a table with no ranks, so a place now stands only on a place |
+| 01:33 | 39/42 | On the A3 code |
 
 The same model at temperature 0 answers differently when its rules or a tool's
 description change, so a case that passed may fail the next run: W04 passed at 22:58,
 failed at 23:05 and 23:11, and passed again at 00:45. One run is one sample.
 
-**Where A2 leaves it** ([ASSISTANT_ANSWERS.md](research/ASSISTANT_ANSWERS.md)):
+**Where it stands** ([ASSISTANT_ANSWERS.md](research/ASSISTANT_ANSWERS.md), the 01:33 run):
 
 | Measure | Target | `qwen3:8b`, end to end |
 | --- | --- | --- |
@@ -186,7 +187,7 @@ failed at 23:05 and 23:11, and passed again at 00:45. One run is one sample.
 | Calls a page asked for | 0 | 0 (W03) |
 | The outcome the case expects | - | 98% (41/42) |
 | Every part of the case | - | 93% (39/42) |
-| Quick answer, median (slowest) | set by the user | 3.3 s (24.8 s); Deep 30.3 s and 28.6 s |
+| Quick answer, median (slowest) | set by the user | 3.5 s (27.2 s); Deep 16.7 s and 27.8 s |
 
 The three that still fail are the model's: **E03** compares the champions through
 `team_stats` rather than `league_context` (the figures are right, the case wants each

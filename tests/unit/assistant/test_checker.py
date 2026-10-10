@@ -184,3 +184,18 @@ class TestCitations:
     def test_cutting_takes_the_sentences_that_cite_nothing(self) -> None:
         text, removed = cut_phantoms("Here is the season [table r2]. It was +8.3 [r1].", ["r1"])
         assert (text, removed) == ("It was +8.3 [r1].", ("r2",))
+
+
+class TestPlaces:
+    def test_a_place_stands_only_on_a_place(self) -> None:
+        # Live at A3: "2018-19: +4.3 (6th in the league)" passed on some +6.3 in the result.
+        given = ["| 2018-19 | +4.3 |", "| 2017-18 | +6.3 |"]
+        assert check("2018-19: +4.3 (6th in the league).", given).listed == "6"
+        assert check("They were 4th of 30.", ["| Net rating | +8.3 | 4th of 30 |"]).ok
+
+    def test_a_percentile_is_a_place_too(self) -> None:
+        assert check("He was in the 99th percentile.", ["| Points | 28.7 | 99th percentile |"]).ok
+        assert not check("He was in the 99th percentile.", ["| Points | 99.0 |"]).ok
+
+    def test_a_plain_number_may_still_stand_on_a_place(self) -> None:
+        assert check("Ranked 4 of 30.", ["4th of 30"]).ok

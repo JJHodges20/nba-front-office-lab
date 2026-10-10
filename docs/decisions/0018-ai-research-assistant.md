@@ -160,3 +160,34 @@ sources and contract-update review; A8 research proposals; A9 the release audit.
   turn away ChatGPT-User and Claude-User, so their pages are not read - only their search
   snippets show. Judging pages as the lab's own agent alone would read them; the user chose
   on 2026-10-09 to keep honouring the sites' stated wishes.
+
+## Settled while building A3 (2026-10-10)
+
+The user accepted the two departures from the specification below - the tool choosing
+the chart, and nothing fetched on opening the page - on 2026-10-10.
+
+- **A question runs in the background.** `assistant.api.start` returns a job: a thread
+  with its own connection to the lab (so the pages go on reading theirs, and nothing the
+  job remembers leaks into them), its steps readable as they come, and a stop that is
+  taken at the next step and keeps what was gathered. The page looks in once a second
+  through a fragment and takes the answer in when the job is done. Streamlit stops a
+  script when its page is clicked, so a stop button on a blocking call could only have
+  thrown the work away.
+- **The tool chooses the chart, not the model.** The specification had the model ask for a
+  chart by kind, result and columns. A small local model already misses some tool
+  choices, and a chart request would spend a call from Quick's three. Each tool attaches
+  the chart its own rows call for - a line of a team's or a player's seasons, percentile
+  bars, comparison dots, every team's net rating, a benchmark's shares with their 95%
+  intervals - and the page draws it with the workbench's builders and house rules,
+  declining (with a note) one that would break them. Nothing in a chart is computed.
+- **Current information is fetched by questions and by hand, not on opening the page.**
+  The specification had the workbench check every source once a session at launch: up to
+  a dozen requests and a quarter of a minute before the page drew. A question fetches
+  what it needs when it is due, the page shows each source's state, and a button fetches
+  what is due by hand.
+- **The conversation is the session's.** Earlier turns carry over as text, the last three
+  answered ones, so that "and in 2012-13?" follows; a chosen reading of an ambiguous name
+  is asked again with the name settled. Workspaces that persist are A6's.
+- **Text from outside is shown as written.** A dollar sign in an answer is a dollar sign,
+  not the start of a formula; an image in an answer is left out rather than fetched; a
+  page's title or a step is escaped.

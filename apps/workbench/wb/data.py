@@ -11,6 +11,7 @@ from datetime import date, datetime
 import pandas as pd
 import streamlit as st
 
+import front_office.assistant.api as api
 from front_office.domain.fit_model import FitEvidence
 from front_office.domain.optimizer import OptimizerRequest
 from front_office.domain.postseason import PostseasonModel
@@ -18,6 +19,7 @@ from front_office.domain.scenario import Scenario
 from front_office.domain.simulator import SimulatorModel
 from front_office.services import (
     BracketReport,
+    CurrentSource,
     Era,
     EraView,
     FitReport,
@@ -678,3 +680,19 @@ def tables(build: int | None) -> pd.DataFrame:
 @st.cache_data(show_spinner=False)
 def gaps(build: int | None, today: date) -> tuple:
     return lab().health.gaps(today=today)
+
+
+# --- the AI research assistant ------------------------------------------------------------
+#
+# Ollama can be started or stopped while the workbench runs, so its status expires on its
+# own. What the current-information cache holds changes with every refresh and is read
+# fresh.
+
+
+@st.cache_data(show_spinner=False, ttl=30)
+def assistant_status(build: int | None) -> api.AssistantStatus:
+    return api.status()
+
+
+def current_sources() -> tuple[CurrentSource, ...]:
+    return lab().current.status()

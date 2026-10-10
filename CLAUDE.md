@@ -202,7 +202,8 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   calls service methods and writes what they return as the workbench shows it, with the
   evidence: the build, the contract file's date, a source's address and times. It never
   computes a metric, ranks, or fits. Every figure in an answer must be in a result the
-  model was given (`assistant/checker.py`); an empty read of the lab carries the build.
+  model was given (`assistant/checker.py`), and a place ("6th") only on a place; an empty
+  read of the lab carries the build.
 - **Current information is a cache beside the lab.** `data/current.sqlite`
   (`storage/current.py`) holds what `pipelines/current.py` fetched: the season's games,
   the league's transactions, the latest injury report, and a log of every attempt. A
@@ -216,7 +217,8 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   redirect and the address connected to must be public; robots.txt is read for AI agents
   too; refused sites (Sports Reference's, Spotrac, nba.com) are left out of results. The
   search key is the user's own: `FOL_OLLAMA_API_KEY`, from the environment or the
-  git-ignored `.env` - never `OLLAMA_API_KEY`, never printed, never in a test (the
+  git-ignored `.env` (template: `.env.example`, which must never hold a value) - never
+  `OLLAMA_API_KEY`, never printed, never in a test (the
   conftest removes it). Tests use `tests/web_fakes.py`; nothing in the suite reaches the
   network outside the `network` and `ollama` markers.
 - **The evaluation cases are frozen.** `tests/assistant/fixtures/cases.yaml`: never edit a
@@ -256,6 +258,16 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   and apply it at the top of the next run (`state.choose`, `builder.CREATED`).
 - **Headline tiles cut off long text.** Keep a figure's context to about twenty
   characters, or give the row fewer tiles (`components.figures(..., per_row=3)`).
+- **The AI Research page reaches the assistant through `front_office.assistant.api`
+  alone**, imported by its full name (`import front_office.assistant.api as api`: the
+  boundary test reads `from front_office.assistant import api` as the whole package). A
+  question runs as an `api.Job` in its own thread with its own `Lab`; the page only starts
+  it, looks in on it from a fragment, and takes the finished turn in at the top of the
+  next run. The tool chooses a result's chart (`domain.assistant.Chart`); the page draws
+  it, and declines one the house rules would refuse. Model text goes through `_prose`
+  (a dollar sign is not a formula, an image is not fetched) and outside text through
+  `_escaped`. No page test reaches Ollama or the network: `tests/ui/conftest.py` keeps the
+  assistant offline unless a test scripts a model (`tests/ui/test_research_page.py`).
 - **Page tests** (`tests/ui/test_pages.py`) draw a page with `AppTest` and compare what
   it shows with what the service returns. `tests/ui/test_sweep.py` tries every control
   on every page; a new page must be added to its `STARTS`. `AppTest` cannot click a

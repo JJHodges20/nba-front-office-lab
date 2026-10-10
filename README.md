@@ -109,6 +109,7 @@ Stop it with Ctrl+C. [docs/WORKBENCH.md](docs/WORKBENCH.md) is the guide.
 | Roster Optimizer | Several strong, distinct rosters under a payroll budget and the requirements you set, from the value model's projections; any of them can be saved into the Team Builder. |
 | Postseason Outlook | How likely each stage of the playoffs is: for a team, a built roster or a strength you set, for every team of a season, and for a decided season's bracket and series - with intervals, and the model's record on seasons it had not seen. |
 | Scenario Simulator | What a change to a roster would do to its season: players in and out, games missed, development and minutes as your assumptions, and thousands of seasons drawn before and after - payroll, rating, wins and the chance of every stage. |
+| AI Research | Ask in plain words: a model on this machine answers from the lab's data, games, moves and injuries since the build, and the web - every figure checked against what the tools returned, each answer shown with its rows, charts and dated sources. |
 | Data Health | Freshness, failed fetches, missing data, quality checks and source status. |
 
 Season, phase, team, player and comparison window are chosen once in the sidebar and
@@ -128,6 +129,8 @@ lab derived or estimated, and which you assumed.
 ![Team Explorer: ratings with league ranks, the four factors and form](docs/images/team-explorer.png)
 
 ![Winning Benchmarks: how often teams of each record won the championship, with intervals](docs/images/winning-benchmarks.png)
+
+![AI Research: a question answered from the benchmarks, with the shares and their intervals it rests on](docs/images/ai-research.png)
 
 ### Other commands
 

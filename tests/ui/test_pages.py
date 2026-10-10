@@ -33,6 +33,7 @@ PAGES = (
     "optimizer",
     "postseason",
     "simulator",
+    "research",
     "health",
 )
 STATES = {

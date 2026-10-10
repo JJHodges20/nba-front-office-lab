@@ -378,6 +378,10 @@ current information:  pipelines.current: stats.nba.com game logs (through the in
              the raw store), the player-movement file and the injury report
              (providers.nba_current, processing.current) -> data/current.sqlite
              (storage.current) -> services.current
+the AI Research page:  apps/workbench/wb/views/research.py -> front_office.assistant.api
+             (status; start -> a Job: a thread with its own Lab, its steps readable, a
+             stop; history; refresh_current) -> each answer drawn with the workbench's
+             own components and charts
 scripts/benchmark_ollama.py:  each candidate model's first move -> ASSISTANT_MODELS.md
 scripts/evaluate_answers.py:  whole answers on the test databases, in a recorded world
              -> assistant.evaluation.score_answer -> docs/research/ASSISTANT_ANSWERS.md
@@ -417,6 +421,16 @@ snapshots land in the raw store for the next build. The web provider
 (`providers/web.py`) is the only code that reaches arbitrary addresses, after the checks
 of the spec's Safety section; `processing/web.py` turns a page into text with the standard
 library's HTML parser.
+
+From A3 the workbench asks. The AI Research page imports `front_office.assistant.api` and
+nothing else of the assistant: `start` answers a question in a background thread with its
+own `Lab`, so a long answer never holds a page's connection or its memory, and the page
+looks in once a second through a fragment. A result carries the charts its tool chose
+(`domain.assistant.Chart`, built in `assistant/lab_tools.py` from the services' own
+figures); the page draws them with `wb/charts.py` under the house rules and writes the
+rows in the metric catalogs' labels and formats. Page tests never reach Ollama or the
+network: `tests/ui/conftest.py` puts an offline model, the lab's own tools and a refresh
+that fetches nothing behind the facade, and a test that needs answers scripts a model.
 See [AI_ASSISTANT_SPEC.md](AI_ASSISTANT_SPEC.md) and [AI_EVALUATION.md](AI_EVALUATION.md).
 
 ## Conventions

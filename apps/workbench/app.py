@@ -24,6 +24,7 @@ from wb.views import (
     optimizer,
     players,
     postseason,
+    research,
     simulator,
     teams,
     value,
@@ -105,6 +106,14 @@ PAGES = {
             title="Scenario Simulator",
             icon=":material/casino:",
             url_path="simulator",
+        ),
+    ],
+    "Ask": [
+        st.Page(
+            research.render,
+            title="AI Research",
+            icon=":material/smart_toy:",
+            url_path="research",
         ),
     ],
     "System": [

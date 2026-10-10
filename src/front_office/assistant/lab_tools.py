@@ -17,7 +17,7 @@ from typing import Any
 import pandas as pd
 
 from front_office.assistant import tools as t
-from front_office.domain.assistant import Evidence, EvidenceKind, ResultStatus
+from front_office.domain.assistant import Chart, Evidence, EvidenceKind, ResultStatus
 from front_office.domain.eras import Era
 from front_office.domain.metrics import MetricCatalog
 from front_office.domain.schema import Provenance
@@ -114,6 +114,7 @@ class Found:
     warnings: tuple[str, ...] = ()
     kinds: tuple[str, ...] = ()
     limits: tuple[str, ...] = ()
+    charts: tuple[Chart, ...] = ()
 
 
 Handler = Callable[[Lab, Any], Found]
@@ -198,6 +199,41 @@ def seasons_held(labels: Sequence[str]) -> str:
 
 def phase(season_type: str) -> str:
     return PHASES.get(season_type, season_type)
+
+
+# --- charts ------------------------------------------------------------------------------
+
+
+def over_seasons(
+    frame: pd.DataFrame,
+    key: str,
+    catalog: MetricCatalog,
+    title: str,
+    *,
+    reference: float | None = None,
+    reference_label: str = "",
+) -> tuple[Chart, ...]:
+    """A metric season by season, where there are two seasons or more, each once."""
+    if key not in frame.columns:
+        return ()
+    plotted = frame[["season", key]].dropna(subset=[key])
+    if len(plotted) < 2 or plotted["season"].duplicated().any():
+        return ()
+    plotted = plotted.sort_values("season").reset_index(drop=True)
+    plotted = plotted.assign(text=[shown(catalog, key, value) for value in plotted[key]])
+    chart = Chart(
+        "line",
+        title,
+        plotted,
+        x="season",
+        y=key,
+        text="text",
+        y_title=label(catalog, key),
+        metric=key,
+        reference=reference,
+        reference_label=reference_label,
+    )
+    return (chart,)
 
 
 # --- evidence ----------------------------------------------------------------------------
@@ -382,6 +418,7 @@ def _team_history(lab: Lab, args: t.TeamStats, names: pd.DataFrame) -> Found:
         for _, s in seasons.iterrows()
     ]
     header = ["Season", "Team", *(label(profile.metrics, k) for k in keys), "Postseason"]
+    team = names.at[args.team_id, "full_name"]
     return Found(
         ResultStatus.OK,
         title,
@@ -389,6 +426,14 @@ def _team_history(lab: Lab, args: t.TeamStats, names: pd.DataFrame) -> Found:
         seasons,
         (lab_evidence(lab, "team_seasons"),),
         kinds=kinds_of(profile.metrics, keys),
+        charts=over_seasons(
+            seasons,
+            "net_rating",
+            profile.metrics,
+            f"{team}: net rating by season",
+            reference=0.0,
+            reference_label="League average",
+        ),
     )
 
 
@@ -486,13 +531,15 @@ def player_stats(lab: Lab, args: t.PlayerStats) -> Found:
         )
     row, catalog = table.players.loc[args.player_id], table.metrics
     percentiles = table.percentiles
-    lines = []
+    lines, ranked = [], []
     keys = [key for key in PLAYER_KEYS if key in table.players.columns]
     for key in keys:
         rank = DASH
         if key in percentiles.columns and args.player_id in percentiles.index:
             value = percentiles.at[args.player_id, key]
-            rank = DASH if _missing(value) else f"{ordinal(round(float(value)))} percentile"
+            if not _missing(value):
+                rank = f"{ordinal(round(float(value)))} percentile"
+                ranked.append((label(catalog, key), float(value), shown(catalog, key, row[key])))
         lines.append([label(catalog, key), shown(catalog, key, row[key]), rank])
     head = f"{name} ({row['team']}), {args.season} {phase(args.season_type)}, {window.describe().lower()}."
     text = (
@@ -500,6 +547,18 @@ def player_stats(lab: Lab, args: t.PlayerStats) -> Found:
         + "\n"
         + grid(["Metric", "Value", "Among the season's players"], lines, limit=len(lines))
     )
+    charts = ()
+    if ranked:
+        charts = (
+            Chart(
+                "percentiles",
+                f"{name}: percentiles among the season's players, {args.season}",
+                pd.DataFrame(ranked, columns=["metric", "percentile", "value"]),
+                x="metric",
+                y="percentile",
+                text="value",
+            ),
+        )
     return Found(
         ResultStatus.OK,
         title,
@@ -507,6 +566,7 @@ def player_stats(lab: Lab, args: t.PlayerStats) -> Found:
         pd.DataFrame(lines, columns=["metric", "value", "percentile"]),
         (lab_evidence(lab, "player_seasons, player_game_logs"),),
         kinds=kinds_of(catalog, keys),
+        charts=charts,
     )
 
 
@@ -528,6 +588,7 @@ def _career(lab: Lab, args: t.PlayerStats, profile: Any, name: str) -> Found:
         seasons,
         (lab_evidence(lab, "player_seasons"),),
         kinds=kinds_of(catalog, CAREER_KEYS),
+        charts=over_seasons(seasons, "pts_per_game", catalog, f"{name}: points per game by season"),
     )
 
 
@@ -618,6 +679,20 @@ def compare_players(lab: Lab, args: t.ComparePlayers) -> Found:
         warnings.append(f"Not metrics the lab has: {', '.join(unknown)}.")
     if absent:
         warnings.append(f"No statistics this season for player ids {absent}.")
+    ranked = compared[compared["percentile"].notna()]
+    charts = ()
+    if not ranked.empty:
+        charts = (
+            Chart(
+                "comparison",
+                f"{title}: percentiles among the season's players",
+                ranked[["label", "player_name", "percentile", "shown"]].reset_index(drop=True),
+                x="label",
+                y="percentile",
+                text="shown",
+                who="player_name",
+            ),
+        )
     return Found(
         ResultStatus.OK,
         title,
@@ -626,6 +701,7 @@ def compare_players(lab: Lab, args: t.ComparePlayers) -> Found:
         (lab_evidence(lab, "player_seasons"),),
         tuple(warnings),
         kinds_of(catalog, keys),
+        charts=charts,
     )
 
 
@@ -696,6 +772,13 @@ def league_context(lab: Lab, args: t.LeagueContext) -> Found:
             for team_id, r in ordered.iterrows()
         ]
         header = ["Team", "Record", *(label(catalog, k) for k in RANKED_TEAM_KEYS)]
+        bars = pd.DataFrame(
+            {
+                "team": ordered["team_name"].to_numpy(),
+                "net_rating": ordered["net_rating"].to_numpy(),
+                "text": [shown(catalog, "net_rating", v) for v in ordered["net_rating"]],
+            }
+        )
         return Found(
             ResultStatus.OK,
             f"Every team, {season}, by net rating",
@@ -703,6 +786,18 @@ def league_context(lab: Lab, args: t.LeagueContext) -> Found:
             ordered,
             (lab_evidence(lab, "team_seasons"),),
             kinds=kinds_of(catalog, RANKED_TEAM_KEYS),
+            charts=(
+                Chart(
+                    "bars",
+                    f"Net rating, {season}",
+                    bars,
+                    x="team",
+                    y="net_rating",
+                    text="text",
+                    y_title=label(catalog, "net_rating"),
+                    metric="net_rating",
+                ),
+            ),
         )
     if view == "playoffs":
         series = lab.league.playoffs(season)
@@ -779,6 +874,18 @@ def historical_benchmarks(lab: Lab, args: t.HistoricalBenchmarks) -> Found:
         f"{view.span} ({summary.teams} of {summary.field} team-seasons over {summary.seasons} seasons). "
         "A frequency among past teams with its 95% interval - not any team's chance."
     )
+    held = rates[rates["teams"] > 0]
+    intervals = pd.DataFrame(
+        {
+            "band": held["band"].to_numpy(),
+            "rate": held["rate"].to_numpy(),
+            "low": held["low"].to_numpy(),
+            "high": held["high"].to_numpy(),
+            "text": [
+                f"{r['reached']} of {r['teams']} ({r['rate']:.1%})" for _, r in held.iterrows()
+            ],
+        }
+    )
     return Found(
         ResultStatus.OK,
         f"{stage.label}, by {measure}, {view.span}",
@@ -789,6 +896,23 @@ def historical_benchmarks(lab: Lab, args: t.HistoricalBenchmarks) -> Found:
         (lab_evidence(lab, "team_seasons"),),
         ("Benchmarks are history: frequencies among past teams, not a forecast.",),
         ("derived",),
+        charts=(
+            Chart(
+                "intervals",
+                f"{stage.label}: how often past teams got there, by {measure.lower()}",
+                intervals,
+                x="band",
+                y="rate",
+                text="text",
+                low="low",
+                high="high",
+                y_title="Share of past teams that got there, with its 95% interval",
+                tickformat=".0%",
+                y_range=(0.0, 1.0),
+            ),
+        )
+        if not intervals.empty
+        else (),
     )
 
 

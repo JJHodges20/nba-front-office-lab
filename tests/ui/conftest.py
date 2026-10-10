@@ -19,8 +19,12 @@ import plotly.graph_objects as go
 import pytest
 from streamlit.testing.v1 import AppTest
 
+import front_office.assistant.api as api
+from front_office.assistant.toolbox import Toolbox
 from front_office.config.settings import ENV_HOME
 from front_office.pipelines.build import BuildReport
+from front_office.providers.ollama import OllamaProvider
+from tests.ollama_fakes import ScriptedOllama
 from wb import data
 
 APP = Path(__file__).resolve().parents[2] / "apps" / "workbench" / "app.py"
@@ -38,6 +42,24 @@ def draw_page(name: str) -> None:
 
 
 Open = Callable[..., AppTest]
+
+
+@pytest.fixture(autouse=True)
+def _assistant_offline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No page test reaches Ollama or the network: the assistant is offline, its tools the
+    lab's own, and a refresh of current information fetches nothing - unless a test puts a
+    scripted model in (``tests/ui/test_research_page.py``)."""
+    monkeypatch.setattr(
+        api, "connect", lambda host, timeout: OllamaProvider(transport=ScriptedOllama(down=True))
+    )
+    monkeypatch.setattr(api, "tools_for", lambda lab: Toolbox.lab_only())
+    monkeypatch.setattr(
+        api,
+        "refresh_current",
+        lambda project_root=None, force=False: (
+            api.Refreshed("games", "none", "nothing is fetched in tests"),
+        ),
+    )
 
 
 @pytest.fixture

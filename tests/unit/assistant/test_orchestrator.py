@@ -18,7 +18,7 @@ from front_office.domain.assistant import (
 )
 from front_office.providers.ollama import OllamaProvider
 from front_office.services import Lab
-from tests.helpers import BOS
+from tests.helpers import BOS, BROWN
 from tests.ollama_fakes import ScriptedOllama, chat_chunks, tool_call
 from tests.web_fakes import ARTICLE, FakeWeb, page
 
@@ -354,3 +354,22 @@ def test_a_rewrite_that_answers_the_note_instead_of_the_user_is_set_aside(lab: L
     assert answer.text == "Their net rating was +8.3 [r1]."
     assert answer.removed == ("41.2",)
     assert any("the rewrite cited nothing" in step.detail for step in answer.steps)
+
+
+def test_a_name_the_user_has_chosen_is_not_asked_about_again(lab: Lab) -> None:
+    # The page asks again with the reading the user picked from the question back.
+    ollama = ScriptedOllama(chats=[chat_chunks("Which season?")])
+    first = ask(lab, ScriptedOllama(), "How did Brown shoot this season?")
+    chosen = next(option for option in first.options if option.id == BROWN)
+    context = CONTEXT.model_copy(update={"resolved": (chosen,)})
+    answer = ask(lab, ollama, "How did Brown shoot this season?", context=context)
+    assert answer.outcome is not Outcome.CLARIFY
+    system = ollama.chat_payloads[0]["messages"][0]["content"]
+    assert f'"Brown": player Jaylen Brown (player_id {BROWN})' in system
+    # Live at A3 a model told "Brown" is Jaylen Brown looked "Brown" up again: the question
+    # it reads now names him in full, while the answer keeps the user's words.
+    assert (
+        ollama.chat_payloads[0]["messages"][-1]["content"]
+        == "How did Jaylen Brown shoot this season?"
+    )
+    assert answer.question == "How did Brown shoot this season?"

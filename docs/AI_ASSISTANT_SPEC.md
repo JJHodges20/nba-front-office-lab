@@ -12,6 +12,7 @@ design as approved at milestone A0; each milestone notes here what it built.
 | A0 | This specification, [decision 0018](decisions/0018-ai-research-assistant.md), the evaluation design and its 59 cases. |
 | A1 | `configs/assistant.yaml` and its validation (`domain/assistant.py`, `config/assistant.py`); the Ollama adapter (`providers/ollama.py`); the `assistant` layer: the tool registry with every tool's arguments model (`tools.py`), the rules and context (`policy.py`), the first move and its one repair (`routing.py`), scoring (`evaluation.py`), and the facade's readiness check (`api.py`); the boundary tests; the benchmark and its report. Default model `qwen3:8b`, fallback `qwen3:4b-instruct`, an 8,192-token context in both modes. No tool runs yet. |
 | A2 | The assistant answers. Names first (`services/entities.py`, `assistant/names.py`): an ambiguous name is asked about before the model runs. The lab's read tools over the services (`assistant/lab_tools.py`); the executor (`executor.py`), which refuses an id the lab does not hold; the loop (`orchestrator.py`) within each mode's calls, time and context; the answer checker (`checker.py`): a figure no result holds, a chance where none was given, a verdict, a claim to have saved something or a citation of nothing is sent back once, then cut out. Current information (`pipelines/current.py` into `data/current.sqlite`, read by `services/current.py`; `fol current refresh`, `fol current status`) and its tools (`current_tools.py`). The web (`providers/web.py`, `processing/web.py`, `pipelines/web.py`, `web_tools.py`): Ollama's web search with the user's own key, and pages - search results and pasted links - read by id after every check. The end-to-end evaluation (`scripts/evaluate_answers.py`, [ASSISTANT_ANSWERS.md](research/ASSISTANT_ANSWERS.md)). The forecasting tools are A4's; the page is A3's. |
+| A3 | The AI Research page (`apps/workbench/wb/views/research.py`, in the workbench's Ask group): the assistant's state, web search's and each current source's; Quick and Deep; a question answered in the background (`assistant.api.Job`) with its steps shown and a stop; each answer with its kind, its text, notes and limits, its results' rows and charts, its evidence and its workings; a question back answered by a click; failure said on the page, never as an error. The conversation lasts the session. |
 
 ## Purpose and scope
 
@@ -140,14 +141,14 @@ current, stale data); and the user's assumptions, tagged as theirs.
 
 ## Charts and tables
 
-The model may ask for a chart by naming a kind, a result id and its columns. The page
-checks the request - a known kind, columns that exist, at most the series the house rules
-allow, one unit per axis - and draws it with `wb/charts.py` through `components.chart`, so
-it has its table view and exports. Kinds map onto the existing builders: bars
-(`diverging_bars`, `stacked_bars`), lines (`line`, `lines`), `scatter`, intervals
-(`interval_rows`, `interval_columns`, `band_line`), `histogram`, percentiles
-(`percentile_bars`, `comparison_dots`). No code, SQL or chart definition from the model is
-run.
+Every result's rows are on the page, with a CSV. A tool attaches the chart its rows call
+for (`domain.assistant.Chart`): a team's or a player's seasons as a line, a player's season
+as percentile bars, players compared as dots on one scale, every team's net rating as
+bars, a benchmark's shares with their 95% intervals. The page draws it with `wb/charts.py`
+through `components.chart`, so it has its table view and exports, and declines one the
+house rules would refuse (more players than its colours can tell apart), saying so. The
+model plays no part in a chart: the specification first had it ask for one, and A3 left
+that out (decision 0018). No code, SQL or chart definition from the model is run.
 
 ## Current information
 
@@ -161,10 +162,10 @@ The intervals are starting values in `configs/assistant.yaml` (`current:`), to b
 how often each source changes in season. A question fetches only what is due; a source
 that fails is logged and its last copy used, dated. Everything fetched is kept in
 `data/current.sqlite`, apart from the lab's database: a refresh never touches what a build
-made, and nothing refits a model. `fol current refresh` fetches by hand, `fol current
-status` shows each source's state; at A3 the page checks once per session, showing
-*checking*, *updated*, *unavailable* or *cached as of*. `fol refresh` stays a separate,
-explicit step.
+made, and nothing refits a model. `fol current refresh` fetches by hand and `fol current
+status` shows each source's state; so do the AI Research page's badges and its *Fetch
+current information* button. Opening the page fetches nothing (decision 0018, A3).
+`fol refresh` stays a separate, explicit step.
 
 ## Settings and failure
 

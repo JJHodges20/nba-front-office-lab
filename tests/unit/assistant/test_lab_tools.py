@@ -191,3 +191,50 @@ class TestTheLab:
         assert set(found.table["id"]) == {BROWN, 1628971}
         assert found.text.endswith("Several readings: ask the user which is meant.")
         assert isinstance(found.table, pd.DataFrame)
+
+
+class TestCharts:
+    """Each tool chooses the chart its rows are drawn as; the page draws it."""
+
+    def test_a_teams_seasons_are_a_line_of_net_rating(self, lab: Lab) -> None:
+        (chart,) = run(lab, "team_stats", team_id=BOS, season="2025-26", view="history").charts
+        assert (chart.kind, chart.x, chart.y, chart.metric) == (
+            "line",
+            "season",
+            "net_rating",
+            "net_rating",
+        )
+        assert list(chart.frame["season"]) == sorted(chart.frame["season"])
+        assert chart.reference == 0.0 and chart.frame["text"].iloc[-1] == "+8.3"
+
+    def test_a_players_season_is_percentile_bars(self, lab: Lab) -> None:
+        (chart,) = run(lab, "player_stats", player_id=TATUM, season="2025-26").charts
+        assert chart.kind == "percentiles" and chart.frame["percentile"].between(0, 100).all()
+
+    def test_players_compared_are_dots_on_one_scale(self, lab: Lab) -> None:
+        found = run(lab, "compare_players", player_ids=[TATUM, BROWN], season="2025-26")
+        (chart,) = found.charts
+        assert chart.kind == "comparison" and set(chart.frame["player_name"]) == {
+            "Jayson Tatum",
+            "Jaylen Brown",
+        }
+
+    def test_benchmarks_are_shares_with_their_intervals(self, lab: Lab) -> None:
+        found = run(lab, "historical_benchmarks", stage="won_championship", measure="wins_per_82")
+        (chart,) = found.charts
+        assert (chart.kind, chart.low, chart.high, chart.y_range) == (
+            "intervals",
+            "low",
+            "high",
+            (0.0, 1.0),
+        )
+        assert (chart.frame["low"] <= chart.frame["rate"]).all()
+        assert chart.frame["text"].str.contains(" of ").all()
+
+    def test_every_teams_rank_is_bars_of_net_rating(self, lab: Lab) -> None:
+        (chart,) = run(lab, "league_context", view="team_ranks", season="2025-26").charts
+        assert chart.kind == "bars" and len(chart.frame) == 30
+        assert chart.frame["net_rating"].is_monotonic_decreasing
+
+    def test_a_table_of_text_has_no_chart(self, lab: Lab) -> None:
+        assert run(lab, "team_stats", team_id=BOS, season="2025-26").charts == ()

@@ -3,6 +3,79 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone A3 - AI Research Assistant: the AI Research page (2026-10-10)
+
+The workbench asks. A new page in a new Ask group puts the assistant on screen: whether
+it can answer, a question in Quick or Deep mode, its steps as they come and a way to stop
+it, and every answer with what it rests on. No league table, model, setting or roster
+changed; nothing was refitted; the answer machinery of A2 is unchanged but for what the
+browser pass found.
+
+**Built**
+
+- **The facade** (`assistant/api.py`): `start` answers a question in a background
+  `Job` - its own thread and its own `Lab`, its steps readable while it runs, a stop taken
+  at the next step that keeps what was gathered, and the answer or the reason there is
+  none; `history` carries the last three answered turns; `status` says whether web search
+  is set up; `refresh_current` fetches by hand; `connect` and `tools_for` are where tests
+  put a scripted model and recorded tools.
+- **The page** (`apps/workbench/wb/views/research.py`): badges for the assistant, web
+  search and each current source; Quick or Deep; *New conversation*; *Fetch current
+  information*; the conversation, the session's only; for each answer its kind (supported,
+  qualified, not enough to answer, a question back, declined), its text, its notes and
+  limits, the kinds of number it rests on, each result in a tab with the chart its tool
+  chose and its rows in the catalogs' labels and formats with a CSV, the evidence with
+  every date, and how it was answered. A question back is answered by a click, which asks
+  again with the name settled. While a question runs, a fragment shows its steps and a
+  Stop button.
+- **Charts chosen by the tools** (`domain.assistant.Chart`, `assistant/lab_tools.py`): a
+  team's net rating and a player's points by season, a player's percentiles, players
+  compared, every team's net rating, a benchmark's shares with their 95% intervals. The
+  page draws them with `wb/charts.py` and declines one the house rules refuse.
+- **A "Reported" tag** beside measured, derived, estimate, modeled and your assumption:
+  the league's transactions and injury report, and pages on the web.
+- **Tests**: the facade's job (answered, stopped, offline, history, context); the page with
+  a scripted model (offline state, an answer with its tabs, chart and evidence, a question
+  back and the choice, a question stopped while under way, an answer that never came, a new
+  conversation and a refresh); each tool's chart; the page in every page test and in the
+  sweep (27 steps). Every UI test keeps the assistant offline unless it scripts a model.
+
+**The browser pass** - the workbench served over a scratch project with the real model,
+the user's search key and the live current sources, clicked through with Playwright in the
+light and the dark theme. It found what no test could, and each was fixed:
+
+- After the user chose Jaylen Brown, the model, told "Brown" is Jaylen Brown, looked
+  "Brown" up again and asked which one. The question the model reads now names him in
+  full; the page keeps the user's words.
+- A model wrote "2018-19: +4.3 (6th in the league)" from a table with no ranks, and the
+  checker let "6th" stand on another figure near 6. A place now stands only on a place.
+- Result tables showed `team_id`, `win_pct` and 0.6829; they now use the catalogs' labels
+  and formats and leave ids to the CSV. A tab's title was repeated under it; the controls
+  sat out of line.
+
+- A benchmark's bands printed as 5.000000 and 0.793451: a figure no catalog describes is
+  now written without a tail of zeros.
+
+**Decisions** - decision 0018's "Settled while building A3": a question runs in the
+background; the tool chooses the chart, not the model (a change from the specification,
+which had the model ask); opening the page fetches nothing; the conversation is the
+session's; outside text is shown as written. The user accepted both departures from the
+specification on 2026-10-10, and asked for their example key file to become the template:
+`.env.example`, the variable with no value and two lines on its use, checked to hold no
+key before it was committed.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Pass |
+| `pytest -n auto` (everything but live-network and live-model tests) | 3,536 passed in 5 min 4 s |
+| `pytest -m ollama` (the live model) | 6 passed |
+| The end-to-end evaluation, on the A3 code | 39/42, the same three model misses as A2; report generated |
+| The page in a browser | Clicked through twice with Playwright, light and dark, on a scratch copy of the database with the real model, the user's search key and the live current sources: asking, a question back and the choice, a chart, Deep mode and Stop (with a live web search), the evidence, a new conversation, a fetch by hand. No error box or exception on the page; every fault found is listed above and fixed. A screenshot is in the README. |
+| UI boundaries | The page imports `front_office.assistant.api` alone; the boundary tests pass |
+| Data | Nothing in the real `data/` was written: the browser pass ran over a copy |
+
 ## Milestone A2 - AI Research Assistant: tools, evidence, current data, the web (2026-10-09)
 
 The assistant answers: names resolved by code, the lab's data through typed tools, current

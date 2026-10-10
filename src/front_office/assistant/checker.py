@@ -88,6 +88,11 @@ class Figure:
     """The precision written: 0.1 for 8.3, 1,000,000 for $40M."""
     percent: bool
     signed: bool
+    ordinal: bool = False
+    """A place - 4th, 21st - which only a place can hold: a 6th is no 6.3."""
+
+
+ORDINAL = ("st", "nd", "rd", "th")
 
 
 def figures(text: str) -> list[Figure]:
@@ -103,16 +108,25 @@ def figures(text: str) -> list[Figure]:
         sign = match.group("sign")
         if sign in ("-", "−"):
             value = -value
+        place = not fraction and masked[match.end() : match.end() + 2].lower() in ORDINAL
         found.append(
             Figure(
-                match.group(0).strip(), value, step, bool(match.group("percent")), sign is not None
+                match.group(0).strip(),
+                value,
+                step,
+                bool(match.group("percent")),
+                sign is not None,
+                place,
             )
         )
     return found
 
 
 def supports(given: Figure, written: Figure) -> bool:
-    """Whether a figure the model was given holds one it wrote, at the written precision."""
+    """Whether a figure the model was given holds one it wrote, at the written precision.
+    A place stands only on a place: "6th in the league" needs a 6th among the results."""
+    if written.ordinal and not given.ordinal:
+        return False
     tolerance = written.step / 2 + 1e-9 * max(1.0, abs(written.value))
     candidates = [given.value]
     if given.percent and not written.percent:

@@ -47,10 +47,11 @@ def test_every_state_and_kind_has_a_word_an_icon_and_a_colour() -> None:
         components.ESTIMATE,
         components.MODELED,
         components.ASSUMPTION,
+        components.REPORTED,
     )
     assert set(components.PROVENANCE) == set(kinds)
     words = [components.PROVENANCE[kind][0] for kind in kinds]
-    assert words == ["Measured", "Derived", "Estimate", "Modeled", "Your assumption"]
+    assert words == ["Measured", "Derived", "Estimate", "Modeled", "Your assumption", "Reported"]
     assert len({components.PROVENANCE[kind][2] for kind in kinds}) == len(kinds)
 
 
