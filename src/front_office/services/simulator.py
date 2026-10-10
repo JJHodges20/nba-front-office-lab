@@ -18,7 +18,7 @@ import pandas as pd
 
 from front_office.config.models import load_simulator_model
 from front_office.domain.scenario import Scenario, SubjectKind
-from front_office.domain.simulator import SimulatorModel
+from front_office.domain.simulator import DevelopmentBand, SimulatorModel
 from front_office.domain.stages import BRACKET_STAGE_KEYS, stage
 from front_office.domain.tables.rosters import STARTING_SLOTS
 from front_office.modeling.postseason import probability_key
@@ -224,6 +224,20 @@ class SimulatorService:
         )
 
     # --- what there is to work with ------------------------------------------------------
+
+    def projection_miss(self, player_id: int) -> DevelopmentBand | None:
+        """How far the projections of players known as well as this one have missed: the
+        band of the measured misses that the player's projection reliability falls in.
+        ``None`` without a projection, its reliability or the simulator's parameters. The
+        value model is tested on teams; this is what the lab has measured of one player."""
+        model = self.model()
+        projections = self._lab.value.projections()
+        if model is None or int(player_id) not in projections.index:
+            return None
+        reliability = projections.at[int(player_id), "projection_reliability"]
+        if pd.isna(reliability):
+            return None
+        return model.band(float(reliability))
 
     def teams(self) -> pd.DataFrame:
         """Teams with a projected player for the season ahead, indexed by ``team_id``:

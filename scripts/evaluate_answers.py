@@ -63,14 +63,16 @@ from front_office.services import Lab  # noqa: E402
 CASES = ROOT / "tests" / "assistant" / "fixtures" / "cases.yaml"
 RESULTS = ROOT / "data" / "assistant" / "benchmarks"
 REPORT = ROOT / "docs" / "research" / "ASSISTANT_ANSWERS.md"
-MILESTONE = "A2"
+MILESTONE = "A4"
 
 
 def build_labs(where: Path) -> dict[str, Path]:
     """The case file's two databases: the fixture build, and the same with the tests'
-    invented contract file - the recipe of tests/conftest.py."""
+    invented contract file - the recipe of tests/conftest.py - each with the lab's own
+    documents beside it, for research_docs."""
     fixture = where / "fixture"
     shutil.copytree(ROOT / "configs", fixture / "configs")
+    shutil.copytree(ROOT / "docs", fixture / "docs")
     shutil.copytree(FIXTURE_RAW, fixture / "data" / "raw")
     moments = iter([BUILT_AT, BUILT_AT + BUILD_TOOK])
     if not build_database(load_settings(fixture), now=lambda: next(moments)).loaded:

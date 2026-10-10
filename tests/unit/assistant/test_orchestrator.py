@@ -4,8 +4,15 @@ from __future__ import annotations
 
 from datetime import date
 
+from front_office.assistant import checker
 from front_office.assistant.lab_tools import HANDLERS, Found
-from front_office.assistant.orchestrator import GO_AHEAD, NO_MORE_TOOLS, NO_SUCH_RESULT, Assistant
+from front_office.assistant.orchestrator import (
+    GO_AHEAD,
+    NO_MORE_TOOLS,
+    NO_SUCH_RESULT,
+    VERDICT_ASKED,
+    Assistant,
+)
 from front_office.assistant.toolbox import Toolbox
 from front_office.domain.assistant import (
     AssistantSettings,
@@ -73,7 +80,8 @@ def test_only_built_tools_are_offered_to_the_model(lab: Lab) -> None:
     ollama = ScriptedOllama(chats=[chat_chunks("Which season?")])
     ask(lab, ollama, "Tell me something.")
     offered = {tool["function"]["name"] for tool in ollama.chat_payloads[0]["tools"]}
-    assert "team_stats" in offered and "player_value" not in offered
+    assert {"team_stats", "player_value", "research_docs"} <= offered
+    assert "optimize_roster" not in offered, "built at A5"
 
 
 def test_an_invented_figure_is_sent_back_once(lab: Lab) -> None:
@@ -146,14 +154,61 @@ def test_quick_mode_stops_offering_tools_after_three_calls(lab: Lab) -> None:
 def test_a_tool_not_offered_is_refused_and_the_model_goes_on(lab: Lab) -> None:
     ollama = ScriptedOllama(
         chats=[
-            chat_chunks(tool_calls=[tool_call("player_value", view="season_leaders")]),
-            chat_chunks("The value model's tools are not available yet."),
+            chat_chunks(tool_calls=[tool_call("optimize_roster", budget_mode="salary_cap")]),
+            chat_chunks("The roster optimizer is not available yet."),
         ]
     )
-    answer = ask(lab, ollama, "Who does the value model rate highest?")
+    answer = ask(lab, ollama, "Find me the best roster under the cap.")
     (refused,) = answer.results
-    assert refused.status.value == "error" and "no tool called 'player_value'" in refused.text
+    assert refused.status.value == "error" and "no tool called 'optimize_roster'" in refused.text
     assert answer.outcome is Outcome.INSUFFICIENT
+
+
+def test_a_share_without_its_interval_is_sent_back_once(lab: Lab) -> None:
+    """A4 (B01, S02): a benchmark's share and a scenario's chances were given alone."""
+    bands = tool_call("historical_benchmarks", stage="won_championship", measure="wins_per_82")
+    ollama = ScriptedOllama(
+        chats=[
+            chat_chunks(tool_calls=[bands]),
+            chat_chunks("Of the teams that won 55 to 60 games, 0% won the title [r1]."),
+            chat_chunks("Of the teams that won 55 to 60 games, 0% won it, 95% interval [r1]."),
+        ]
+    )
+    answer = ask(lab, ollama, "How often did 55-win teams win the title?")
+    assert [step.kind for step in answer.steps].count("repair") == 1
+    assert "interval" in answer.text and checker.INTERVALS_IN_ROWS not in answer.warnings
+    stubborn = ScriptedOllama(
+        chats=[
+            chat_chunks(tool_calls=[bands]),
+            chat_chunks("Of the teams that won 55 to 60 games, 0% won the title [r1]."),
+            chat_chunks("Of the teams that won 55 to 60 games, 0% won the title [r1]."),
+        ]
+    )
+    kept = ask(lab, stubborn, "How often did 55-win teams win the title?")
+    assert kept.text.startswith("Of the teams") and checker.INTERVALS_IN_ROWS in kept.warnings
+
+
+def test_a_question_asking_for_a_verdict_gets_the_evidence_and_a_note(lab: Lab) -> None:
+    """A4 (V01): "are they a real contender?" was answered with the chances alone, rightly,
+    and nothing said of the verdict left out."""
+    outlook = tool_call("postseason_outlook", view="team", team_id=BOS, season="2025-26")
+    ollama = ScriptedOllama(
+        chats=[
+            chat_chunks(tool_calls=[outlook]),
+            chat_chunks("From their 2025-26 season, the model's chances are in [r1]."),
+        ]
+    )
+    answer = ask(lab, ollama, "Are the Celtics a real contender?")
+    assert answer.outcome is Outcome.QUALIFIED
+    assert VERDICT_ASKED in answer.warnings
+    plain = ScriptedOllama(
+        chats=[
+            chat_chunks(tool_calls=[outlook]),
+            chat_chunks("From their 2025-26 season, the model's chances are in [r1]."),
+        ]
+    )
+    asked = ask(lab, plain, "What were the Celtics' chances of each round?")
+    assert asked.outcome is Outcome.SUPPORTED and VERDICT_ASKED not in asked.warnings
 
 
 def test_earlier_turns_count_as_given(lab: Lab) -> None:
@@ -209,7 +264,10 @@ def test_the_lab_toolbox_offers_current_information_and_the_web(lab: Lab) -> Non
     assert {"current_games", "injury_report", "transactions", "web_search", "read_source"} <= set(
         handlers
     )
-    assert "player_value" not in handlers, "built at A4"
+    assert {"player_value", "roster_fit", "postseason_outlook", "simulate_scenario"} <= set(
+        handlers
+    )
+    assert "research_docs" in handlers and "optimize_roster" not in handlers, "built at A5"
 
 
 class Fixed:
@@ -288,6 +346,13 @@ def test_a_model_that_says_it_will_look_and_stops_is_asked_once_to_do_it(lab: La
 def test_a_refusal_that_says_the_lab_does_not_support_it_is_declined(lab: Lab) -> None:
     ollama = ScriptedOllama(chats=[chat_chunks("The lab does not support deleting rosters.")])
     answer = ask(lab, ollama, "Delete my roster called Test Roster.")
+    assert answer.outcome is Outcome.DECLINED
+
+
+def test_a_refusal_with_a_word_in_the_middle_is_declined(lab: Lab) -> None:
+    """A4 (F02): written in plainer words, "does not currently support" was missed."""
+    said = "The lab's optimizer does not currently support adding a bonus for chemistry."
+    answer = ask(lab, ScriptedOllama(chats=[chat_chunks(said)]), "Add a chemistry bonus.")
     assert answer.outcome is Outcome.DECLINED
 
 

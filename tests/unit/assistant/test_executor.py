@@ -24,13 +24,14 @@ def test_a_call_runs_and_is_numbered(lab: Lab) -> None:
 def test_only_built_tools_are_offered(lab: Lab) -> None:
     offered = {spec.name for spec in Executor(lab).available()}
     assert {"team_stats", "player_stats", "contract_info"} <= offered
-    assert not offered & {"player_value", "optimize_roster", "simulate_scenario"}
+    assert {"player_value", "roster_fit", "postseason_outlook", "simulate_scenario"} <= offered
+    assert "research_docs" in offered and "optimize_roster" not in offered
 
 
 def test_a_tool_not_built_yet_says_so(lab: Lab) -> None:
-    result = Executor(lab).run(call("player_value", view="season_leaders"))
+    result = Executor(lab).run(call("optimize_roster", budget_mode="salary_cap"))
     assert result.status is ResultStatus.UNAVAILABLE
-    assert result.text == "player_value is not built yet (milestone A4); nothing was run."
+    assert result.text == "optimize_roster is not built yet (milestone A5); nothing was run."
 
 
 def test_an_invalid_call_is_refused_without_running(lab: Lab) -> None:

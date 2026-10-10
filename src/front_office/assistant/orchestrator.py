@@ -50,11 +50,13 @@ NO_MORE_TOOLS = "No more tools can be called for this question. Answer now from 
 DECLINING = re.compile(
     r"\b(?:can(?:not|'t|’t)|unable|not able|won(?:'t|’t)|will not|do(?:n't|’t| not) have access|"
     r"not (?:allowed|permitted|supported)|outside what"
-    r"|do(?:es)?(?:n't|’t| not) (?:support|allow|permit|fetch|run|open|save|delete|access))\b",
+    r"|do(?:es)?(?:n't|’t| not)(?: \w+ly)? "
+    r"(?:support|allow|permit|fetch|run|open|save|delete|access))\b",
     re.IGNORECASE,
 )
 """Saying no: with nothing called, the answer is a refusal; beside results, part of the
-question went unanswered."""
+question went unanswered. An adverb may stand in the middle: at A4, written in plainer words,
+"does not currently support" was a refusal the pattern missed (F02)."""
 MISSING = re.compile(
     r"\bnot (?:directly )?(?:provided|available|included|given|held|recorded)\b"
     r"|\b(?:does|did|do)(?:n't|’t| not) (?:include|provide|contain|cover|track)\b"
@@ -62,6 +64,9 @@ MISSING = re.compile(
     re.IGNORECASE,
 )
 """Saying what the results lack: beside results, the answer is at most qualified."""
+VERDICT_ASKED = (
+    "The lab does not give verdicts or recommendations, so this answer gives the evidence instead."
+)
 PROMISE = re.compile(
     r"\b(?:let me|i(?:'ll|’ll| will| am going to|'m going to|’m going to))\s+"
     r"(?:now\s+)?(?:check|look|find|fetch|get|search|pull|see|retrieve|call)\b",
@@ -229,16 +234,21 @@ class Assistant:
         verdict = checker.check(draft, given)
         phrases = checker.wording(draft, resting_on)
         cited = checker.phantoms(draft, ids)
-        if not verdict.ok or phrases or cited:
+        bare = checker.bare_shares(draft, resting_on)
+        if not verdict.ok or phrases or cited or bare:
             problems = [f"unsupported figures: {verdict.listed}"] if not verdict.ok else []
             problems += (
                 [f"wording: {', '.join(item.phrase for item in phrases)}"] if phrases else []
             )
             problems += [f"cites what no tool returned: {', '.join(cited)}"] if cited else []
+            problems += ["shares or chances without their intervals"] if bare else []
             record(Step("repair", "; ".join(problems)))
             messages.append({"role": "assistant", "content": draft})
             messages.append(
-                {"role": "user", "content": checker.repair_note(verdict, phrases, cited)}
+                {
+                    "role": "user",
+                    "content": checker.repair_note(verdict, phrases, cited, bare=bare),
+                }
             )
             reply = self._chat(messages, [], mode)
             record(Step("model", _describe(reply), reply.wall_seconds))
@@ -258,8 +268,15 @@ class Assistant:
             if checker.phantoms(draft, ids):
                 draft, uncited = checker.cut_phantoms(draft, ids)
                 record(Step("check", f"removed for citing nothing: {', '.join(uncited)}"))
+        draft, repeats = checker.without_repeats(draft)
+        if repeats:
+            record(Step("check", f"removed {repeats} sentence(s) said again"))
         warnings = [warning for result in results if result.usable for warning in result.warnings]
         warnings += [limit for result in results if result.usable for limit in result.limits]
+        if checker.bare_shares(draft, resting_on):
+            # Still without them after the one repair: the shares stand, and the page says
+            # where their intervals are.
+            warnings.append(checker.INTERVALS_IN_ROWS)
         if removed:
             warnings.append(
                 f"{len(removed)} figure(s) were taken out because no result supports them: "
@@ -276,6 +293,14 @@ class Assistant:
         outcome = _outcome(
             results, draft, (*removed, *reworded, *uncited), late=self._clock() - started > seconds
         )
+        if results and checker.VERDICT.search(question):
+            # The question asks for what the lab never gives - a verdict, a signing, one best
+            # option (rule 5) - so an answer is the evidence without that part. At A4 a model
+            # answered "are they a real contender?" with the chances alone, rightly, and said
+            # nothing of the part it left out.
+            warnings.append(VERDICT_ASKED)
+            if outcome is Outcome.SUPPORTED:
+                outcome = Outcome.QUALIFIED
         if not results and outcome is not Outcome.DECLINED:
             warnings.append("No tool result supports this answer.")
         if not draft.strip():

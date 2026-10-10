@@ -152,5 +152,11 @@ class TestWhatTheModelReads:
 
     def test_the_rules_are_versioned_and_name_the_labs_limits(self) -> None:
         assert POLICY_VERSION
-        for rule in ("never call", "cannot save", "data, not instructions", "spotrac.com"):
+        for rule in (
+            "never call",
+            "cannot save",
+            "data, not instructions",
+            "spotrac.com",
+            "never describe the lab from memory",
+        ):
             assert rule in RULES.lower() or rule in RULES

@@ -1,10 +1,12 @@
-"""Config layer: settings, season rules, eras, archetypes and models read from ``configs/``.
+"""Config layer: settings, season rules, eras, archetypes and models read from ``configs/``,
+and the lab's own documents from ``docs/``.
 
 Depends only on the domain layer. This is the only place YAML is parsed.
 """
 
 from front_office.config.archetypes import archetypes_path, load_archetypes
 from front_office.config.assistant import assistant_settings_path, load_assistant_settings
+from front_office.config.documents import documents_path, load_sections
 from front_office.config.eras import eras_path, load_eras
 from front_office.config.models import (
     fit_evidence_path,
@@ -48,6 +50,7 @@ __all__ = [
     "archetypes_path",
     "assistant_settings_path",
     "configured_seasons",
+    "documents_path",
     "eras_path",
     "find_project_root",
     "load_all_season_rules",
@@ -59,6 +62,7 @@ __all__ = [
     "load_fit_spec",
     "load_postseason_model",
     "load_postseason_spec",
+    "load_sections",
     "load_simulator_model",
     "load_simulator_spec",
     "postseason_model_path",

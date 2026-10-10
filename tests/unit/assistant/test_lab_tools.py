@@ -152,6 +152,14 @@ class TestLeague:
         found = run(lab, "metric_definition", metric="true shooting")
         assert "| True shooting percentage | ts_pct |" in found.text
 
+    @pytest.mark.parametrize(
+        "written", ["winning_percentage", "Winning Percentage", "W%", "win_pct"]
+    )
+    def test_a_metric_written_any_way(self, lab: Lab, written: str) -> None:
+        """A4: a model asked for "winning_percentage", which is "Winning percentage"."""
+        found = run(lab, "metric_definition", metric=written)
+        assert "| Winning percentage | win_pct |" in found.text
+
 
 class TestContracts:
     def test_without_a_contract_file(self, lab: Lab) -> None:

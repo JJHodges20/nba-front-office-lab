@@ -66,6 +66,23 @@ DONE_FOR_THE_USER = re.compile(
 """A claim to have saved or changed something: the assistant cannot, and must not say so."""
 CHANCE_TOOLS = frozenset({"postseason_outlook", "simulate_scenario"})
 """The only tools whose results are chances (decisions 0009, 0014, 0015)."""
+ABOUT_CHANCES = CHANCE_TOOLS | {"research_docs"}
+"""The tools a chance word may rest on: the two that give chances, and the lab's documents,
+which describe them. At A4 an answer explaining the postseason model from its decision had
+"chances" cut."""
+INTERVAL_TOOLS = CHANCE_TOOLS | {"historical_benchmarks"}
+"""The tools whose shares come with intervals: a model's chance and a benchmark's frequency,
+which the rules give only with their intervals (rule 4)."""
+INTERVAL = re.compile(r"\binterval", re.IGNORECASE)
+WITH_INTERVALS = (
+    "Your answer gives percentages without their intervals. Write it again with each chance "
+    'or share followed by its interval as the result writes it - "X% (95% interval Y% to '
+    'Z%)" - as rule 4 asks, and keep everything else as it was.'
+)
+INTERVALS_IN_ROWS = (
+    "Some percentages above are given without their 95% interval; each interval is in the "
+    "table below."
+)
 FREQUENCY_NOT_CHANCE = (
     "only the postseason model and the simulator give a chance; a benchmark is how often "
     "past teams did something - say it as a count and a share"
@@ -210,7 +227,7 @@ def wording(answer: str, tools: Iterable[str]) -> tuple[Wording, ...]:
     """Phrases of ``answer`` that break the lab's language: a chance where no result is a
     chance, a verdict anywhere. ``tools`` are the tools whose results the answer rests on."""
     found = []
-    if not set(tools) & CHANCE_TOOLS:
+    if not set(tools) & ABOUT_CHANCES:
         found += [
             Wording(m.group(0), FREQUENCY_NOT_CHANCE)
             for m in CHANCE.finditer(answer)
@@ -221,7 +238,22 @@ def wording(answer: str, tools: Iterable[str]) -> tuple[Wording, ...]:
     return tuple(found)
 
 
-def repair_note(result: Check, phrases: Sequence[Wording] = (), cited: Sequence[str] = ()) -> str:
+def bare_shares(answer: str, tools: Iterable[str]) -> bool:
+    """Whether the answer gives a model's chance or a benchmark's share without its
+    interval: it rests on a tool whose shares come with one, states a percentage, and never
+    says "interval". At A4 answers gave the shares alone, though every row held them."""
+    if not set(tools) & INTERVAL_TOOLS or INTERVAL.search(answer):
+        return False
+    return any(figure.percent for figure in figures(answer))
+
+
+def repair_note(
+    result: Check,
+    phrases: Sequence[Wording] = (),
+    cited: Sequence[str] = (),
+    *,
+    bare: bool = False,
+) -> str:
     parts = []
     if cited:
         parts.append(
@@ -237,6 +269,8 @@ def repair_note(result: Check, phrases: Sequence[Wording] = (), cited: Sequence[
     for rule in dict.fromkeys(item.rule for item in phrases):
         said = ", ".join(dict.fromkeys(f'"{item.phrase}"' for item in phrases if item.rule == rule))
         parts.append(f"Do not write {said}: {rule}.")
+    if bare:
+        parts.append(WITH_INTERVALS)
     return " ".join(parts)
 
 
@@ -281,3 +315,30 @@ def cut(answer: str, given: Sequence[str]) -> tuple[str, tuple[str, ...]]:
             lines.append(" ".join(kept))
     text = "\n".join(lines).strip()
     return re.sub(r"\n{3,}", "\n\n", text), tuple(dict.fromkeys(removed))
+
+
+REPEATED = 40
+"""Characters a sentence needs before saying it again counts as a loop rather than an echo."""
+
+
+def without_repeats(answer: str) -> tuple[str, int]:
+    """The answer with every sentence said a second time taken out, and how many were. At A4
+    a model wrote one sentence over and over until its output ran out; a short phrase that
+    recurs - "No change." - is left alone. Lines are kept as lines."""
+    seen: set[str] = set()
+    dropped = 0
+    lines: list[str] = []
+    for line in answer.splitlines():
+        kept = []
+        for sentence in SENTENCE.split(line):
+            said = " ".join(sentence.split()).lower()
+            if len(said) >= REPEATED and said in seen:
+                dropped += 1
+                continue
+            seen.add(said)
+            kept.append(sentence.strip())
+        if kept or not line.strip():
+            lines.append(" ".join(item for item in kept if item))
+    if not dropped:
+        return answer, 0
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip(), dropped

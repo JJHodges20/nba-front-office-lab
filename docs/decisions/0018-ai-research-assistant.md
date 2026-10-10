@@ -191,3 +191,72 @@ the chart, and nothing fetched on opening the page - on 2026-10-10.
 - **Text from outside is shown as written.** A dollar sign in an answer is a dollar sign,
   not the start of a formula; an image in an answer is left out rather than fetched; a
   page's title or a step is escaped.
+
+## Settled while building A4 (2026-10-10)
+
+- **Every modeled figure goes out with what the lab knows of its error, and nothing new is
+  computed to supply one.** A chance carries its 95% interval from the postseason model's
+  kept draws, and the season model's record on team-seasons it had not seen, read both ways
+  - with each season's own rating and from the rating predicted before it (decision 0014).
+  A scenario carries the interval of the seasons drawn and the wins test's coverage. A
+  player's projection has no tested interval of its own: the value model is tested on
+  teams. The tool says so, and gives what the lab has measured instead - how far
+  projections of players that well known have missed (the simulator's bands) - and the
+  value model's error on a team with the minutes projected. An interval for one player
+  would be a new claim, and it would have to earn its place out of sample first.
+- **Fit is a limit, not a figure.** While the fit evidence is not usable, a profile is
+  description and its result carries the limit that there is no fit score and no
+  correction, so an answer resting on it is qualified and says why.
+- **A scenario takes each player's current team** (the user's decision at the A4 review,
+  2026-10-10). A question about the season ahead, or one naming no season, means the
+  rosters as they stand: a scenario that removes, or assumes something of, a player who is
+  not on that team's roster is an error - nothing is simulated, and the result names the
+  player, the season and the team they are with, with its id. A question looking back at a
+  season already played is answered from that season's figures; the simulator only looks
+  ahead. (The fixture's 2026-27 rosters have Jaylen Brown traded to Philadelphia, which is
+  what S01 asks about; the case was changed to expect the error.)
+- **Plain words on screen** (the user's standing wish, 2026-10-10). The tools' texts, the
+  notes an answer carries and the page's own words are written for someone who is not a
+  statistician, and rule 13 (rules `2026-10-10.3`) asks the model for short sentences and
+  everyday words, keeping a term such as net rating or interval where it is needed.
+- **A roster id is checked like a player's or a team's.** The executor refuses a saved
+  roster the lab does not hold, listing those it does, before anything runs.
+- **The document index is built for each search, in memory.** About three hundred sections
+  index in a few hundredths of a second, so an edited document is found as it now reads and
+  no index file can go stale. A section is searched in passages of whole paragraphs, so a
+  long one is not found for holding every word somewhere, and returned once, with its best
+  passage. The question's common words and asking verbs ("how does it decide") are left
+  out, the rest are matched on their stems, and nothing in a query is read as search
+  syntax. The metric glossary and the data dictionary are left out: they are generated
+  from the catalogs `metric_definition` reads, and as text their tables hold the words of
+  almost any question. The assistant's recorded answers are left out so that it cannot cite
+  itself. A section is cited by file and heading - the `docs` kind of evidence - which is
+  what the case file's `source` means by "a document path".
+- **What the evaluation runs settled** (each a fix to the assistant, none to a case):
+  - *How the lab works is never from memory.* Rule 12 (rules `2026-10-10.1`): how a figure
+    is computed, how a tool or model decides, how a model was tested and why something was
+    chosen come from `research_docs` or a model's evidence. A model had described the
+    optimizer from its own imagination.
+  - *A question is given the meaning it can only have.* The team view asked about "a team
+    with a +5.0 net rating" and no team reads it as a team of that strength; the team view
+    asked about the season ahead draws it with the simulator, as `simulate_scenario` would,
+    rather than finding no season; a player id with a value view that reads no player, and
+    a view or season sent to `data_status`, are dropped rather than refused. Each was a
+    model's call that made the answer fail for want of a meaning that was never in doubt.
+  - *A figure the services have is given, not left to arithmetic.* A scenario shows the
+    service's change beside before and after; a model that subtracted for itself had the
+    difference cut. Every range says what it is ("80% interval", "95% interval").
+  - *A question asking for a verdict gets a qualified answer and a note.* Rule 5 forbids
+    verdicts in the answer; when the question asks for one ("a real contender", "should
+    sign", "the best roster"), code marks the answer qualified and says the lab gives the
+    evidence instead, rather than trusting the model to say what it left out.
+  - *The documents may describe chances.* A chance word in an answer must rest on a chance
+    - the postseason model's or the simulator's - or on the lab's documents, which describe
+    them. A frequency from the benchmarks is still never a chance.
+  - *A share goes with its interval.* An answer resting on a benchmark, the postseason
+    model or the simulator that states a percentage and never says "interval" is sent back
+    once, with the other repairs, to give each with its interval (rule 4); if the rewrite
+    still leaves them out, it stands and the page says the intervals are in the rows.
+  - *An answer that loops is cut back to saying each sentence once.* A model wrote the same
+    sentence until its output ran out; a sentence of forty characters or more said again is
+    taken out, and the step says so.

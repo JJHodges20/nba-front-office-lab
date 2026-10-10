@@ -390,8 +390,11 @@ def _cited(need: str, answer: Answer) -> bool:
     if need == "as_of":
         return any(item.kind is EvidenceKind.CONTRACTS and item.effective_at for item in evidence)
     if need == "source":
+        # "A dated link or document path" (the case file's header): an outside source, or a
+        # section of the lab's own documents (A4).
         return any(
-            item.kind in (EvidenceKind.CURRENT, EvidenceKind.WEB) and item.location
+            item.kind in (EvidenceKind.CURRENT, EvidenceKind.WEB, EvidenceKind.DOCS)
+            and item.location
             for item in evidence
         )
     if need == "model":

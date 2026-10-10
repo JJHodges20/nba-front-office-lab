@@ -512,7 +512,14 @@ cases:
         - {call: value.projections, row: 1628401, column: projected_impact, value: 2.68, tolerance: 0.005}
         - {call: value.projections, row: 1628401, column: projected_wins, value: 5.09, tolerance: 0.005}
         - {call: value.status, path: upcoming, value: "2026-27"}
-      cite: [model, interval]
+        # How far projections of players known this well have typically missed: what the lab
+        # has of one player's uncertainty (added with the change below).
+        - {call: simulator.projection_miss, args: {player_id: 1628401}, path: spread, value: 1.12, tolerance: 0.005}
+      # Changed 2026-10-10 by the user's decision (A4 review): the value model is tested on
+      # teams, so there is no tested interval for one player's projection, and the answer
+      # gives the typical miss above instead; the case no longer asks for the word
+      # "interval". Was: cite [model, interval].
+      cite: [model]
 
   # --- fit is description ---------------------------------------------------------------
   - id: F01
@@ -850,10 +857,19 @@ cases:
     turns:
       - user: "What happens to the Celtics' 2026-27 season if Jaylen Brown misses 30 games?"
     expect:
-      outcome: supported
+      # Changed 2026-10-10 by the user's decision (A4 review): the fixture's 2026-27 rosters,
+      # real league responses, have Jaylen Brown traded to Philadelphia on 2026-07-06. A
+      # question about the season ahead, or naming no season, takes each player's current
+      # team, so a scenario that assumes something of a player not on that team is an error:
+      # nothing is simulated and the answer says where the player is. Looking back at
+      # 2025-26 is answered from that season's figures. Was: outcome supported, cite
+      # [model, interval].
+      outcome: insufficient
       first_call:
         - {tool: simulate_scenario, args: {subject: team, subject_id: 1610612738}}
-      cite: [model, interval]
+      facts:
+        - {call: value.projections, row: 1627759, column: team_name, value: "Philadelphia 76ers"}
+      cite: [build]
 
   - id: S02
     category: scenarios

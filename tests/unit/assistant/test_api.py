@@ -131,6 +131,7 @@ def test_the_context_says_where_the_season_and_the_data_stand(built_readonly: Se
         context = api.context_for(lab, QUESTION, date(2026, 10, 9))
     assert context.calendar.startswith("2026-27 league year; none of its games played yet")
     assert context.data.startswith("data build 1 of 2026-10-01; team statistics 1996-97 to 2025-26")
+    assert "; the models project 2026-27;" in context.data
     assert context.data.endswith("no contract file.")
     assert (context.season, context.mode) == ("2025-26", Mode.QUICK)
 

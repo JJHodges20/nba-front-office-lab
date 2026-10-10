@@ -244,6 +244,24 @@ class TestScoringAnswers:
         )
         assert scored.missing_cites == ("build", "nba")
 
+    def test_a_section_of_the_labs_documents_is_a_source(self) -> None:
+        """The case file's "source": a dated link or a document path (A4)."""
+        section = Evidence(
+            EvidenceKind.DOCS,
+            "0013 - The optimizer › Decision",
+            location="docs/decisions/0013-roster-optimizer.md#decision",
+        )
+        scored = score_answer(
+            case("M01"),
+            answer(
+                "M01",
+                "It maximises the sum of the parts and returns several rosters [r1].",
+                Outcome.SUPPORTED,
+                ("research_docs", {"query": "roster optimizer"}, (section,)),
+            ),
+        )
+        assert scored.passed and not scored.missing_cites
+
     def test_a_refusal_is_the_declined_outcome(self) -> None:
         scored = score_answer(case("X01"), answer("X01", "I can't run SQL.", Outcome.DECLINED))
         assert scored.passed and scored.calls == ()

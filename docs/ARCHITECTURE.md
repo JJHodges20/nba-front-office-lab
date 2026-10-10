@@ -30,11 +30,11 @@ it, and nothing else in the project (decision
 | Layer | Responsibility | May import |
 | --- | --- | --- |
 | `domain` | Shared vocabulary: seasons, cap-rule models, data contracts. Pure, no I/O. | nothing |
-| `config` | Settings, season rules, eras and model files read from `configs/`. The only place YAML is parsed. | `domain` |
+| `config` | Settings, season rules, eras and model files read from `configs/`, and the lab's own documents from `docs/` for the assistant's search. The only place YAML is parsed. | `domain` |
 | `providers` | Adapters that retrieve data from external sources and return it unchanged. The only layer that touches the network. | `domain` |
 | `rawstore` | Immutable, timestamped snapshots of what providers returned. | `domain` |
 | `processing` | Pure functions that turn raw payloads into frames satisfying a data contract. | `domain` |
-| `storage` | Database schema (built from the data contracts) and repositories. The only layer that writes SQL. | `domain` |
+| `storage` | Database schema (built from the data contracts), repositories, and the in-memory search over the lab's documents. The only layer that writes SQL. | `domain` |
 | `quality` | Data-quality checks. They report problems; they never repair data. | `domain` |
 | `analytics` | Every formula. Pure functions over frames. | `domain` |
 | `modeling` | Estimates fitted to the lab's own data and tested out of sample. Pure functions over frames. | `domain`, `analytics` |
@@ -369,6 +369,9 @@ a question:  domain.assistant.Context (sidebar, resolved names, sources)
                 -> assistant.executor: the call checked (routing), its ids checked
                    against the lab, its handler run:
                      assistant.lab_tools      -> services
+                     assistant.model_tools    -> services (value, fit, postseason, simulator)
+                     assistant.document_tools -> services.documents -> config.documents
+                                                 (docs/) + storage.documents (FTS5, in memory)
                      assistant.current_tools  -> pipelines.current (when due) -> services.current
                      assistant.web_tools      -> providers.web (search) | pipelines.web (a page)
                 -> each result back to the model, quoted as data
@@ -431,6 +434,15 @@ figures); the page draws them with `wb/charts.py` under the house rules and writ
 rows in the metric catalogs' labels and formats. Page tests never reach Ollama or the
 network: `tests/ui/conftest.py` puts an offline model, the lab's own tools and a refresh
 that fetches nothing behind the facade, and a test that needs answers scripts a model.
+
+From A4 the assistant reads the fitted models. `assistant/model_tools.py` calls the value,
+fit, postseason and simulator services and nothing else: it fits nothing, and gives every
+modeled figure with the error the lab measured for it and the model files it read, by
+revision. `assistant/document_tools.py` searches the lab's documents: `config/documents.py`
+reads the Markdown under `docs/` and cuts it at its headings (`domain/documents.py`), and
+`storage/documents.py` indexes the sections with SQLite's FTS5 in memory for each search
+- SQL stays in `storage` - so no index file exists to go stale. `assistant/toolbox.py` holds every handler that needs only the lab
+(`LAB_HANDLERS`), which the executor runs by default.
 See [AI_ASSISTANT_SPEC.md](AI_ASSISTANT_SPEC.md) and [AI_EVALUATION.md](AI_EVALUATION.md).
 
 ## Conventions

@@ -1,10 +1,11 @@
 """AI Research: ask the lab in plain words, and see what every answer rests on.
 
-A local model answers from the lab's tools (decision 0018): the lab's data, what has
-happened since the build, and pages on the web. Every figure in an answer was checked
-against the results before it is shown. Under each answer the page draws what it rests on:
-each result's rows, a chart where the tool chose one, and the evidence - sources, dates,
-the build. The conversation lasts as long as this browser tab, and nothing is saved.
+A local model answers from the lab's tools (decision 0018): the lab's data, its fitted
+models and its own documents, what has happened since the build, and pages on the web.
+Every figure in an answer was checked against the results before it is shown. Under each
+answer the page draws what it rests on: each result's rows, a chart where the tool chose
+one, and the evidence - sources, dates, the build, the model files. The conversation lasts
+as long as this browser tab, and nothing is saved.
 
 A question runs in the background (``assistant.api.Job``): the page shows its steps as
 they come, and can stop it, keeping what was gathered by then.
@@ -35,7 +36,7 @@ from front_office.domain.assistant import (
 from front_office.domain.metrics import MetricSpec
 from front_office.services import METRIC_CATALOGS, CurrentSource
 from wb import charts, components, data, formats, state
-from wb.components import DERIVED, ESTIMATE, MEASURED, REPORTED
+from wb.components import ASSUMPTION, DERIVED, ESTIMATE, MEASURED, MODELED, REPORTED
 from wb.theme import Palette
 
 TURNS = "ai_turns"
@@ -48,16 +49,17 @@ TAB_LABEL = 38
 """Characters of a result's title on its tab."""
 
 SUBTITLE = (
-    "Ask in plain words. A model on this machine answers from the lab's data, what has "
-    "happened since the last build, and pages on the web; every figure it gives is checked "
-    "against those results before it is shown. The conversation lasts until this tab is "
-    "closed or reloaded, and nothing is saved."
+    "Ask a question in your own words. An AI model running on this computer answers from the "
+    "lab's data, models and documents, the latest league news, and the web. Every number it "
+    "gives is checked against those sources before you see it. The conversation lasts until "
+    "you close or reload this tab, and nothing is saved."
 )
-PROMPT = "Ask about players, teams, seasons, recent games, injuries, moves or reporting"
+PROMPT = "Ask about players, teams, seasons, forecasts, recent games, injuries, trades or news"
 MODES = {Mode.QUICK.value: "Quick", Mode.DEEP.value: "Deep"}
 MODE_HELP = (
-    "Quick: one fact or one comparison - up to 3 tool calls and 90 seconds. Deep: several "
-    "sources or a longer look - up to 12 calls and 5 minutes, with the model thinking first."
+    "Quick: for one fact or one comparison - up to 3 lookups and about 90 seconds. Deep: for "
+    "a longer look at several sources - up to 12 lookups and 5 minutes, thinking it through "
+    "first."
 )
 READINESS = {
     api.AssistantState.READY: ("Ready", ":material/check_circle:", "green"),
@@ -75,32 +77,33 @@ OUTCOMES = {
         "Supported",
         ":material/verified:",
         "green",
-        "Answered from the results; every figure checked.",
+        "Answered from the lab's results; every number was checked.",
     ),
     Outcome.QUALIFIED: (
-        "Qualified",
+        "Partly answered",
         ":material/info:",
         "orange",
-        "Partly answered: what is missing, limited, stale or estimated is said.",
+        "Part of the question could not be answered, or comes with a caveat: the notes say which.",
     ),
     Outcome.INSUFFICIENT: (
         "Not enough to answer",
         ":material/help:",
         "gray",
-        "Nothing in the results answers it. What is missing is said; nothing is invented.",
+        "The lab's results do not answer this. The answer says what is missing and makes "
+        "nothing up.",
     ),
     Outcome.CLARIFY: (
         "Question back",
         ":material/contact_support:",
         "blue",
-        "A name in the question has several readings: choose the one you mean.",
+        "A name could mean more than one player, team or season: pick the one you mean.",
     ),
     Outcome.DECLINED: (
         "Declined",
         ":material/block:",
         "gray",
-        "Something the assistant does not do: run SQL or code, open files, save or change "
-        "anything, refit a model.",
+        "Something the assistant does not do: run code or database queries, open files, save "
+        "or change anything, or refit a model.",
     ),
 }
 STEPS = {
@@ -116,11 +119,13 @@ EVIDENCE = {
     EvidenceKind.CONTRACTS: "Your contract file",
     EvidenceKind.CURRENT: "Current information",
     EvidenceKind.WEB: "The web",
+    EvidenceKind.DOCS: "The lab's documents",
 }
 EXAMPLES = (
     "What was the Celtics' net rating in 2025-26, and where did it rank?",
     "Compare Jalen Brunson and Jaylen Brown this season.",
     "How often have teams that won 55 to 60 games won the championship?",
+    "What would a team with a +5 net rating expect in the playoffs?",
     "Have the Knicks made any moves since the start of October?",
     "Search the web for reporting on the Knicks' preseason.",
 )
@@ -132,7 +137,11 @@ def render() -> None:
     filters = state.current()
     _finish()
     status = data.assistant_status(filters.build)
-    components.header("AI Research", SUBTITLE, kinds=[MEASURED, DERIVED, ESTIMATE, REPORTED])
+    components.header(
+        "AI Research",
+        SUBTITLE,
+        kinds=[MEASURED, DERIVED, ESTIMATE, MODELED, ASSUMPTION, REPORTED],
+    )
     _status(status)
     turns: list[api.Turn] = st.session_state.setdefault(TURNS, [])
     job: api.Job | None = st.session_state.get(JOB)
@@ -233,9 +242,9 @@ def _controls(turns: list[api.Turn], *, busy: bool) -> None:
 def _welcome(status: api.AssistantStatus) -> None:
     examples = "\n".join(f"- {_escaped(example)}" for example in EXAMPLES)
     body = (
-        "Names, seasons and teams are read from the question, and the sidebar's season and "
-        "team stand in where it names none. A name that could be several players is asked "
-        "about before anything runs.\n\nFor example:\n" + examples
+        "The assistant reads names, seasons and teams from your question; where you name none, "
+        "it uses the season and team chosen in the sidebar. If a name could mean more than one "
+        "player, it asks which one first.\n\nFor example:\n" + examples
     )
     with st.container(border=True):
         st.markdown(":material/forum: **Ask a question**")
@@ -359,7 +368,7 @@ def _results(number: int, answer: Answer) -> None:
     shown = [result for result in answer.results if _has_rows(result)]
     if not shown:
         return
-    st.markdown("**What it rests on**")
+    st.markdown("**Where this answer comes from**")
     tabs = st.tabs([_tab_label(result) for result in shown])
     for tab, result in zip(tabs, shown, strict=True):
         with tab:
@@ -493,15 +502,41 @@ def _figure(chart: Chart, palette: Palette, tickformat: str) -> go.Figure:
             palette=palette,
             value_title=chart.y_title,
             tickformat=tickformat,
+            reference=chart.reference,
+            reference_label=chart.reference_label,
             axis_range=chart.y_range,
         )
     if chart.kind == "percentiles":
+        # A tool names the axis when higher is not better - a roster's fit measures (A4).
+        titled = {"axis_title": chart.y_title} if chart.y_title else {}
         return charts.percentile_bars(
-            frame, percentile=chart.y, label=chart.x, text=chart.text, palette=palette
+            frame, percentile=chart.y, label=chart.x, text=chart.text, palette=palette, **titled
         )
     assert chart.who is not None
+    if chart.y_range is None:
+        return charts.comparison_dots(
+            frame,
+            metric=chart.x,
+            who=chart.who,
+            percentile=chart.y,
+            text=chart.text,
+            palette=palette,
+        )
+    # Not a percentile but a share with natural ends - a chance before and after a change.
+    low, high = chart.y_range
+    margin = (high - low) * 0.02
     return charts.comparison_dots(
-        frame, metric=chart.x, who=chart.who, percentile=chart.y, text=chart.text, palette=palette
+        frame,
+        metric=chart.x,
+        who=chart.who,
+        percentile=chart.y,
+        text=chart.text,
+        palette=palette,
+        axis_title=chart.y_title,
+        axis_range=(low - margin, high + margin),
+        tickvals=None,
+        tickformat=tickformat,
+        reference=chart.reference,
     )
 
 

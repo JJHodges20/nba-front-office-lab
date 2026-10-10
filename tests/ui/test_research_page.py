@@ -17,7 +17,7 @@ from streamlit.testing.v1 import AppTest
 
 import front_office.assistant.api as api
 from front_office.providers.ollama import OllamaProvider, OllamaUnavailable
-from tests.helpers import BOS, BROWN
+from tests.helpers import BOS, BROWN, WHITE
 from tests.ollama_fakes import ScriptedOllama, chat_chunks, tool_call
 from tests.ui.conftest import drawn, texts
 from wb.views import research
@@ -103,6 +103,37 @@ def test_an_answer_shows_its_outcome_its_rows_its_chart_and_its_evidence(
     folded = [block.label for block in app.status]
     assert "Evidence: 1 source" in folded and "How it was answered" in folded
     assert len(app.dataframe) >= 1
+
+
+def test_a_scenario_shows_its_chances_before_and_after_and_the_model_files(
+    model, page, plain_home: Path
+) -> None:
+    missing = tool_call(
+        "simulate_scenario",
+        subject="team",
+        subject_id=BOS,
+        player_assumptions=[{"player_id": WHITE, "games_missed": 30}],
+    )
+    model(
+        ScriptedOllama(
+            chats=[
+                chat_chunks(tool_calls=[missing]),
+                chat_chunks("With Derrick White missing 30 games the chances move [r1]."),
+            ]
+        )
+    )
+    app = ask(page(plain_home, "research"), "What if Derrick White misses 30 games?")
+    (turn,) = app.session_state["ai_turns"]
+    assert turn.answer is not None and turn.answer.outcome.value == "supported"
+    said = texts(app)
+    assert "Modeled" in said and "Your assumption" in said, "the header names both kinds"
+    figure = drawn(app)["ai_chart_0_r1_0"]
+    assert {trace.name for trace in figure.data} == {"Before", "After"}
+    chances = [value for trace in figure.data for value in trace.x]
+    assert all(0 <= value <= 1 for value in chances), "a chance's own axis, not a percentile's"
+    assert figure.layout.xaxis.tickformat == ".0%"
+    labels = {item.label for item in turn.answer.evidence}
+    assert any(label.startswith("Simulator parameters, revision") for label in labels)
 
 
 def test_a_name_with_two_readings_is_asked_about_and_the_choice_asks_again(

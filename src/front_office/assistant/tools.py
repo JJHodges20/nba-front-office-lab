@@ -67,7 +67,9 @@ class ResolveEntities(ToolArgs):
 
 
 class DataStatus(ToolArgs):
-    pass
+    # It takes nothing. At A4 a model sent it a view, and then a season; they are ignored
+    # rather than refused, as the call means the same without them.
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
 
 class PlayerStats(ToolArgs):
@@ -134,6 +136,10 @@ class ContractInfo(ToolArgs):
     team_id: int | None = None
 
 
+PLAYERLESS_VALUE_VIEWS = frozenset({"season_leaders", "value_for_money", "model_evidence"})
+"""The value views that read no single player."""
+
+
 class PlayerValue(ToolArgs):
     view: Literal[
         "player",
@@ -143,9 +149,25 @@ class PlayerValue(ToolArgs):
         "roles",
         "value_for_money",
         "model_evidence",
-    ]
+    ] = Field(
+        description="player: one player's value by season and projection (player_id); "
+        "season_leaders: the most valuable players of a season; projections: next season's "
+        "(player_id for one player); breakdown: where a player's impact comes from "
+        "(player_id, season); roles: the roles players fill and how often they carry over; "
+        "value_for_money: salaries against value; model_evidence: how accurate the value "
+        "model was on seasons it had not seen, against simpler methods."
+    )
     player_id: int | None = None
     season: Season | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _no_player_where_none_is_read(cls, data: Any) -> Any:
+        # At A4 a model sent player_id 0 with model_evidence: an id a view does not read
+        # is dropped, rather than refused as a player the lab does not hold.
+        if isinstance(data, Mapping) and data.get("view") in PLAYERLESS_VALUE_VIEWS:
+            return {key: value for key, value in data.items() if key != "player_id"}
+        return data
 
 
 class RosterFit(ToolArgs):
@@ -157,10 +179,12 @@ class RosterFit(ToolArgs):
 
 class PostseasonOutlook(ToolArgs):
     view: Literal["team", "roster", "strength", "bracket", "season_odds", "model_record"] = Field(
-        description="team: one team in a season (team_id, season); roster: a built roster "
-        "(roster_id); strength: any team of a net rating (net_rating); bracket: a season's "
-        "playoff teams; season_odds: every team of a season; model_record: how the model "
-        "did on seasons it had not seen."
+        description="team: a real team in a season (team_id, season; the season ahead is "
+        "drawn by the simulator); roster: a built roster (roster_id); strength: a "
+        "hypothetical team of any net rating (net_rating) - the model reads net rating, not "
+        "wins: for a team known by its record, historical_benchmarks with wins_per_82; "
+        "bracket: a decided season's playoff teams; season_odds: every team of a season; "
+        "model_record: how the postseason model did on seasons it had not seen."
     )
     team_id: int | None = None
     season: Season | None = None
@@ -272,17 +296,17 @@ REGISTRY: tuple[ToolSpec, ...] = (
     ToolSpec("historical_benchmarks", "How often past teams in each band of a measure reached a playoff stage: frequencies with counts and intervals, not chances.", HistoricalBenchmarks, R, "A2"),
     ToolSpec("metric_definition", "What a metric means, its unit and where it comes from.", MetricDefinition, R, "A2"),
     ToolSpec("contract_info", "Salaries and payrolls from the user's contract file, with its date: a player's salary by season; a team's payroll against the cap, the tax line and the aprons; every team's payroll; the cap rules.", ContractInfo, R, "A2"),
-    ToolSpec("player_value", "The value model: a player's impact and wins, season leaders, projections for next season, roles, value for money, the model's tested error.", PlayerValue, R, "A4"),
+    ToolSpec("player_value", "The player value model: a player's impact and wins by season and next season's projection, a season's leaders, where an impact comes from, roles, value for money, and how accurate the model was on seasons it had not seen.", PlayerValue, R, "A4"),
     ToolSpec("roster_fit", "How a team's or built roster's players fit together, as description; the evidence on whether fit predicts anything.", RosterFit, R, "A4"),
-    ToolSpec("postseason_outlook", "The postseason model's chance of each playoff stage, with intervals, for a team, a built roster or a net rating; its record.", PostseasonOutlook, R, "A4"),
+    ToolSpec("postseason_outlook", "The postseason model's chance of each playoff stage, with intervals: a real team's season, a built roster, or a hypothetical team of any net rating; every team of a season; the model's record.", PostseasonOutlook, R, "A4"),
     ToolSpec("simulate_scenario", "Simulate next season for a team or built roster, before and after changes the user assumes.", SimulateScenario, C, "A4"),
     ToolSpec("optimize_roster", "Find several distinct hypothetical rosters under a payroll budget and role requirements.", OptimizeRoster, C, "A5"),
     ToolSpec("current_games", "Recently completed games, newer than the lab's data build.", CurrentGames, N, "A2"),
     ToolSpec("injury_report", "The league's official injury report, with its time.", InjuryReport, N, "A2"),
-    ToolSpec("transactions", "Signings, trades and waivers announced by the league, with dates.", Transactions, N, "A2"),
+    ToolSpec("transactions", "Signings, trades and waivers announced by the league, with dates: what has changed on a roster since the lab's build.", Transactions, N, "A2"),
     ToolSpec("web_search", "Search the web for reporting; returns sources with ids.", WebSearch, N, "A2"),
     ToolSpec("read_source", "Read one source by its id: a search result, a feed item or a link the user pasted.", ReadSource, N, "A2"),
-    ToolSpec("research_docs", "Search the lab's own documentation and research for how something is computed or was tested.", ResearchDocs, R, "A4"),
+    ToolSpec("research_docs", "Search the lab's own documentation and research: how a figure is computed, how a tool or model works and was tested, why something was decided.", ResearchDocs, R, "A4"),
 )  # fmt: skip
 
 BY_NAME: Mapping[str, ToolSpec] = {spec.name: spec for spec in REGISTRY}

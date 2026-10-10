@@ -298,6 +298,10 @@ def context_for(lab: Lab, question: Question, today: date) -> Context:
         data += f"; team statistics {status.team_seasons[-1]} to {status.team_seasons[0]}"
     if status.player_seasons:
         data += f"; player statistics {status.player_seasons[-1]} to {status.player_seasons[0]}"
+    upcoming = lab.value.status().upcoming if status.is_built else None
+    if upcoming is not None:
+        # "Next season" is the one the models look ahead to (A4).
+        data += f"; the models project {upcoming}"
     data += (
         f"; contract file as of {status.contract_as_of:%Y-%m-%d}"
         if status.has_contracts and status.contract_as_of

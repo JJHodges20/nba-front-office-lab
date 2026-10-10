@@ -201,6 +201,8 @@ class EvidenceKind(StrEnum):
     """Current information fetched from the league since the build: games, injuries, moves."""
     WEB = "web"
     """A page, a search result or a link the user pasted: reporting, not the lab's data."""
+    DOCS = "docs"
+    """The lab's own documentation and research: a file and the heading of a section."""
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,9 +1,9 @@
 """Running a checked tool call: its handler, the ids it names, its result.
 
 The executor is where a model's request meets the lab (decision 0018). A call must name a
-registered tool with arguments that validate (``routing.check``); every player and team id
-it names must be one the lab holds - the A1 benchmark saw a model invent ``team_id: 1`` -
-and a tool whose handler is not built yet says so. A handler's failure becomes a result
+registered tool with arguments that validate (``routing.check``); every player, team and
+saved roster it names must be one the lab holds - the A1 benchmark saw a model invent
+``team_id: 1`` - and a tool whose handler is not built yet says so. A handler's failure becomes a result
 that says what went wrong, never an exception in the conversation. The text the model reads
 is bounded; the rows behind it are kept whole for the page.
 """
@@ -14,8 +14,9 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from typing import Any
 
-from front_office.assistant.lab_tools import HANDLERS, Found, lab_evidence
+from front_office.assistant.lab_tools import Found, lab_evidence
 from front_office.assistant.routing import Call
+from front_office.assistant.toolbox import LAB_HANDLERS
 from front_office.assistant.tools import BY_NAME, REGISTRY, Permission, ToolArgs, ToolSpec
 from front_office.domain.assistant import ResultStatus, ToolResult
 from front_office.services import Lab, LabNotBuilt
@@ -32,6 +33,7 @@ PLAYER_FIELDS = (
     "exclude_player_ids",
 )
 TEAM_FIELDS = ("team_id",)
+ROSTER = "roster"
 READ = Permission.READ
 
 Handler = Callable[[Lab, Any], Found]
@@ -48,7 +50,7 @@ class Executor:
         max_characters: int = MAX_CHARACTERS,
     ) -> None:
         self._lab = lab
-        self._handlers = dict(HANDLERS if handlers is None else handlers)
+        self._handlers = dict(LAB_HANDLERS if handlers is None else handlers)
         self._max = max_characters
         self._count = 0
         self._players: set[int] | None = None
@@ -124,12 +126,27 @@ class Executor:
         players = [
             int(value) for name in PLAYER_FIELDS for value in _as_list(getattr(args, name, None))
         ]
+        players += [int(item.player_id) for item in getattr(args, "player_assumptions", ())]
         teams = [
             int(value) for name in TEAM_FIELDS for value in _as_list(getattr(args, name, None))
         ]
+        rosters = [int(value) for value in _as_list(getattr(args, "roster_id", None))]
         subject = getattr(args, "subject", None)
-        if subject == "team" and getattr(args, "subject_id", None) is not None:
-            teams.append(int(args.subject_id))  # type: ignore[attr-defined]
+        if getattr(args, "subject_id", None) is not None:
+            named = int(args.subject_id)  # type: ignore[attr-defined]
+            (rosters if subject == ROSTER else teams).append(named)
+        if rosters:
+            saved = self._lab.rosters.list()
+            known = {int(i) for i in saved["roster_id"]}
+            strangers = sorted(set(rosters) - known)
+            if strangers:
+                listed = ", ".join(
+                    f"{int(row['roster_id'])} ({row['name']})" for _, row in saved.iterrows()
+                )
+                return (
+                    f"the lab holds no saved roster with id {', '.join(map(str, strangers))}. "
+                    + (f"The saved rosters are {listed}." if listed else "No roster is saved.")
+                )
         if players:
             if self._players is None:
                 self._players = {int(i) for i in self._lab.entities.players().index}

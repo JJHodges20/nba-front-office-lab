@@ -203,7 +203,22 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   evidence: the build, the contract file's date, a source's address and times. It never
   computes a metric, ranks, or fits. Every figure in an answer must be in a result the
   model was given (`assistant/checker.py`), and a place ("6th") only on a place; an empty
-  read of the lab carries the build.
+  read of the lab carries the build. A chance or a benchmark's share goes with its interval:
+  an answer without one is sent back once, then noted. A question asking for a verdict gets
+  a qualified answer and a note, whatever the model says.
+- **A modeled figure goes out with its error, and the assistant makes none up.**
+  `assistant/model_tools.py` reads the fitted files through the services and cites them by
+  revision: a chance with its 95% interval and the season model's record read both ways, a
+  scenario with the interval of the seasons drawn and the wins test, a projection with
+  the simulator's band for players that well known. A single player's projection has no
+  tested interval - say so; never build one in the assistant. A fit profile carries the
+  limit that there is no fit score while the evidence is not usable. A scenario for the
+  season ahead takes each player's current team (the user's decision): one naming a player
+  not on that roster is not run, and the result says which team they are with.
+- **The document index is built for each search.** `research_docs` reads `docs/` afresh
+  (`config/documents.py`) and searches it with FTS5 in memory (`storage/documents.py`); no
+  index file exists. The generated glossary and dictionary and the assistant's recorded
+  answers are left out. A section is cited by file and heading (evidence kind `docs`).
 - **Current information is a cache beside the lab.** `data/current.sqlite`
   (`storage/current.py`) holds what `pipelines/current.py` fetched: the season's games,
   the league's transactions, the latest injury report, and a log of every attempt. A
@@ -256,6 +271,10 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   selected, and it then overrules every later choice in the sidebar.
 - **Never assign to a widget's session key after the widget is drawn.** Park the value
   and apply it at the top of the next run (`state.choose`, `builder.CREATED`).
+- **Plain words on screen.** The user wants simple, easy language wherever possible: short
+  sentences, everyday words, a statistic explained in a few words where it appears. This
+  holds for page text, notes, table headings, chart titles and the assistant's answers
+  (its rule 13); keep a lab term such as net rating or 95% interval where it is needed.
 - **Headline tiles cut off long text.** Keep a figure's context to about twenty
   characters, or give the row fewer tiles (`components.figures(..., per_row=3)`).
 - **The AI Research page reaches the assistant through `front_office.assistant.api`

@@ -2,8 +2,8 @@
 
 Built afresh for every question, because the web's handlers carry the question's sources
 and its budget: searches and pages read, by mode (docs/AI_ASSISTANT_SPEC.md). The lab's
-own handlers need nothing but the lab. Tests build a toolbox with fakes, or with the lab's
-handlers alone.
+own handlers - its data, its models and its documents - need nothing but the lab. Tests
+build a toolbox with fakes, or with the lab's handlers alone.
 """
 
 from __future__ import annotations
@@ -12,7 +12,9 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 
 from front_office.assistant.current_tools import Refresh, current_handlers
+from front_office.assistant.document_tools import DOCUMENT_HANDLERS
 from front_office.assistant.lab_tools import HANDLERS, Handler
+from front_office.assistant.model_tools import MODEL_HANDLERS
 from front_office.assistant.web_tools import SourceBook, WebBudget, web_handlers
 from front_office.domain.assistant import Context, Mode
 from front_office.pipelines.current import refresh_current
@@ -21,6 +23,8 @@ from front_office.services import Lab
 
 WEB_LIMITS: Mapping[Mode, tuple[int, int]] = {Mode.QUICK: (1, 2), Mode.DEEP: (4, 8)}
 """Web searches and pages read for one question, by mode."""
+LAB_HANDLERS: Mapping[str, Handler] = {**HANDLERS, **MODEL_HANDLERS, **DOCUMENT_HANDLERS}
+"""Every handler that needs nothing but the lab: its data, its models, its documents."""
 
 
 class Toolbox:
@@ -51,11 +55,12 @@ class Toolbox:
 
     @classmethod
     def lab_only(cls) -> Toolbox:
-        """The lab's own data and nothing fetched: no current data, no web."""
+        """The lab's own data, models and documents, and nothing fetched: no current data,
+        no web."""
         return cls(current=False, online=False)
 
     def handlers(self, context: Context) -> dict[str, Handler]:
-        found = dict(HANDLERS)
+        found = dict(LAB_HANDLERS)
         if self._current:
             clock = {} if self._now is None else {"now": self._now}
             found |= current_handlers(self._refresh, **clock)

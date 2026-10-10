@@ -3,6 +3,126 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone A4 - AI Research Assistant: the forecasting tools and the document index (2026-10-10)
+
+The assistant reads the lab's fitted models and its own documents. Four tools answer from
+the value model, the roster fit evidence, the postseason model and the simulator; a fifth
+searches `docs/`. No league table, model file, setting or roster changed: nothing was
+fitted, refitted or measured, and every file is read as it stands (value model r2, fit
+evidence f2, postseason model p2, simulator s2).
+
+**Built**
+
+- **The model tools** (`assistant/model_tools.py`), service calls only:
+  - `player_value` - a player's seasons and projection; a season's leaders, ranked among
+    everyone valued; the projections; where an impact comes from; roles beside how often
+    they carry over; value for money against the user's contract file; the model's test
+    against simpler methods, with the minutes as played and as projected.
+  - `roster_fit` - a team's or built roster's profile, each measure placed among the
+    season's teams, the roles in its rotation and the sum of its parts; the evidence; where
+    champions stood. A profile carries the limit that there is no fit score while the
+    evidence is not usable.
+  - `postseason_outlook` - a real team as a team of its strength, beside what happened; a
+    built roster; a hypothetical team of any net rating; a decided season's bracket; every
+    team of a season; the model's record, read with each season's rating and from the rating
+    predicted before it, and what else was tried. The season ahead is drawn by the
+    simulator.
+  - `simulate_scenario` - a team or built roster before and after the user's assumptions
+    (players added and removed, games missed, development, minutes, salary, the two
+    presets), with the service's change for each figure, the interval of the seasons drawn
+    and the wins test. A scenario takes each player's current team: one that names a
+    player who is not on that roster is not run, and the result says which team they are
+    with.
+  Every modeled figure goes out with its error, and each result cites the model files by
+  revision. A single player's projection has no tested interval, and the tool says so,
+  giving the simulator's measured spread for players that well known instead.
+- **The document index** (`domain/documents.py`, `config/documents.py`,
+  `storage/documents.py`, `services/documents.py`, `assistant/document_tools.py`):
+  `research_docs` reads the Markdown under `docs/` afresh, cuts it at its headings and in
+  passages, and searches it with SQLite FTS5 in memory - about 280 sections in a few
+  hundredths of a second - leaving out the generated glossary and dictionary and the
+  assistant's recorded answers. A section is quoted as written and cited by file and
+  heading: a new kind of evidence, `docs`, which the evaluation's `source` now counts, as
+  the case file's header always defined it.
+- **The executor** refuses a saved roster the lab does not hold, listing those it does,
+  and checks the players a scenario assumes about; it runs every handler that needs only
+  the lab by default (`toolbox.LAB_HANDLERS`).
+- **The page**: the Modeled and Your assumption tags in its header; a chance before and
+  after drawn on a chance's own axis; intervals with a reference line; the lab's documents
+  and the model files in the evidence; the new tools' rows as the model read them, with the
+  figures behind them in each chart's export. The context tells the model which season the
+  models project.
+- **Tests**: the section splitter and passages, the search (stems, one hit per section,
+  common words, no search syntax), the loader (and the repository's own documents), the
+  service, every view of every tool against the services' own figures, the executor's
+  roster and assumption checks, the scenario before and after, the season ahead, the page
+  drawing a scenario, the rules, the repeated-sentence guard, the verdict note.
+
+**The evaluation** - eight runs over the 56 cases A4 makes runnable: 42, 45, 44, 45, 45 and
+44 passed before the review, 43 and 46 after the user's decisions
+([AI_EVALUATION.md](AI_EVALUATION.md) lists what each led to); every fix was to the
+assistant, and the only case changes are the two the user decided (below). What the runs
+settled (decision 0018, "Settled while building A4"): how the lab works comes from its
+documents or a model's evidence, never memory (rule 12); a call means what it can only
+mean - a team view with a rating and no team is a team of that strength, the season ahead
+is the simulator's, a stray player id or argument is dropped rather than refused; the tools
+give the changes and say what every range is; a question asking for a verdict is qualified
+with a note; a chance word may rest on the lab's documents; a share or chance without its
+interval is sent back once and otherwise noted; a sentence said again is cut; a refusal may
+have a word in the middle ("does not currently support"); a metric is found however it is
+written; the tool descriptions say what each view is for, and that the transactions tool
+answers roster changes. At the end: the right first tool in 34 of 35 cases that need one,
+nothing called in the 11 *clarify* and *refuse* cases, one call refused in 52, nothing
+forbidden, the only figures cut five that I01 invented, a quick answer in 4.6 seconds at the
+median and none late. During the third and fourth runs the machine's GPU was shared with a
+game, which slowed those answers; the final runs were not held up by it.
+
+**The user's decisions at the A4 review (2026-10-10)** - two cases rested on what the lab's
+data or models do not hold; the user decided both, and each case carries a comment saying
+so:
+
+- **S01** asks what happens to the Celtics' 2026-27 season if Jaylen Brown misses 30 games.
+  The fixture's 2026-27 rosters - real league responses - have him traded to Philadelphia
+  on 2026-07-06. The user decided that a question about the season ahead, or naming no
+  season, takes each player's current team, so this is an error; looking back at 2025-26
+  should be answered from that season's figures. `simulate_scenario` now refuses a scenario
+  that removes, or assumes something of, a player not on that roster, saying which team
+  they are with, and the case expects *insufficient* with the build cited (was *supported*,
+  citing the model and an interval), its frozen fact being Brown's current team.
+- **P04** asks for the model's projection of Derrick White and cited an interval. The value
+  model is tested on teams, so there is no tested interval for one player's projection; the
+  tool gives how far projections of players known that well have typically missed. The
+  case now cites the model alone (was the model and an interval), and freezes that typical
+  miss as a fact, read through a new service method, `SimulatorService.projection_miss`,
+  which the tool uses too.
+- **Plain words**: the user wants simple, easy language on screen wherever possible. The
+  tools' texts, the notes and the AI Research page were rewritten in plainer words, and rule
+  13 (rules `2026-10-10.3`) asks the model for the same, and to call a player "they".
+
+**The browser pass** - the workbench over a scratch copy of the database (with the docs
+folder beside it) and the real model, clicked through with Playwright in the light and the
+dark theme: the Celtics' chances with their interval chart and table, a projection, a fit
+description that declines a score, the optimizer explained from its decision, a scenario
+before and after, a team of +5.0 net rating, and the Brown scenario with its note. It found
+one fault: the fit profile's percentile axis read "Percentile (higher is better)", which is
+wrong for fit measures; it now names the season's teams, as the Roster Fit page does.
+After the user's decisions the page was looked at again in both themes: the plainer words,
+S01's question answered with "Not enough to answer" and where Brown is, a projection, and
+a verdict question with its note. The model still writes "he" for a player now and then,
+though rule 13 asks for "they".
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Pass |
+| `pytest -n auto` (everything but live-network and live-model tests) | 3,616 passed in 4 min 15 s |
+| `pytest -m ollama` (the live model) | 6 passed |
+| The end-to-end evaluation, on the A4 code | 46/56 (42 to 46 over eight runs); report generated |
+| The page in a browser | Clicked through as above, light and dark, before and after the user's decisions; no error box or exception; the one fault found is fixed and checked again in both themes |
+| UI boundaries | The page imports `front_office.assistant.api` alone; the boundary tests pass |
+| Data and models | No model file or setting changed; the browser pass ran over a copy; the evaluation's saved runs are in `data/assistant/benchmarks/`, which is not committed |
+
 ## Milestone A3 - AI Research Assistant: the AI Research page (2026-10-10)
 
 The workbench asks. A new page in a new Ask group puts the assistant on screen: whether

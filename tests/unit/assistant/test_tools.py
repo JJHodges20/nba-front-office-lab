@@ -118,6 +118,17 @@ class TestValidation:
         with pytest.raises(ValidationError):
             SimulateScenario(subject="team", subject_id=1, save=True)
 
+    def test_data_status_ignores_what_it_does_not_take(self) -> None:
+        """A4: a model sent data_status a view, then a season."""
+        assert BY_NAME["data_status"].args(view="data_build", season="2025-26") is not None
+
+    def test_a_player_id_a_value_view_does_not_read_is_dropped(self) -> None:
+        """A4: a model sent player_id 0 with model_evidence."""
+        value = BY_NAME["player_value"].args
+        assert value(view="model_evidence", player_id=0).player_id is None
+        assert value(view="season_leaders", player_id=7).player_id is None
+        assert value(view="projections", player_id=7).player_id == 7
+
     def test_a_season_is_written_like_2025_26(self) -> None:
         with pytest.raises(ValidationError):
             BY_NAME["team_stats"].args(team_id=1, season="2025")

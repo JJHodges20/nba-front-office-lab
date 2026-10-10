@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from front_office.assistant.checker import (
+    bare_shares,
     check,
     cut,
     cut_phantoms,
@@ -10,6 +11,7 @@ from front_office.assistant.checker import (
     figures,
     phantoms,
     repair_note,
+    without_repeats,
     wording,
 )
 
@@ -112,6 +114,38 @@ class TestCutting:
         assert removed == ("41.2",)
 
 
+class TestIntervals:
+    def test_a_share_without_its_interval_is_bare(self) -> None:
+        """A4: answers gave a benchmark's share and the simulator's chances alone."""
+        assert bare_shares("0 of 10 won it: 0% [r1].", ["historical_benchmarks"])
+        assert bare_shares("Their chance rises to 51.1% [r1].", ["simulate_scenario"])
+
+    def test_a_share_with_its_interval_is_not(self) -> None:
+        answer = "0 of 10 won it: 0%, with a 95% interval of 0% to 27.8% [r1]."
+        assert not bare_shares(answer, ["historical_benchmarks"])
+
+    def test_only_shares_that_come_with_intervals_need_them(self) -> None:
+        assert not bare_shares("They shot 58.3% [r1].", ["team_stats"])
+        assert not bare_shares("They went 0 for 10 [r1].", ["historical_benchmarks"])
+
+    def test_the_note_asks_for_them(self) -> None:
+        assert "interval" in repair_note(check("", []), bare=True)
+
+
+class TestRepeats:
+    def test_a_sentence_said_again_is_taken_out(self) -> None:
+        """A4: a model wrote one sentence over and over until its output ran out."""
+        loop = "The model's log loss for the playoffs is 0.250, lower than the base rate's."
+        answer = f"First things first. {loop} {loop}\n{loop} And then the end."
+        text, dropped = without_repeats(answer)
+        assert dropped == 2
+        assert text == f"First things first. {loop}\nAnd then the end."
+
+    def test_a_short_phrase_that_recurs_stays(self) -> None:
+        answer = "Before: no change.\nAfter: no change."
+        assert without_repeats(answer) == (answer, 0)
+
+
 class TestWording:
     def test_a_frequency_called_a_chance_is_caught(self) -> None:
         answer = "Teams like these had a 0% chance of winning the title [r1]."
@@ -134,6 +168,12 @@ class TestWording:
 
     def test_a_chance_from_the_postseason_model_stands(self) -> None:
         assert wording("A 12% chance of the title [r1].", ["postseason_outlook"]) == ()
+
+    def test_the_labs_documents_may_describe_chances(self) -> None:
+        """A4: an answer explaining the postseason model from its decision had "chances" cut."""
+        answer = "The model gives each team's chances of each stage from two inputs [r1]."
+        assert wording(answer, ["research_docs"]) == ()
+        assert wording(answer, ["historical_benchmarks"]), "a frequency is still not a chance"
 
     @pytest.mark.parametrize(
         "phrase", ["a title contender", "should sign him", "the best roster", "contenders"]

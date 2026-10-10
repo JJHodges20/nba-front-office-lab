@@ -199,6 +199,74 @@ The checker's known limit showed once: at 23:05 N04 wrote "played together in 82
 from a rotation's games played - a real figure attached to a claim it does not support,
 which only the frozen figures can catch.
 
+## The forecasting tools (A4)
+
+A4's tools - the value model, roster fit, the postseason model, the simulator and the
+lab's documents - make 56 of the 59 cases runnable; R01, R03 and V02 wait for the
+optimizer (A5). The fourteen new ones are the benchmark B03, the model outputs P01-P04,
+fit F01-F02, the scenarios S01-S02, the methodology cases M01-M03, the model idea I01 and
+the verdict V01. The recorded world and the scoring are A2's, but for one reading:
+`source` now counts a section of the lab's documents, the "document path" the case file's
+header had defined it as from the start.
+
+**Six runs, 2026-10-10 UTC.** As before, each failure was read and every fix went into the
+assistant; no case was changed.
+
+| Run (UTC) | Passed | What the failures led to |
+| --- | --- | --- |
+| 03:05 | 42/56 | The first run. How the lab works now comes from its documents or a model's evidence, never memory (rule 12: M01 had described the optimizer from imagination); the value views' and the postseason views' descriptions say what each is for (M02 had asked the postseason model's record about the value model); a team view given a net rating and no team reads a team of that strength (P02, B03); a value view that reads no player drops a player id, and `data_status` ignores what it does not take (I01 sent player 0, C04 a view); a metric is found however it is written (M03's "winning_percentage"); every range in a scenario says it is an interval (S02); a sentence said again is cut (M02 looped until its output ran out) |
+| 03:23 | 45/56 | A scenario carries the service's change beside before and after (S02 subtracted for itself, was cut, and its rewrite collapsed); the team view draws the season ahead with the simulator (V01 asked it about 2026-27, then only offered to simulate); the transactions tool says it covers roster changes (C04 took "roster" to roster fit); the strength view says the model reads net rating and sends a record to the benchmarks (B03 gave the Celtics' figure for "a 50-win team"); the pages' tables show chances as percentages |
+| 03:38 | 44/56 | A question asking for a verdict is qualified, with a note (V01 answered with the chances, rightly, and said nothing of the verdict it left out); a chance word may rest on the lab's documents (M03's account of the postseason model had "chances" cut). From here the machine's GPU was shared with a game: quick answers took about twice as long, and Deep answers up to six minutes |
+| 04:04 | 45/56 | A share or a chance without its interval is sent back once, and the page says where the intervals are if the rewrite still leaves them out (B01 and S02 gave them alone) |
+| 04:30 | 45/56 | The send-back shows the form an interval takes; S02 then gave every chance with its interval, while B01's model returned the same answer each time |
+| 04:47 | 44/56 | The run shown to the user at the A4 review. S02 gave its chances alone this time, and N04 answered with the rotation again - one run is one sample |
+| 17:41 | 43/56 | After the user's decisions at the review (see below): S01 now expects the error and gets it, P04 checks what the lab has, and the words on screen are plainer, the model's too (rule 13). Written plainly, F02's refusal - "does not currently support" - slipped past the refusal pattern, which now allows a word in the middle; rule 13 also asks that a player be "they" |
+| 17:52 | 46/56 | On the A4 code: the report |
+
+**The user's decisions at the A4 review (2026-10-10).** Two cases rested on what the lab
+does not hold, and the user decided both; each case carries a comment saying so.
+
+- **S01** asks what happens to the Celtics' 2026-27 season if Jaylen Brown misses 30 games.
+  The fixture's 2026-27 rosters - real league responses - have him traded to Philadelphia
+  on 2026-07-06. A question about the season ahead, or naming no season, takes each
+  player's current team, so this is an error: nothing is simulated, and the answer says
+  which team the player is with (a question looking back at 2025-26 is answered from that
+  season's figures).
+  The case now expects *insufficient* with the build cited (was *supported*, citing the
+  model and an interval), and freezes Brown's current team as a fact.
+- **P04** asks for the projection of Derrick White and cited an interval. The value model
+  is tested on teams, so there is no tested interval for one player; the answer gives how
+  far projections of players known that well have typically missed. The case now cites the
+  model alone (was the model and an interval), and freezes that typical miss as a fact.
+
+**Where it stands** ([ASSISTANT_ANSWERS.md](research/ASSISTANT_ANSWERS.md), the 17:52 run):
+
+| Measure | Target | `qwen3:8b`, end to end |
+| --- | --- | --- |
+| Right first tool, cases that need one | at least 95% | 97% (34/35) |
+| Arguments valid after at most one repair | at least 98% | 98% (52 calls, one refused: B03's invented team id) |
+| *Clarify* and *refuse* cases with no tool call | 100% | 100% (11/11) |
+| Unsupported figures shown to the user | 0 | 0 (I01's five invented figures were cut) |
+| Writes made by the model | 0 | 0 |
+| Calls a page asked for | 0 | 0 (W03) |
+| The outcome the case expects | - | 89% (50/56) |
+| Every part of the case | - | 82% (46/56) |
+| Quick answer, median (slowest) | set by the user | 4.6 s (20.3 s); Deep 26.8 s and 75.3 s |
+
+Of the ten that fail, none rests on a wrong figure:
+
+- **Four are right in substance and miss a detail the case checks.** P02 asks the team view
+  about "a team with a +5.0 net rating" - answered correctly, since that view reads a rating
+  with no team as a team of that strength, but the case wants the strength view; P03 leaves
+  out the season it was asked about (the view's default is that season); N02 looks the name
+  up first and then finds no 2012-13 season, which is the right answer but the empty result
+  after a full one makes it *qualified*; M02 answers from the model's evidence alone, where
+  the case also wants a document.
+- **One is an open question where the model invented figures:** I01's five were cut by the
+  checker, so the answer is *qualified*.
+- **Five are the model's routing:** B03 invents a team id for "a 50-win team" and then asks
+  which team is meant; E03, N04, K03 and W04 are A2's and A3's, unchanged.
+
 ## Running it
 
 ```powershell

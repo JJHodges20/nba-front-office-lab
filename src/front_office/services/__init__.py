@@ -25,6 +25,7 @@ from front_office.services.builder import (
 )
 from front_office.services.contracts import ContractService
 from front_office.services.current import CurrentDataService, CurrentSource
+from front_office.services.documents import DocumentSearch, DocumentService
 from front_office.services.explore import Relationship, relationship
 from front_office.services.fit import FitReport, FitService, FitStatus, SumOfParts
 from front_office.services.glossary import METRIC_CATALOGS, metric_glossary
@@ -76,6 +77,8 @@ __all__ = [
     "ContractService",
     "CurrentDataService",
     "CurrentSource",
+    "DocumentSearch",
+    "DocumentService",
     "Era",
     "EraView",
     "FitReport",

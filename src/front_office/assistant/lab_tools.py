@@ -165,6 +165,10 @@ def metric_key(catalog: MetricCatalog, text: str) -> str | None:
     return None
 
 
+def _folded(text: str) -> str:
+    return fold(text.replace("%", " pct"))
+
+
 def label(catalog: MetricCatalog, key: str) -> str:
     return catalog[key].name if key in catalog else key.replace("_", " ")
 
@@ -917,16 +921,20 @@ def historical_benchmarks(lab: Lab, args: t.HistoricalBenchmarks) -> Found:
 
 
 def metric_definition(lab: Lab, args: t.MetricDefinition) -> Found:
-    wanted = args.metric.strip().lower()
+    # Compared folded, so that a key written as words or a name written as a key matches:
+    # at A4 a model asked for "winning_percentage", which is "Winning percentage".
+    wanted = _folded(args.metric)
     found = []
     for group, catalog in METRIC_CATALOGS.items():
         for spec in catalog:
-            if wanted in (spec.key.lower(), spec.label.lower(), spec.name.lower()):
+            if wanted in (_folded(spec.key), _folded(spec.label), _folded(spec.name)):
                 found.append((group, spec))
     if not found:
         for group, catalog in METRIC_CATALOGS.items():
             found += [
-                (group, s) for s in catalog if wanted in s.name.lower() or wanted in s.key.lower()
+                (group, s)
+                for s in catalog
+                if wanted and (wanted in _folded(s.name) or wanted in _folded(s.key))
             ]
     title = f'Metric "{args.metric}"'
     if not found:

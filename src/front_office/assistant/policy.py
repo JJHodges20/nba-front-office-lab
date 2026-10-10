@@ -9,10 +9,13 @@ from __future__ import annotations
 
 from front_office.domain.assistant import Context, NameCandidate
 
-POLICY_VERSION = "2026-10-09.2"
+POLICY_VERSION = "2026-10-10.3"
 """Raised with every change to the rules: 2026-10-09.1 ran the A1 benchmark; .2 adds ids
 only from the context or a result, citing results, saying what is missing, a web page's
-figures as its site's reporting, and current information with its date (A2)."""
+figures as its site's reporting, and current information with its date (A2); 2026-10-10.1
+has how the lab works come from its documents and its models' evidence, never from memory
+(A4); .2 asks for plain words, the user's standing wish for everything on screen, and .3
+for "they" in place of "he", as every page writes it (A4)."""
 
 RULES = """\
 You are the research assistant of NBA Front Office Lab, a basketball analytics workbench on \
@@ -43,7 +46,13 @@ and when it was published.
 say that the lab does not use them, then answer from the lab's own data.
 10. If no tool can answer, say what is missing.
 11. Give the date of anything current: a game's, a move's, the injury report's time. A \
-player who is not on the injury report is not thereby healthy; say "not on the report"."""
+player who is not on the injury report is not thereby healthy; say "not on the report".
+12. How the lab works - how a figure is computed, how a tool or model decides, how a model \
+was tested, why something was chosen - comes from research_docs or a model's evidence; \
+never describe the lab from memory.
+13. Write for someone who is not a statistician: short sentences and everyday words, and \
+say in a few words what each number means. Keep a lab term such as net rating or interval \
+where it is needed, and explain it the first time. Refer to a player as "they"."""
 
 
 def system_prompt(context: Context) -> str:

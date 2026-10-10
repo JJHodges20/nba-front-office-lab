@@ -250,10 +250,18 @@ as a document: [research/SIMULATOR.md](research/SIMULATOR.md); why it is built t
 [decisions/0015-simulator.md](decisions/0015-simulator.md).
 
 **AI Research.** Ask in plain words, and see what every answer rests on. A language model
-on this machine (through Ollama) answers from the lab's tools - its statistics, its models'
-files as later milestones add them, the contract file, this season's games, the league's
-transactions and injury report fetched since the build, and pages on the web - and every
-figure in an answer is checked against what the tools returned before you see it.
+on this machine (through Ollama) answers from the lab's tools - its statistics, its fitted
+models (player value, roster fit, the postseason model and the scenario simulator), its own
+documents, the contract file, this season's games, the league's transactions and injury
+report fetched since the build, and pages on the web - and every figure in an answer is
+checked against what the tools returned before you see it. A modeled figure comes with its
+error: a chance with its 95% interval and the model's record on seasons it had not seen, a
+scenario with the interval of the seasons drawn, a projection with how far projections of
+players that well known have missed. Fit is described, never scored. A scenario's changes
+are your assumptions, tagged as such. A scenario for the season ahead uses each player's
+current team: name a player who is not on that team's roster and nothing is simulated -
+the answer says which team the player is with. Questions looking back at a season already
+played are answered from that season's figures.
 
 - *Above the conversation*: whether the assistant can answer (and, when it cannot, what to
   do: start Ollama, or pull the model), whether web search is set up, and how fresh each
@@ -268,8 +276,9 @@ figure in an answer is checked against what the tools returned before you see it
   season - is asked about before anything runs; choose one and the question is asked
   again with it. Under the answer: notes and limits, the kinds of number it rests on, each
   result's rows with the chart its tool chose and a CSV, the evidence (every source with
-  its address and its dates: published, effective, fetched), and how it was answered
-  (each step, the model, the rules' version, the time).
+  its address and its dates: published, effective, fetched; each model file with its
+  revision; each section of the lab's documents by file and heading), and how it was
+  answered (each step, the model, the rules' version, the time).
 - *Names and sidebar*: names, seasons and teams are read from the question; the sidebar's
   season and team stand in where it names none. A link pasted into a question can be read.
 
@@ -297,6 +306,6 @@ whose record on past seasons is a tab away, never a verdict on a team. A role is
 applied to a player's statistics, not a measurement of how they play, and the page says
 so. Roster fit describes a roster and reports what the evidence found; it does not score
 one. The optimizer's rosters are the parts added up under a budget, several of them,
-never one answer. The AI Research assistant cannot yet use the value model, roster fit,
-the postseason model or the simulator, or keep a conversation past the session; those come
-with the assistant's later milestones.
+never one answer. The AI Research assistant cannot yet propose rosters from the optimizer
+or keep a conversation past the session; those come with the assistant's later
+milestones.
