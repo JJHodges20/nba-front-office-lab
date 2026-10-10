@@ -89,6 +89,15 @@ def scratch_home(contract_template: Path, tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def priced_home(priced_template: Path, tmp_path: Path) -> Path:
+    """A private copy of the project with a salary for every projected player, where the
+    optimizer builds whole rosters: for tests that save one."""
+    target = tmp_path / "priced"
+    shutil.copytree(priced_template, target)
+    return target
+
+
+@pytest.fixture
 def page(open_at: Callable[[Path], None]) -> Open:
     """Draw one page for a project: ``page(home, "teams", filter_team=BOS)``.
 

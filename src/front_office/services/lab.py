@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from front_office.services.optimizer import OptimizerService
     from front_office.services.players import PlayerService
     from front_office.services.postseason import PostseasonService
+    from front_office.services.proposals import ProposalService
     from front_office.services.simulator import SimulatorService
     from front_office.services.teams import TeamService
     from front_office.services.value import ValueService
@@ -338,6 +339,12 @@ class Lab:
         from front_office.services.postseason import PostseasonService
 
         return PostseasonService(self)
+
+    @property
+    def proposals(self) -> ProposalService:
+        from front_office.services.proposals import ProposalService
+
+        return ProposalService(self)
 
     @property
     def simulator(self) -> SimulatorService:

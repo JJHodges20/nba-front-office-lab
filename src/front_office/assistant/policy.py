@@ -15,7 +15,9 @@ only from the context or a result, citing results, saying what is missing, a web
 figures as its site's reporting, and current information with its date (A2); 2026-10-10.1
 has how the lab works come from its documents and its models' evidence, never from memory
 (A4); .2 asks for plain words, the user's standing wish for everything on screen, and .3
-for "they" in place of "he", as every page writes it (A4)."""
+for "they" in place of "he", as every page writes it (A4). At A5 two rule 6s that said where
+the user saves and edits rosters (.4, .5) each sent a model's answer somewhere wrong, and
+.3's rules were kept (decision 0018)."""
 
 RULES = """\
 You are the research assistant of NBA Front Office Lab, a basketball analytics workbench on \

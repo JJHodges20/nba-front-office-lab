@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 
 import pandas as pd
@@ -50,6 +50,59 @@ class RosterRepository:
                 )
             )
             return int(result.inserted_primary_key[0])
+
+    def create_with_players(
+        self,
+        name: str,
+        *,
+        stats_season: str,
+        payroll_season: str,
+        players: Sequence[tuple[int, str]],
+        notes: str | None = None,
+    ) -> int:
+        """Create a roster holding ``players`` - ``(player_id, slot)`` pairs - in one
+        transaction, and return its id: the roster and every player are saved, or nothing
+        is. A player appears once, and a starting slot holds one player."""
+        ids = [int(player) for player, _ in players]
+        if len(set(ids)) != len(ids):
+            raise StorageError("a player can be on a roster only once")
+        for _, slot in players:
+            if slot not in ROSTER_SLOTS:
+                raise StorageError(f"slot must be one of {list(ROSTER_SLOTS)}, not {slot!r}")
+        starters = [slot for _, slot in players if slot != ROSTER_SLOTS[-1]]
+        if len(set(starters)) != len(starters):
+            raise StorageError("a starting slot can hold only one player")
+        moment = self._now()
+        with self._database.begin() as connection:
+            result = connection.execute(
+                self._rosters.insert().values(
+                    name=_clean_name(name),
+                    stats_season=Season.parse(stats_season).label,
+                    payroll_season=Season.parse(payroll_season).label,
+                    notes=(notes or "").strip() or None,
+                    created_at=moment,
+                    updated_at=moment,
+                )
+            )
+            roster_id = int(result.inserted_primary_key[0])
+            if players:
+                try:
+                    connection.execute(
+                        self._players.insert(),
+                        [
+                            {
+                                "roster_id": roster_id,
+                                "player_id": int(player),
+                                "slot": slot,
+                                "assumed_salary": None,
+                                "added_at": moment,
+                            }
+                            for player, slot in players
+                        ],
+                    )
+                except IntegrityError as error:
+                    raise StorageError(f"could not save the roster: {error.orig}") from error
+            return roster_id
 
     def list(self) -> pd.DataFrame:
         """Every roster, most recently changed first."""

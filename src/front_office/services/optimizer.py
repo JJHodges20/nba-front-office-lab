@@ -27,7 +27,9 @@ from front_office.domain.optimizer import (
 from front_office.domain.tables.rosters import ROSTER_SLOTS, STARTING_SLOTS
 from front_office.modeling.fit import fills_column
 from front_office.modeling.optimizer import GROUPS, REQUIRED_COLUMNS, solve
+from front_office.services.builder import RosterError
 from front_office.services.lab import Lab
+from front_office.storage import StorageError
 
 PLAN_COLUMNS = (
     "player_name",
@@ -279,20 +281,18 @@ class OptimizerService:
             error=(model.validation.projected or model.validation.net).rmse,
         )
 
-    def save(self, player_ids: Sequence[int], name: str, request: OptimizerRequest) -> int:
-        """Create a Team Builder roster from a solution's players and return its id.
-
-        The five largest projected shares start, each in a slot that suits the player's
-        group; everyone else is on the bench. The Team Builder can move them.
-        """
-        pool = self.pool()
+    def slots(
+        self, player_ids: Sequence[int], pool: pd.DataFrame | None = None
+    ) -> tuple[tuple[int, str], ...]:
+        """Where a saved roster puts each player, the largest projected share first: the
+        five largest start, each in a slot that suits their group, and everyone else is
+        on the bench. The Team Builder can move them."""
+        pool = self.pool() if pool is None else pool
         chosen = pool.loc[[int(player) for player in player_ids]].sort_values(
             "projected_share", ascending=False
         )
-        roster = self._lab.builder.create(
-            name, stats_season=request.stats_season, payroll_season=request.payroll_season
-        )
         free = list(STARTING_SLOTS)
+        placed = []
         for player_id, row in chosen.iterrows():
             slot = BENCH
             if free:
@@ -301,8 +301,30 @@ class OptimizerService:
                 ]
                 slot = wanted[0] if wanted else free[0]
                 free.remove(slot)
-            self._lab.builder.add_player(roster, int(player_id), slot=slot)
-        return roster
+            placed.append((int(player_id), slot))
+        return tuple(placed)
+
+    def save(
+        self,
+        player_ids: Sequence[int],
+        name: str,
+        request: OptimizerRequest,
+        *,
+        notes: str | None = None,
+    ) -> int:
+        """Create a Team Builder roster from a solution's players and return its id, in
+        one transaction: the roster is saved whole or not at all (decision 0018, A5).
+        Players are placed as :meth:`slots` says."""
+        try:
+            return self._lab.rosters.create_with_players(
+                name,
+                stats_season=request.stats_season,
+                payroll_season=request.payroll_season,
+                players=self.slots(player_ids),
+                notes=notes,
+            )
+        except StorageError as error:
+            raise RosterError(str(error)) from error
 
     # --- assembly -----------------------------------------------------------------------
 

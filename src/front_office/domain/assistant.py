@@ -23,6 +23,8 @@ from urllib.parse import urlsplit
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, PositiveFloat, field_validator
 
+from front_office.domain.proposals import RosterProposal
+
 LOCAL_NAMES = frozenset({"localhost"})
 
 
@@ -300,6 +302,8 @@ class ToolResult:
     answer, but a qualified one."""
     charts: tuple[Chart, ...] = ()
     """How the page draws the result, as its tool chose."""
+    proposals: tuple[RosterProposal, ...] = ()
+    """Rosters the optimizer found, for the user to review and save by their own click."""
 
     @property
     def usable(self) -> bool:

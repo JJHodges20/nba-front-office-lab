@@ -281,8 +281,23 @@ played are answered from that season's figures.
   answered (each step, the model, the rules' version, the time).
 - *Names and sidebar*: names, seasons and teams are read from the question; the sidebar's
   season and team stand in where it names none. A link pasted into a question can be read.
+- *Rosters to review*: ask for rosters - "three rosters for next season under a $150M
+  budget", "a roster under the luxury tax with at least two rim protectors" - and the
+  assistant runs the Roster Optimizer with what you asked for and nothing else. Each
+  option found (two to four, each differing from the others by at least three players)
+  appears under the answer: its payroll and what is left under the budget, its projected
+  net rating with how far such forecasts typically miss, how it differs from Option A, what
+  was asked for, the contract file's date, and its players with where each would start,
+  their salaries and their forecasts. They are examples that fit the budget - options to
+  compare, not a recommendation - and nobody has checked that the trades or signings to
+  get them are allowed. The assistant cannot
+  save one. *Save approved roster* under an option saves it for the Team Builder - only
+  if the data, the player value model and the salaries are the same as when it was
+  proposed; otherwise it says what changed and saves nothing. Pressing it again finds the
+  roster already saved instead of saving a second one.
 
-The conversation lasts until the tab is closed or reloaded, and nothing is saved. Web
+The conversation lasts until the tab is closed or reloaded; nothing is saved but a roster
+you approve. Web
 search needs your own Ollama account's key, in the project's `.env` file as
 `FOL_OLLAMA_API_KEY` (copy `.env.example` to `.env` and fill it in); without it the page
 says so, and pasted links are still read. Some

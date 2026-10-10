@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from front_office.assistant.checker import (
+    FOR_THE_USER,
     bare_shares,
     check,
     cut,
@@ -51,6 +52,10 @@ class TestReading:
             # A2, live: a numbered list's markers had been read as figures.
             ("Reports:\n1. Still working out the kinks\n  4) Starters sharp", []),
             ("The score was 4. Then 5.5 more.", [4.0, 5.5]),
+            # A5 (S02, M03): the lab's units had been cut as figures no result held.
+            ("+8.3 points per 100 possessions", [8.3]),
+            ("48 wins per 82 games, every 100 possessions", [48.0]),
+            ("100 possessions and 82 games", [100.0, 82.0]),
         ],
     )
     def test_what_counts_as_a_figure(self, text: str, read: list[float]) -> None:
@@ -188,6 +193,8 @@ class TestWording:
     def test_the_repair_note_names_both_kinds_of_problem(self) -> None:
         note = repair_note(check("+9.9", [RESULT]), wording("a 4% chance", []))
         assert "+9.9" in note and 'Do not write "chance"' in note
+        # A5 (R01): the rewrite had begun "Here's the corrected version".
+        assert note.endswith(FOR_THE_USER) and repair_note(check("", [])) == ""
 
     def test_cutting_takes_only_the_sentences_that_break_the_rules(self) -> None:
         text, removed = cut_wording(

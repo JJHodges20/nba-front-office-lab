@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import shutil
 from datetime import date
 from pathlib import Path
 
 import pytest
 
 from front_office.assistant import api
+from front_office.assistant import tools as t
 from front_office.assistant.api import AssistantState, status
-from front_office.assistant.toolbox import Toolbox
-from front_office.config import Settings
+from front_office.assistant.toolbox import LAB_HANDLERS, Toolbox
+from front_office.config import Settings, load_settings
 from front_office.config.assistant import assistant_settings_path
 from front_office.domain.assistant import Answer, Mode, Outcome
 from front_office.providers.ollama import OllamaProvider
@@ -156,3 +158,22 @@ def test_a_refresh_by_hand_reports_each_source(project: Path, monkeypatch: pytes
         api.Refreshed("games", "none", "no 2026-27 games played yet"),
     )
     assert asked == [True]
+
+
+# --- an approved roster proposal ---------------------------------------------------------------
+
+
+def test_an_approved_proposal_is_saved_once(priced_template: Path, tmp_path: Path) -> None:
+    """A5: the page's button reaches the save through the facade; a second press finds it."""
+    home = tmp_path / "home"
+    shutil.copytree(priced_template, home)
+    asked = t.OptimizeRoster(budget_mode="custom", budget_millions=150)
+    with Lab(load_settings(home)) as lab:
+        proposal = LAB_HANDLERS["optimize_roster"](lab, asked).proposals[0]
+    saved = api.save_proposal(proposal, "Approved", project_root=home)
+    assert saved.created and saved.name == "Approved"
+    again = api.save_proposal(proposal, "Approved again", project_root=home)
+    assert not again.created and again.roster_id == saved.roster_id
+    with Lab(load_settings(home)) as lab:
+        members = lab.rosters.players(saved.roster_id)
+    assert set(members["player_id"]) == set(proposal.player_ids)

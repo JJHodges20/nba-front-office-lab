@@ -39,6 +39,7 @@ NOT_FIGURES = re.compile(
     rf"|\b\d{{1,2}}(?:st|nd|rd|th)?\s+{MONTH}(?:,?\s+(?:19|20)\d{{2}})?\b"  # 1 October 2026
     r"|(?<![\d$.,])(?:19[4-9]\d|20\d{2})(?![\d%]|[.,]\d|\s?(?:million|billion|thousand|[MBK])\b)"  # 2026
     r"|(?m:^)[ \t]*\d{1,2}[.)](?=[ \t])"  # 1. or 2) opening a line: a list, not a figure
+    r"|\b(?:per|every)\s+(?:100\s+possessions|82\s+games)\b"  # the lab's units (A5: S02, M03)
     r"|\[[a-z]{1,2}\d{1,4}\]"  # [r1], [s2]
     r"|(?<![\w.])[a-z]{1,2}\d{1,4}(?![\w.])"  # r1, u3
 )
@@ -79,6 +80,12 @@ WITH_INTERVALS = (
     'or share followed by its interval as the result writes it - "X% (95% interval Y% to '
     'Z%)" - as rule 4 asks, and keep everything else as it was.'
 )
+FOR_THE_USER = (
+    "Write the whole answer for the user, as if for the first time: do not mention this note "
+    "or that anything was corrected."
+)
+"""Closing every note sent back: at A2, and again at A5 (R01: "Here's the corrected
+version"), a model answered the note instead of the user."""
 INTERVALS_IN_ROWS = (
     "Some percentages above are given without their 95% interval; each interval is in the "
     "table below."
@@ -271,6 +278,8 @@ def repair_note(
         parts.append(f"Do not write {said}: {rule}.")
     if bare:
         parts.append(WITH_INTERVALS)
+    if parts:
+        parts.append(FOR_THE_USER)
     return " ".join(parts)
 
 

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
 from front_office.assistant import checker
@@ -36,6 +36,7 @@ from front_office.domain.assistant import (
     Mode,
     NameCandidate,
     Outcome,
+    ResultStatus,
     Step,
     ToolResult,
 )
@@ -51,28 +52,72 @@ DECLINING = re.compile(
     r"\b(?:can(?:not|'t|’t)|unable|not able|won(?:'t|’t)|will not|do(?:n't|’t| not) have access|"
     r"not (?:allowed|permitted|supported)|outside what"
     r"|do(?:es)?(?:n't|’t| not)(?: \w+ly)? "
-    r"(?:support|allow|permit|fetch|run|open|save|delete|access))\b",
+    r"(?:support|allow|permit|fetch|run|open|save|delete|access)"
+    r"|do(?:es)?(?:n't|’t| not) have (?:a|an|any|the) (?:\w+ )?"
+    r"(?:way|parameter|setting|option|feature|tool|capability|ability) (?:to|for))\b",
     re.IGNORECASE,
 )
 """Saying no: with nothing called, the answer is a refusal; beside results, part of the
 question went unanswered. An adverb may stand in the middle: at A4, written in plainer words,
-"does not currently support" was a refusal the pattern missed (F02)."""
+"does not currently support" was a refusal the pattern missed (F02). At A5, with the
+optimizer offered, F02 was refused as "does not have a direct parameter to add a bonus", and
+X03 as "does not have the capability to delete rosters"."""
 MISSING = re.compile(
     r"\bnot (?:directly )?(?:provided|available|included|given|held|recorded)\b"
-    r"|\b(?:does|did|do)(?:n't|’t| not) (?:include|provide|contain|cover|track)\b"
+    r"|\b(?:data|results?|figures|file|report|table|sources?|database)\b"
+    r"[^.;:!?]{0,40}?\b(?:does|did|do)(?:n't|’t| not) (?:include|provide|contain|cover|track)\b"
     r"|\b(?:no|none of the) (?:data|information|figures?|results?) (?:on|for|about|in|shows?)\b",
     re.IGNORECASE,
 )
-"""Saying what the results lack: beside results, the answer is at most qualified."""
+"""Saying what the results lack: beside results, the answer is at most qualified. "Does not
+include" counts when the data, the results or a file is what lacks it - at A2, "the data did
+not include lineups" (N04); at A5 an explanation from the documents, "winning percentage ...
+does not provide the same level of insight" (M03), had been read as nothing to answer from."""
+_CANNOT = r"\b(?:can(?:not|'t|’t)|unable to|not able to|do(?:es)?(?:n't|’t| not))\s+(?:\w+\s+)?"
+OWN_LIMITS = (
+    (
+        re.compile(_CANNOT + r"(?:save|store|delete|change|edit|apply|refit)\b", re.IGNORECASE),
+        re.compile(r"\b(?:save|store|delete|change|edit|apply|refit)\b", re.IGNORECASE),
+    ),
+    (
+        re.compile(
+            _CANNOT + r"(?:check|verify|confirm|guarantee)\b[^.;:!?]{0,60}?"
+            r"\b(?:trades?|signings?|rules|legal\w*|feasib\w*|cap compliance|CBA)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(r"\b(?:trades?|legal\w*|rules|CBA|allowed)\b", re.IGNORECASE),
+    ),
+)
+"""What the assistant never does, and what its tools never check, said beside an answer: its
+limits, not part of the question left unanswered - unless the question asked about exactly
+that (the second pattern of each pair). At A5 whole roster answers were "partly answered"
+for relaying "The lab cannot save rosters" (R03) and, on the real data, "The lab cannot
+check league rules or trade feasibility"."""
 VERDICT_ASKED = (
     "The lab does not give verdicts or recommendations, so this answer gives the evidence instead."
 )
+WHAT_TO_DO = re.compile(
+    r"\b(?:should|ought to)\b(?:\s+[\w'’-]+){0,3}?\s+"
+    r"(?:sign|trade for|trade|acquire|pursue|target|draft|keep|cut)\b",
+    re.IGNORECASE,
+)
+"""A question asking what a team should do - "Who should the Knicks sign?" - is asking for a
+verdict too. Read in questions only; at A5 the answer check's verdict words, which need
+"should sign" together, missed it (V02)."""
 PROMISE = re.compile(
     r"\b(?:let me|i(?:'ll|’ll| will| am going to|'m going to|’m going to))\s+"
     r"(?:now\s+)?(?:check|look|find|fetch|get|search|pull|see|retrieve|call)\b",
     re.IGNORECASE,
 )
 """A reply that says it will look something up: a small model sometimes stops there."""
+OFFER = re.compile(
+    r"\b(?:(?:would you like|do you want) me to|shall i|should i)\s+"
+    r"(?:look|check|find|fetch|get|search|pull|see|retrieve|call|run)\b",
+    re.IGNORECASE,
+)
+"""Offering to look something up instead of doing it. Before anything is called, in a reply
+that declines nothing, it is held to like a promise (A5: M01 described the optimizer from
+memory and offered to look it up in the lab's documents)."""
 GO_AHEAD = "Go ahead: call the tool now, then answer from its result."
 NO_SUCH_RESULT = (
     "That cites a result no tool has returned in this answer. Call the tool that gives it, "
@@ -171,16 +216,25 @@ class Assistant:
                 reply = self._chat(messages, offering, mode)
                 record(Step("model", _describe(reply), reply.wall_seconds))
                 cited = checker.phantoms(reply.content, (r.result_id for r in results))
+                promised = PROMISE.search(reply.content) is not None
+                deferred = _defers(reply.content, results, by_name)
                 if (
                     offering
                     and not reply.tool_calls
                     and not nudged
-                    and (PROMISE.search(reply.content) or cited)
+                    and (promised or cited or deferred)
                 ):
-                    # Said it would look something up and stopped, or cited a result no
-                    # tool returned (copying an earlier turn): asked once to make the call.
+                    # Said it would look something up and stopped, put it off - offered to,
+                    # or named a tool for the user to use - or cited a result no tool
+                    # returned (copying an earlier turn): asked once to make the call.
                     nudged = True
-                    why = f"cited {', '.join(cited)} without calling a tool" if cited else "said it would call a tool and did not"  # fmt: skip
+                    why = (
+                        f"cited {', '.join(cited)} without calling a tool"
+                        if cited
+                        else "said it would call a tool and did not"
+                        if promised
+                        else str(deferred)
+                    )
                     record(Step("repair", why))
                     messages.append({"role": "assistant", "content": reply.content})
                     messages.append(
@@ -291,9 +345,13 @@ class Assistant:
                 "Sentences citing results that do not exist were taken out: " + ", ".join(uncited)
             )
         outcome = _outcome(
-            results, draft, (*removed, *reworded, *uncited), late=self._clock() - started > seconds
+            results,
+            draft,
+            (*removed, *reworded, *uncited),
+            late=self._clock() - started > seconds,
+            question=question,
         )
-        if results and checker.VERDICT.search(question):
+        if results and (checker.VERDICT.search(question) or WHAT_TO_DO.search(question)):
             # The question asks for what the lab never gives - a verdict, a signing, one best
             # option (rule 5) - so an answer is the evidence without that part. At A4 a model
             # answered "are they a real contender?" with the chances alone, rightly, and said
@@ -395,7 +453,12 @@ def _describe(reply: ChatReply) -> str:
 
 
 def _outcome(
-    results: Sequence[ToolResult], draft: str, removed: tuple[str, ...], *, late: bool
+    results: Sequence[ToolResult],
+    draft: str,
+    removed: tuple[str, ...],
+    *,
+    late: bool,
+    question: str = "",
 ) -> Outcome:
     """What kind of answer it is, from what it rests on and what it says.
 
@@ -403,17 +466,57 @@ def _outcome(
     to answer from. An answer that says it cannot and states no figure: nothing to answer
     from either, whatever was read. Otherwise qualified when anything is missing, cut,
     late or limited - a result that holds nothing new, a refusal of part of the question -
-    and supported when nothing is.
+    and supported when nothing is. A call refused or failed and then made again with a
+    usable result leaves nothing missing, and nor do the assistant's limits - it cannot
+    save, its tools do not check trades against the league's rules - when the question did
+    not ask about them.
     """
     usable = [result for result in results if result.usable]
     if not results:
         return Outcome.DECLINED if DECLINING.search(draft) else Outcome.INSUFFICIENT
     if not usable:
         return Outcome.INSUFFICIENT
-    declines = DECLINING.search(draft) is not None or MISSING.search(draft) is not None
+    said = draft
+    for limit, asked in OWN_LIMITS:
+        if not asked.search(question):
+            said = limit.sub(" ", said)
+    declines = DECLINING.search(said) is not None or MISSING.search(said) is not None
     if declines and not checker.figures(draft):
         return Outcome.INSUFFICIENT
     limited = any(result.limits for result in usable)
-    if removed or late or len(usable) < len(results) or declines or limited:
+    if removed or late or _gaps(results) or declines or limited:
         return Outcome.QUALIFIED
     return Outcome.SUPPORTED
+
+
+def _defers(text: str, results: Sequence[ToolResult], tools: Iterable[str]) -> str | None:
+    """Why a reply put off a call it could have made - before anything was called, in a reply
+    that declines nothing (not "I cannot run SQL; would you like me to check the
+    standings?"): it offered to look something up, or named one of its tools for the user to
+    use, which the user cannot do. At A5, M01's model named `research_docs` or
+    `optimize_roster` for the user in each of three runs, rather than calling it."""
+    if results or DECLINING.search(text):
+        return None
+    if OFFER.search(text):
+        return "offered to look it up instead of calling a tool"
+    named = [name for name in tools if re.search(rf"\b{re.escape(name)}\b", text)]
+    if named:
+        return f"named {', '.join(named)} instead of calling it"
+    return None
+
+
+def _gaps(results: Sequence[ToolResult]) -> bool:
+    """Whether a result left something out of the answer: one that found nothing or could
+    not answer - unless it was a call refused or failed that the model made again with a
+    usable result (A5: R01 sent an amount with the salary-cap mode, was told to use a
+    custom budget, and did; the page had called the answer "partly answered" with nothing
+    said to be missing)."""
+    for position, result in enumerate(results):
+        if result.usable:
+            continue
+        corrected = result.status is ResultStatus.ERROR and any(
+            later.usable and later.tool == result.tool for later in results[position + 1 :]
+        )
+        if not corrected:
+            return True
+    return False

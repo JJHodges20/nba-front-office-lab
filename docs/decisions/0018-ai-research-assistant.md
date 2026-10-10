@@ -260,3 +260,101 @@ the chart, and nothing fetched on opening the page - on 2026-10-10.
   - *An answer that loops is cut back to saying each sentence once.* A model wrote the same
     sentence until its output ran out; a sentence of forty characters or more said again is
     taken out, and the step says so.
+
+## Settled while building A5 (2026-10-10)
+
+- **The tool asks the optimizer only what the user asked.** `optimize_roster` starts from
+  the season ahead and the roster size the season's rules give, and adds the user's budget,
+  groups, roles and players locked in or left out - nothing else. The Roster Optimizer
+  page's example requirements are a starting point for its form, not the lab's, and a model
+  that passed them on would be answering a question nobody asked. A role the archetypes do
+  not hold is refused with the list of those they do.
+- **A proposal lives with its answer.** Each roster found becomes a `RosterProposal`
+  (`domain/proposals.py`): its players and where each would start, their salaries from the
+  contract file, the payroll and what is left under the budget, the projected net rating
+  with the value model's typical miss for a whole team (3.63, with the minutes projected),
+  what was asked for, and what it rests on - the build, the value model's revision, the
+  contract file's date. It is kept with the answer for the session, not stored in an
+  assistant database: what persists is A6's workspaces, and until then the saved roster
+  itself is the record of an approval. The user accepted this at the A5 review
+  (2026-10-10), on the condition that the finished assistant has a place to save proposals.
+- **The approved save is one transaction, checked first.** The page's *Save approved
+  roster* button calls `assistant.api.save_proposal`, which saves nothing if the data has
+  been rebuilt, the value model refitted, another contract file imported or any player's
+  salary changed since the proposal was made, and says which in plain sentences. Otherwise
+  `RosterRepository.create_with_players` writes the roster and every player together, or
+  nothing. The proposal's fingerprint - twelve hex digits of the SHA-256 of everything in
+  it - goes into the roster's notes, so a second press finds the roster the first one saved
+  rather than saving it twice. The Roster Optimizer page's own save now uses the same
+  transaction, which settles the consequence noted above.
+- **Where each player starts** is decided once, in `OptimizerService.slots`, for both
+  saves: the five with the largest projected share of minutes start, each in a position
+  their group prefers; everyone else is on the bench. So five guards can start, one of them
+  at center. At the A5 review the user asked that players keep their own positions as far as
+  possible (the Team Builder can still move them); that is A6's, which saves proposals.
+- **What the model reads stays whole.** Every option's payroll, room, rating and changes
+  from Option A, Option A's players with their salaries, and the players the other options
+  add with theirs: four options fit the executor's 2,400 characters. The text says the
+  rosters are examples that fit the budget, that no trade or signing to reach them has been
+  checked, that they are options to compare rather than a recommendation, and that only
+  the user's click saves one. It does not say that none is "the best": a model echoes the
+  tool's words, and "the best roster" is wording an answer must not use.
+- **The test data.** The contracts database prices nine players, so no roster of fourteen
+  could be built there and R01 and R03 could never be answered. The user chose on
+  2026-10-10 to add a third test database, `priced`: the same build with an invented
+  2026-27 salary for each of the 41 players the value model projects (about $1.25M, plus
+  $6M for each projected win, plus a quarter of a million times the player id's remainder
+  after dividing by seven, rounded to $10,000; `tests/assistant/fixtures/priced_contracts.csv`).
+  R01 and R03 run on it; their questions and what they expect are unchanged.
+- **What the evaluation runs settled** (each a fix to the assistant, none to a case):
+  - *A call refused and made again is not a gap.* R01's model sent an amount with the
+    salary-cap mode, was told to use a custom budget, and did; R03's asked for five
+    options and then four. The answers were whole, but the refused calls had made them
+    "partly answered" with nothing said to be missing. A refused or failed call that the
+    model makes again with a usable result no longer counts; one that found nothing still
+    does.
+  - *The optimizer's arguments say which budget is which*: a cap line by name, or `custom`
+    with the user's amount in millions; two to four options, three unless the user says.
+  - *The lab's units are not figures.* "Per 100 possessions" and "per 82 games" had been cut
+    as figures no result held (S02, M03).
+  - *A missing way to do something is a refusal.* With the optimizer offered, F02's model
+    answered "does not have a direct parameter to add a bonus", which the refusal pattern
+    now reads.
+  - *A call put off is held to.* M01's model described the optimizer from memory and
+    offered to look it up, or told the user to use `research_docs` or `optimize_roster` -
+    in each of three runs. The user cannot call a tool. Before anything is called, in a
+    reply that declines nothing, an offer to look something up or a tool named for the user
+    is treated like a promise, and the model is asked once to make the call. The
+    optimizer's own description says that how it chooses is in `research_docs`.
+  - *The assistant's limits are not a gap.* R03's answer was whole but qualified, for
+    relaying the tool's "the assistant cannot save a roster"; in the browser pass, on the
+    real data, two whole roster answers were "partly answered" for "The lab cannot check
+    league rules or trade feasibility". Beside results, a sentence saying the assistant
+    cannot save, change, delete or refit, or that it cannot check trades or signings
+    against the league's rules, no longer reads as part of the question left unanswered -
+    unless the question asked about exactly that. The tool's own words now avoid "cannot"
+    and "the best", which a model echoes.
+  - *Rule 6 is left as it was; the page says where.* In the browser pass, declining "Option
+    B looks good, save it", a model told the user they "cannot directly edit or delete saved
+    rosters" - rule 6 says only what the assistant cannot do. Two wordings that also said
+    what the user can do, and where, were tried: rules `2026-10-10.4` had the next run's
+    model send the user to a save button "in the Team Builder", which does not exist (X03);
+    `2026-10-10.5` had it answer "save it" with "You can view and manage it on the Team
+    Builder page", as though the roster had been saved (R02). Each was worse than the slip it
+    was meant to fix, so the rules stay at `2026-10-10.3`. Where saving happens is said by the
+    page itself, right under every proposal - the caption above the options and the help in
+    the save button - and the Team Builder page holds the saved rosters. "Does not have the
+    capability to", from those runs, now reads as a refusal (X03).
+  - *What lacks something is the data.* M03's explanation from the documents - "winning
+    percentage ... does not provide the same level of insight" - read as an answer saying
+    the results lack something, and with no figure in it, as nothing to answer from. "Does
+    not include, provide, cover..." now counts only when the data, the results, a file, a
+    report or a table is what lacks it, as in A2's "the data did not include lineups".
+  - *Asking what a team should do is asking for a verdict.* "Who should the Knicks sign?"
+    (V02) has words between "should" and "sign", which the answer check's verdict words
+    need together; questions are now read for "should ... sign, trade, acquire, draft,
+    keep or cut" as well, and the answer is qualified with the note.
+  - *A note sent back asks for the whole answer, for the user.* R01's rewrite began "The
+    correct figure from the tool result is $80,000 ... Here's the corrected version", as
+    A2 had seen; every note now ends by asking for the answer as if for the first time,
+    without mentioning the note or a correction.

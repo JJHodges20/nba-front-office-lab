@@ -20,6 +20,7 @@ from front_office.assistant import tools as t
 from front_office.domain.assistant import Chart, Evidence, EvidenceKind, ResultStatus
 from front_office.domain.eras import Era
 from front_office.domain.metrics import MetricCatalog
+from front_office.domain.proposals import RosterProposal
 from front_office.domain.schema import Provenance
 from front_office.domain.seasons import SeasonType
 from front_office.services import METRIC_CATALOGS, Lab, Qualification, Window
@@ -115,6 +116,7 @@ class Found:
     kinds: tuple[str, ...] = ()
     limits: tuple[str, ...] = ()
     charts: tuple[Chart, ...] = ()
+    proposals: tuple[RosterProposal, ...] = ()
 
 
 Handler = Callable[[Lab, Any], Found]

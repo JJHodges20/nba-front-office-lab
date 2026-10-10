@@ -54,6 +54,7 @@ from front_office.services.postseason import (
     SubjectOutlook,
     probability_key,
 )
+from front_office.services.proposals import ProposalSaved, ProposalService
 from front_office.services.simulator import (
     Outcome,
     ScenarioReport,
@@ -105,6 +106,8 @@ __all__ = [
     "PostseasonError",
     "PostseasonService",
     "PostseasonStatus",
+    "ProposalSaved",
+    "ProposalService",
     "Qualification",
     "Relationship",
     "RosterCheck",

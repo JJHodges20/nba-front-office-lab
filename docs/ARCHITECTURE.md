@@ -287,7 +287,9 @@ a page:  OptimizerService.pool  (projections for the season ahead + the contract
          salaries + the latest season's roles and groups)
          -> modeling.optimizer.solve (an integer programme, HiGHS through SciPy)
          -> rosters, best first, each cut off before the next
-         -> OptimizerService.save -> a Team Builder roster
+         -> OptimizerService.save -> a Team Builder roster, in one transaction
+            (RosterRepository.create_with_players; OptimizerService.slots says who starts)
+the assistant:  the same run -> ProposalService.from_report -> proposals for review
 ```
 
 `domain/optimizer.py` holds the request (what a run respects) and the outcome;
@@ -372,6 +374,8 @@ a question:  domain.assistant.Context (sidebar, resolved names, sources)
                      assistant.model_tools    -> services (value, fit, postseason, simulator)
                      assistant.document_tools -> services.documents -> config.documents
                                                  (docs/) + storage.documents (FTS5, in memory)
+                     assistant.proposal_tools -> services.optimizer -> services.proposals
+                                                 (each roster found, a proposal)
                      assistant.current_tools  -> pipelines.current (when due) -> services.current
                      assistant.web_tools      -> providers.web (search) | pipelines.web (a page)
                 -> each result back to the model, quoted as data
@@ -385,6 +389,8 @@ the AI Research page:  apps/workbench/wb/views/research.py -> front_office.assis
              (status; start -> a Job: a thread with its own Lab, its steps readable, a
              stop; history; refresh_current) -> each answer drawn with the workbench's
              own components and charts
+an approved proposal:  the user's click -> assistant.api.save_proposal -> ProposalService.save
+             (nothing it rests on changed, not saved before) -> one transaction
 scripts/benchmark_ollama.py:  each candidate model's first move -> ASSISTANT_MODELS.md
 scripts/evaluate_answers.py:  whole answers on the test databases, in a recorded world
              -> assistant.evaluation.score_answer -> docs/research/ASSISTANT_ANSWERS.md
@@ -443,6 +449,17 @@ reads the Markdown under `docs/` and cuts it at its headings (`domain/documents.
 `storage/documents.py` indexes the sections with SQLite's FTS5 in memory for each search
 - SQL stays in `storage` - so no index file exists to go stale. `assistant/toolbox.py` holds every handler that needs only the lab
 (`LAB_HANDLERS`), which the executor runs by default.
+
+From A5 the assistant proposes rosters, and only the user saves one.
+`assistant/proposal_tools.py` runs the optimizer with what the user asked for and nothing
+else; `services/proposals.py` turns each roster found into a `RosterProposal`
+(`domain/proposals.py`) - the players and where each would start, their salaries, the
+payroll, the projected rating with its typical miss, what was asked for and what it rests
+on - which travels with the result to the page and lasts the session. The page's button
+reaches `assistant.api.save_proposal`; `ProposalService.save` finds an earlier save by the
+fingerprint in a roster's notes, refuses one whose build, value model, contract file or
+salaries have changed, and otherwise writes the roster and its players in one
+transaction (`RosterRepository.create_with_players`).
 See [AI_ASSISTANT_SPEC.md](AI_ASSISTANT_SPEC.md) and [AI_EVALUATION.md](AI_EVALUATION.md).
 
 ## Conventions

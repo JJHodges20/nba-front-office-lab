@@ -6,6 +6,8 @@
   read while it runs, which can be stopped, and whose answer arrives when it is done. A
   job opens its own connection to the lab, so the pages go on reading theirs.
 - ``history``: the session's earlier turns, as the conversation the next question follows.
+- ``save_proposal``: a roster the optimizer proposed, saved for the Team Builder when the
+  user presses the button under it - never by the model.
 - ``refresh_current``: fetch what is due of the current sources, by hand.
 
 Ollama not running, or the model not pulled, is a message on the page, never an error:
@@ -34,6 +36,7 @@ from front_office.domain.assistant import (
     NameCandidate,
     Step,
 )
+from front_office.domain.proposals import RosterProposal
 from front_office.domain.seasons import Season
 from front_office.pipelines.current import refresh_current as fetch_current
 from front_office.providers.ollama import (
@@ -44,7 +47,7 @@ from front_office.providers.ollama import (
     OllamaUnavailable,
 )
 from front_office.providers.web import search_key
-from front_office.services import Lab
+from front_office.services import Lab, ProposalSaved
 
 STATUS_TIMEOUT_SECONDS = 5.0
 HISTORY_TURNS = 3
@@ -318,6 +321,20 @@ def context_for(lab: Lab, question: Question, today: date) -> Context:
         resolved=question.resolved,
         mode=question.mode,
     )
+
+
+# --- roster proposals ----------------------------------------------------------------------
+
+
+def save_proposal(
+    proposal: RosterProposal, name: str, *, project_root: Path | None = None
+) -> ProposalSaved:
+    """Save a roster proposal the user approved, as a Team Builder roster, in one
+    transaction. Nothing is saved when the data, the value model, the contract file or a
+    player's salary has changed since the proposal was made; a second press finds the
+    roster the first one saved."""
+    with Lab.open(project_root) as lab:
+        return lab.proposals.save(proposal, name)
 
 
 # --- current information -------------------------------------------------------------------

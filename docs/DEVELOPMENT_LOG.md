@@ -3,6 +3,118 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone A5 - AI Research Assistant: roster proposals and the approved save (2026-10-10)
+
+The assistant proposes rosters, and only the user saves one. No league table, model file
+or setting changed: nothing was fitted or rebuilt, and the optimizer is the one milestone 11
+built.
+
+**Built**
+
+- **The tool** (`assistant/proposal_tools.py`): `optimize_roster` runs the optimizer with
+  what the user asked for - a budget (a cap line or an owner's figure), a roster size,
+  groups, roles, players locked in or left out - and nothing else; the Roster Optimizer
+  page's example requirements are not added. A role the archetypes do not hold is refused
+  with the list of roles; nothing found says why in the optimizer's own words (the
+  fourteen cheapest players already cost more than the budget, say). The text the model
+  reads gives every option's payroll, what is left under the budget, its projected net
+  rating and its changes from Option A, Option A's players with their salaries and the
+  players the other options add with theirs, the value model's typical miss for a whole
+  team, and that the rosters are options to compare - not a recommendation, and not trades
+  or signings anyone has checked are allowed - which only the user's click saves.
+- **Proposals** (`domain/proposals.py`, `services/proposals.py`): each roster found is a
+  `RosterProposal` - its players and where each would start, their salaries, the payroll,
+  the room, the rating with its typical miss, what was asked for in words, and what it
+  rests on (the build, the value model's revision, the contract file's date) - with a
+  fingerprint, twelve hex digits of the SHA-256 of all of it. It travels with the result to
+  the page and lasts the session.
+- **The approved save**: `assistant.api.save_proposal` -> `ProposalService.save`. A roster
+  whose notes carry the fingerprint is the one an earlier press saved, and is returned; a
+  proposal whose build, value model, contract file or any salary has changed is refused in
+  plain sentences and nothing is written; otherwise `RosterRepository.create_with_players`
+  writes the roster and all its players in one transaction. `OptimizerService.save` - the
+  Roster Optimizer page's button - uses the same transaction and the same placement
+  (`OptimizerService.slots`: the five largest projected shares start), which settles the
+  consequence decision 0018 recorded.
+- **The page**: under an answer that found rosters, *Rosters to review*: each option with
+  its payroll against the budget, what is left to spend, its projected net rating give or
+  take the typical miss, how it differs from Option A, what was asked for and what it rests
+  on, its players' table, and a *Save approved roster* button with a name; then "Saved
+  as...", "Already saved as..." or "Not saved" with the reasons.
+- **Every tool in the registry is now built.** The executor's "not built yet" path stays,
+  for a toolbox that leaves a tool out, and its tests use one.
+- **Tests**: the transaction (saved whole; a duplicate player, a shared starting slot or an
+  unknown slot saves nothing; a failure while writing the players leaves no roster), the
+  proposals against the optimizer's own plans, the requirements in words, the fingerprint,
+  every change the check names, a save, a second press, a refusal after a rebuild or a
+  salary change, the tool on every path (options, roles kept, locks and exclusions, fewer
+  options than asked, the time limit, nothing found, no contract file, an unknown role, an
+  unknown id), the facade's save, and the page drawing three options and saving one twice
+  with a scripted model.
+
+**The test data - the user's decision (2026-10-10).** The contracts database prices nine
+players, so no roster of fourteen could be built on it and R01 and R03 could never be
+answered. The user chose fuller test data: a third test database, `priced`
+(`priced_template`), is the fixture build with an invented 2026-27 salary for each of the 41
+players the value model projects - about $1.25M, plus $6M for each projected win, plus a
+quarter of a million times the player id's remainder after dividing by seven, rounded to
+$10,000 (`tests/assistant/fixtures/priced_contracts.csv`). R01 and R03 run on it; their
+questions and what they expect are unchanged, and each carries a comment saying so.
+
+**The evaluation** - eight runs over all 59 cases: 42, 47, 44, 46, 47, 50, 45 and 48
+passed ([AI_EVALUATION.md](AI_EVALUATION.md) lists what each led to); every fix was to the
+assistant, and the only case changes are the two the user decided. What the runs settled
+(decision 0018, "Settled while building A5"): a call refused and made again is not a gap;
+the optimizer's arguments say which budget is which; "per 100 possessions" and "per 82
+games" are units, not figures; "does not have a parameter to" or "the capability to" is a
+refusal; a call put off - an offer to look it up, or a tool named for the user, who cannot
+call one - is held to like a promise; "Who should the Knicks sign?" asks for a verdict;
+every note sent back asks for the whole answer, for the user; the assistant's limits
+(it cannot save; its tools do not check trades against the league's rules) are not a gap;
+"does not include" counts only when the data lacks something; and the tool's own words
+avoid "cannot" and "the best", which a model echoes. Two wordings of rule 6 that said where
+the user saves and edits rosters were tried and dropped: each sent an answer somewhere
+wrong (runs six and seven, the second of them the best score of the eight), so the rules are
+A4's. At the end: all three roster cases pass, the right first tool in 36 of 37 cases that
+need one, nothing called in the 11 *clarify* and *refuse* cases, one call refused in 54,
+nothing forbidden, and one figure cut (B02's "7 games" for a 4-3 Finals). Each change to a
+tool's description moved a few unrelated answers, as A4 had seen: H05 now leaves out a
+default season, and B02 writes the length of a Finals the result gives as a score.
+
+**The browser pass** - the workbench over a scratch copy of the real database (427 players
+with a 2026-27 salary and a forecast), with the real model, clicked through with Playwright
+in the light and the dark theme: three rosters under $150M and a luxury-tax roster with two
+rim protectors, each option's tiles, comparison, basis and players; *Save approved roster*
+pressed twice ("Saved as..." and then "Already saved as... It was not saved a second time");
+the saved roster in the Team Builder (14 players, every one priced from the contract file);
+and "Option B looks good, save it", declined. It found two faults. Whole roster answers
+were "partly answered" for relaying that the lab cannot check trades against the league's
+rules - fixed. A refusal to save told the user they "cannot directly edit or delete saved
+rosters" - left: rule 6 was kept, above, and the page says where saving happens. The
+welcome card now has a roster example. The five players with the most forecast minutes
+start, as the Roster Optimizer's save has placed them since milestone 11, so a roster of
+guards can show a guard "Starts at C"; the Team Builder moves them.
+
+**The user's decisions at the A5 review (2026-10-10)**:
+
+- Proposals may last the session with their answer for now, as long as the finished
+  assistant has a place to save them: A6's workspaces will.
+- Rule 6 stays as it was, with its occasional wrong remark about editing saved rosters.
+- Players should keep their own positions as far as possible when a roster is saved; the
+  Team Builder can still move them. To be done with A6, which saves proposals.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Pass |
+| `pytest -n auto` (everything but live-network and live-model tests) | 3,673 passed in 4 min 24 s |
+| `pytest -m ollama` (the live model) | 6 passed |
+| The end-to-end evaluation, on the A5 code | 48/59 (42 to 50 over eight runs); report generated |
+| The page in a browser | Clicked through as above, light and dark, over a copy of the real database; no error box or exception; the "partly answered" fault is fixed, and the refusal's slip about editing saved rosters is left with the rules as they were, for the reasons above and by the user's decision |
+| UI boundaries | The page imports `front_office.assistant.api` alone of the assistant; the boundary tests pass |
+| Data and models | No model file, setting or league table changed; the browser pass saved its rosters into a copy, never the lab's database; the evaluation's saved runs are in `data/assistant/benchmarks/`, which is not committed |
+
 ## Milestone A4 - AI Research Assistant: the forecasting tools and the document index (2026-10-10)
 
 The assistant reads the lab's fitted models and its own documents. Four tools answer from

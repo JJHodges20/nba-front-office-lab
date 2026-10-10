@@ -40,7 +40,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))  # the recorded world and the test databases' recipe live in tests/
 
 from tests.assistant.recorded import world_toolbox  # noqa: E402
-from tests.conftest import BUILD_TOOK, BUILT_AT, FIXTURE_RAW, with_contracts  # noqa: E402
+from tests.conftest import (  # noqa: E402
+    BUILD_TOOK,
+    BUILT_AT,
+    FIXTURE_RAW,
+    PRICED_CONTRACT_FILE,
+    with_contracts,
+)
 from tests.helpers import CONTRACT_FILE  # noqa: E402
 
 from front_office.assistant.evaluation import (  # noqa: E402
@@ -63,13 +69,13 @@ from front_office.services import Lab  # noqa: E402
 CASES = ROOT / "tests" / "assistant" / "fixtures" / "cases.yaml"
 RESULTS = ROOT / "data" / "assistant" / "benchmarks"
 REPORT = ROOT / "docs" / "research" / "ASSISTANT_ANSWERS.md"
-MILESTONE = "A4"
+MILESTONE = "A5"
 
 
 def build_labs(where: Path) -> dict[str, Path]:
-    """The case file's two databases: the fixture build, and the same with the tests'
-    invented contract file - the recipe of tests/conftest.py - each with the lab's own
-    documents beside it, for research_docs."""
+    """The case file's three databases: the fixture build, and the same with each of the
+    tests' invented contract files - the recipe of tests/conftest.py - each with the lab's
+    own documents beside it, for research_docs."""
     fixture = where / "fixture"
     shutil.copytree(ROOT / "configs", fixture / "configs")
     shutil.copytree(ROOT / "docs", fixture / "docs")
@@ -78,7 +84,8 @@ def build_labs(where: Path) -> dict[str, Path]:
     if not build_database(load_settings(fixture), now=lambda: next(moments)).loaded:
         raise SystemExit("the fixture database could not be built")
     with_contracts(fixture, where / "contracts", CONTRACT_FILE)
-    return {"fixture": fixture, "contracts": where / "contracts"}
+    with_contracts(fixture, where / "priced", PRICED_CONTRACT_FILE.read_text(encoding="utf-8"))
+    return {"fixture": fixture, "contracts": where / "contracts", "priced": where / "priced"}
 
 
 def evaluate(arguments: argparse.Namespace) -> dict[str, Any]:

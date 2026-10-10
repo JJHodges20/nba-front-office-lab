@@ -79,7 +79,7 @@ Lettered so as not to clash with the milestones above; each passes the same gate
 | A2 | Tools, evidence, current data, the web | Name resolution, the read tools, the evidence record and answer checker, game logs, the injury report and transactions, web search and pasted links | Done (2026-10-09; whole answers end to end, [ASSISTANT_ANSWERS.md](research/ASSISTANT_ANSWERS.md); web search checked live) |
 | A3 | The AI Research page | Quick and Deep, the evidence panel, tables and charts, cancel, failure states | Done (2026-10-10; the page in the Ask group, clicked through in both themes with the real model) |
 | A4 | Forecasting tools | Value, fit, postseason and simulator tools; the document index | Done (2026-10-10; every modeled figure with its error and its model file, the documents searched with FTS5, plainer words on screen; 46/56 end to end) |
-| A5 | Roster proposals | 2-4 options as drafts; the approved save, atomic and checked against its fingerprint | Planned |
+| A5 | Roster proposals | 2-4 options as drafts; the approved save, atomic and checked against its fingerprint | Done (2026-10-10; each roster found is a proposal under the answer, saved only by the user's click after checking nothing it rests on has changed, in one transaction; a third test database prices every projected player; 48/59 end to end) |
 | A6 | Workspaces | Named, persistent research; asking from any page; export and delete | Planned |
 | A7 | Wider sources | More feeds, search quality, contract-update review | Planned |
 | A8 | Research proposals | Experiments for the models, written up, never applied | Planned |

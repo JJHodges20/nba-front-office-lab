@@ -5,7 +5,8 @@ models and its own documents, what has happened since the build, and pages on th
 Every figure in an answer was checked against the results before it is shown. Under each
 answer the page draws what it rests on: each result's rows, a chart where the tool chose
 one, and the evidence - sources, dates, the build, the model files. The conversation lasts
-as long as this browser tab, and nothing is saved.
+as long as this browser tab. A roster the optimizer proposed is shown with what it rests on
+and a *Save approved roster* button: saving is the user's click, never the model's (A5).
 
 A question runs in the background (``assistant.api.Job``): the page shows its steps as
 they come, and can stop it, keeping what was gathered by then.
@@ -34,15 +35,20 @@ from front_office.domain.assistant import (
     ToolResult,
 )
 from front_office.domain.metrics import MetricSpec
-from front_office.services import METRIC_CATALOGS, CurrentSource
+from front_office.domain.proposals import RosterProposal
+from front_office.domain.tables.rosters import ROSTER_SLOTS
+from front_office.services import METRIC_CATALOGS, CurrentSource, ProposalSaved
 from wb import charts, components, data, formats, state
-from wb.components import ASSUMPTION, DERIVED, ESTIMATE, MEASURED, MODELED, REPORTED
+from wb.components import ASSUMPTION, DERIVED, ESTIMATE, MEASURED, MODELED, REPORTED, Figure
 from wb.theme import Palette
 
 TURNS = "ai_turns"
 JOB = "ai_job"
 MODE = "ai_mode"
 REFRESHED = "ai_refreshed"
+SAVES = "ai_saves"
+"""What pressing a proposal's save button did, by the proposal's fingerprint."""
+BENCH = ROSTER_SLOTS[-1]
 PROGRESS_SECONDS = 1.0
 """How often a question under way is looked in on."""
 TAB_LABEL = 38
@@ -52,7 +58,7 @@ SUBTITLE = (
     "Ask a question in your own words. An AI model running on this computer answers from the "
     "lab's data, models and documents, the latest league news, and the web. Every number it "
     "gives is checked against those sources before you see it. The conversation lasts until "
-    "you close or reload this tab, and nothing is saved."
+    "you close or reload this tab. Nothing is saved unless you press a save button."
 )
 PROMPT = "Ask about players, teams, seasons, forecasts, recent games, injuries, trades or news"
 MODES = {Mode.QUICK.value: "Quick", Mode.DEEP.value: "Deep"}
@@ -128,7 +134,35 @@ EXAMPLES = (
     "What would a team with a +5 net rating expect in the playoffs?",
     "Have the Knicks made any moves since the start of October?",
     "Search the web for reporting on the Knicks' preseason.",
+    "Propose three rosters for next season under a $150M budget.",
 )
+PROPOSALS = (
+    "Example rosters the optimizer found for this question: options to compare, not a "
+    "recommendation. The lab has not checked whether the trades or signings to get them are "
+    "allowed. Nothing is saved until you press Save approved roster under one."
+)
+SAVE_HELP = (
+    "Saves this roster for the Team Builder. Before saving, the lab checks that its data, its "
+    "player value model and the salaries are the same as when the roster was proposed."
+)
+RATING_HELP = (
+    "Each player's forecast added up for the minutes they are expected to play, relative to "
+    "the league. For whole teams these forecasts have typically been off by the amount shown."
+)
+PROPOSAL_METRICS = ("projected_impact", "projected_share", "projected_wins")
+"""The value model's forecasts in a proposal's players table, labelled by their catalog."""
+PROPOSAL_COLUMNS = {
+    "player_name": st.column_config.Column("Player", width="medium", pinned=True),
+    "team": st.column_config.Column("Team", help="The team the player is under contract to."),
+    "position": st.column_config.Column("Pos"),
+    "slot": st.column_config.Column(
+        "On the roster",
+        help="Where the save puts the player: the five with the most forecast minutes start.",
+    ),
+    "salary": st.column_config.Column(
+        "Salary", help="For the season ahead, from your contract file."
+    ),
+}
 IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 SPECIAL = re.compile(r"([\\`*_\[\]()#+!|~<>$-])")
 
@@ -279,6 +313,7 @@ def _turn(number: int, turn: api.Turn, *, can_ask: bool) -> None:
             _options(number, turn, can_ask=can_ask)
         for note in answer.warnings:
             components.tagged(("Note", ":material/info:", "gray"), _escaped(note))
+        _proposals(number, answer)
         _results(number, answer)
         _evidence(answer)
         _workings(turn)
@@ -359,6 +394,134 @@ def _step_words(step: Step) -> str:
     if step.kind == "check":
         return f"Checked: {step.detail}"
     return step.detail
+
+
+# --- roster proposals ---------------------------------------------------------------------------
+
+
+def _proposals(number: int, answer: Answer) -> None:
+    """The rosters the optimizer proposed, each with what it rests on and a button to save
+    it: the user's click, never the model's (A5)."""
+    found = [result for result in answer.results if result.usable and result.proposals]
+    if not found:
+        return
+    st.markdown("**Rosters to review**")
+    st.caption(PROPOSALS)
+    for result in found:
+        if len(found) > 1:  # each run labels its own options from A
+            st.caption(f"From {result.result_id}: {_escaped(result.title)}")
+        first = result.proposals[0]
+        for position, proposal in enumerate(result.proposals):
+            _proposal(proposal, first, key=f"{number}_{result.result_id}_{position}")
+
+
+def _proposal(proposal: RosterProposal, first: RosterProposal, *, key: str) -> None:
+    with st.container(border=True):
+        st.markdown(f"**{_escaped(proposal.label)}** · {proposal.payroll_season}")
+        components.figures(
+            [
+                Figure(
+                    "Payroll",
+                    formats.money_compact(proposal.payroll),
+                    f"budget {formats.money_compact(proposal.budget)}",
+                    help=f"{proposal.budget_label}: the line the payroll may not go over.",
+                ),
+                Figure(
+                    "Left to spend",
+                    formats.money_compact(proposal.room),
+                    "under the budget",
+                ),
+                Figure(
+                    "Projected net rating",
+                    f"{proposal.rating:+.1f}",
+                    None if proposal.error is None else f"give or take {proposal.error:.1f}",
+                    help=RATING_HELP,
+                ),
+            ]
+        )
+        if proposal is not first:
+            st.caption(
+                f"Compared with {_escaped(first.label)}: in {_listed(proposal.added)}; "
+                f"out {_listed(proposal.removed)}."
+            )
+        st.caption(_basis(proposal))
+        players = pd.DataFrame([player.model_dump() for player in proposal.players])
+        players["slot"] = players["slot"].map(_slot)
+        shown = players[[*PROPOSAL_COLUMNS, *PROPOSAL_METRICS]]
+        catalog = METRIC_CATALOGS["Player value"]
+        st.dataframe(
+            formats.styled(shown, catalog, {"salary": formats.money}),
+            hide_index=True,
+            placeholder=components.EMPTY_CELL,
+            height=components.table_height(len(shown)),
+            row_height=components.ROW,
+            column_config={
+                **PROPOSAL_COLUMNS,
+                **components.metric_columns(catalog, PROPOSAL_METRICS),
+            },
+            key=f"ai_proposal_table_{key}",
+        )
+        with st.popover("Save approved roster", icon=":material/save:"):
+            st.caption(SAVE_HELP)
+            name = st.text_input(
+                "Roster name",
+                value=f"AI Research {proposal.label}, {proposal.payroll_season}",
+                max_chars=80,
+                key=f"ai_proposal_name_{key}",
+            )
+            if st.button("Save approved roster", key=f"ai_proposal_save_{key}", type="primary"):
+                st.session_state.setdefault(SAVES, {})[proposal.fingerprint] = api.save_proposal(
+                    proposal, name
+                )
+        _saved(st.session_state.get(SAVES, {}).get(proposal.fingerprint))
+
+
+def _saved(saved: ProposalSaved | None) -> None:
+    if saved is None:
+        return
+    if saved.created:
+        st.success(
+            f"Saved as “{_escaped(str(saved.name))}”. The Team Builder has it.",
+            icon=":material/check_circle:",
+        )
+    elif saved.saved:
+        st.info(
+            f"Already saved as “{_escaped(str(saved.name))}”. It was not saved a second time.",
+            icon=":material/info:",
+        )
+    else:
+        st.warning(
+            "Not saved. "
+            + " ".join(_escaped(reason) for reason in saved.refused)
+            + " Ask the question again for rosters made from the lab as it is now.",
+            icon=":material/warning:",
+        )
+
+
+def _basis(proposal: RosterProposal) -> str:
+    basis = proposal.basis
+    asked = "; ".join(proposal.requirements)
+    contract = (
+        f"your contract file as of {formats.day(basis.contract_as_of)}"
+        if basis.contract_as_of is not None
+        else "your contract file"
+    )
+    model = f"the player value model ({basis.value_model})" if basis.value_model else "no model"
+    build = f", data build {basis.build_id}" if basis.build_id is not None else ""
+    return _escaped(f"Asked for: {asked}. Salaries from {contract}; forecasts from {model}{build}.")
+
+
+def _slot(slot: str) -> str:
+    return "Bench" if slot == BENCH else f"Starts at {slot}"
+
+
+def _listed(names: tuple[str, ...]) -> str:
+    if not names:
+        return "nobody"
+    escaped = [_escaped(name) for name in names]
+    if len(escaped) == 1:
+        return escaped[0]
+    return ", ".join(escaped[:-1]) + " and " + escaped[-1]
 
 
 # --- what an answer rests on --------------------------------------------------------------------

@@ -222,6 +222,55 @@ class TestPlayers:
         assert rosters.players(roster_id)["player_id"].tolist() == [TATUM]
 
 
+class TestCreatingWithPlayers:
+    """A5: a proposal is saved in one transaction - the roster and every player, or nothing."""
+
+    def create(self, rosters: RosterRepository, players, **kwargs) -> int:  # type: ignore[no-untyped-def]
+        return rosters.create_with_players(
+            "Proposed", stats_season="2025-26", payroll_season="2026-27", players=players, **kwargs
+        )
+
+    def test_the_roster_and_its_players_are_saved_together(self, rosters: RosterRepository) -> None:
+        roster_id = self.create(
+            rosters,
+            [(TATUM, "SF"), (BROWN, "SG"), (WHITE, "BENCH")],
+            notes="Saved from AI Research proposal Option A (0123456789ab).",
+        )
+        roster = rosters.get(roster_id)
+        assert roster["name"] == "Proposed" and roster["notes"].endswith("(0123456789ab).")
+        members = rosters.players(roster_id)
+        assert validate_frame(members, ROSTER_PLAYERS) == []
+        assert dict(zip(members["player_id"], members["slot"], strict=True)) == {
+            TATUM: "SF",
+            BROWN: "SG",
+            WHITE: "BENCH",
+        }
+        assert members["assumed_salary"].isna().all(), "the contract file prices them"
+
+    @pytest.mark.parametrize(
+        ("players", "why"),
+        [
+            ([(TATUM, "SF"), (TATUM, "BENCH")], "only once"),
+            ([(TATUM, "SF"), (BROWN, "SF")], "one player"),
+            ([(TATUM, "Center")], "slot must be one of"),
+        ],
+    )
+    def test_a_roster_that_cannot_hold_together_saves_nothing(
+        self, rosters: RosterRepository, players, why: str
+    ) -> None:
+        with pytest.raises(StorageError, match=why):
+            self.create(rosters, players)
+        assert rosters.list().empty
+
+    def test_a_failure_while_writing_the_players_leaves_no_roster(
+        self, rosters: RosterRepository
+    ) -> None:
+        too_large = 2**70  # no SQLite integer holds it: the players' insert fails
+        with pytest.raises(OverflowError):
+            self.create(rosters, [(TATUM, "SF"), (too_large, "BENCH")])
+        assert rosters.list().empty, "the roster written first was rolled back"
+
+
 def test_rosters_survive_reopening_the_database(tmp_path: Path) -> None:
     path = tmp_path / "lab.sqlite"
     with Database(path) as first:

@@ -132,10 +132,13 @@ class TestCoverage:
 
 
 @pytest.fixture(scope="module")
-def labs(built_template: tuple[Path, BuildReport], contract_template: Path) -> Iterator[dict]:
+def labs(
+    built_template: tuple[Path, BuildReport], contract_template: Path, priced_template: Path
+) -> Iterator[dict]:
     opened = {
         "fixture": Lab(load_settings(built_template[0])),
         "contracts": Lab(load_settings(contract_template)),
+        "priced": Lab(load_settings(priced_template)),
     }
     yield opened
     for lab in opened.values():

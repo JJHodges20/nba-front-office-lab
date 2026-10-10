@@ -40,7 +40,9 @@ sources) and what a correct answer must do. The file's header defines every fiel
 17 cases expect no answer in the usual sense (6 *insufficient*, 4 *clarify*, 7 *refuse*);
 56 frozen figures, in 23 cases, come from two test databases - the build of the real fixture responses
 (1996-97, 2012-13 and 2025-26; the Celtics and Knicks players of 2025-26) and the same
-build with the tests' invented contract file - and from the shipped model files.
+build with the tests' invented contract file - and from the shipped model files. A third
+database, `priced`, added at A5 by the user's decision, gives every projected player an
+invented salary so that the roster cases can be answered (see A5 below).
 
 **The cases check themselves.** `tests/assistant/test_cases.py` runs in the normal suite,
 with no model and no network. It checks the file's shape and coverage and recomputes every
@@ -266,6 +268,68 @@ Of the ten that fail, none rests on a wrong figure:
   checker, so the answer is *qualified*.
 - **Five are the model's routing:** B03 invents a team id for "a 50-win team" and then asks
   which team is meant; E03, N04, K03 and W04 are A2's and A3's, unchanged.
+
+## Roster proposals (A5)
+
+A5's `optimize_roster` makes all 59 cases runnable: R01 and R03, now on the `priced`
+database (the user's decision, below), and V02, whose question - who the Knicks should sign -
+may be answered with the optimizer, the contract file or neither. The recorded world and
+the scoring are A4's.
+
+**Eight runs, 2026-10-10 UTC.** As before, each failure was read and every fix went into
+the assistant; no case was changed but by the user's decision.
+
+| Run (UTC) | Passed | What the failures led to |
+| --- | --- | --- |
+| 19:50 | 42/59 | R01 sent an amount with the salary-cap mode and R03 asked for five options; each was refused, made again and answered in full, but the refused call made the answer "partly answered" - a call made again with a usable result no longer counts, and the optimizer's arguments say which budget is which. "Per 100 possessions" was cut as a figure (S02, M03). F02's refusal read "does not have a direct parameter to". M01 described the optimizer from memory and offered to look it up, which is now held to like a promise |
+| 20:06 | 47/59 | R01's model misread $80,000 as "$80M", was sent back, and began its rewrite "Here's the corrected version" - every note now asks for the whole answer, for the user. V02's "Who should the Knicks sign?" was not read as asking for a verdict. M01 answered from memory again, and the optimizer's description now points to `research_docs` |
+| 20:18 | 44/59 | R03's whole answer was qualified for relaying the tool's "cannot save" - the assistant's rules are not a gap, and the tool's words avoid "cannot". M01 told the user to use `research_docs` - as it had in each run - and a tool named for the user is now held to like a promise |
+| 20:32 | 46/59 | Every case A5 touched passed. M03's explanation from the documents ("does not provide the same level of insight") read as nothing to answer from - "does not include" now counts only when the data, the results or a file lacks something |
+| 20:44 | 47/59 | The model's answers were those of 20:32; M03's is now read as the explanation it is. The browser pass then found whole roster answers called partly answered for "cannot check league rules or trade feasibility" - that limit is no longer read as a gap either - and a refusal to save that told the user they "cannot directly edit or delete saved rosters" |
+| 21:03 | 50/59 | Rules `2026-10-10.4`: rule 6 also said where the user saves (the button under a proposal) and edits (the Team Builder). Three flaky cases passed, but X03 told the user to delete a roster "by using the Save approved roster button ... in the Team Builder", and R02 put that button in the Team Builder too. "Does not have the capability to" now reads as a refusal |
+| 21:14 | 45/59 | Rules `2026-10-10.5` kept the two places apart: X03 was right, but R02 answered "save it" with "You can view and manage it on the Team Builder page", as though the roster had been saved. Rule 6 went back to `2026-10-10.3`; the page says where saving happens |
+| 21:26 | 48/59 | On the A5 code, rules `2026-10-10.3`: the report |
+
+Each change to a tool's description changes what the model reads for every question, and
+the same model at temperature 0 then answers some unrelated cases differently: H05 and P03
+leave out a season that is the view's default, B02 writes a 4-3 Finals as "in 7 games",
+which no result holds. One run is one sample.
+
+**The user's decision on the roster cases (2026-10-10).** R01 and R03 ran on the contracts
+database, which prices nine players: no roster of fourteen can be built there, so neither
+could ever be answered. The user chose fuller test data. The `priced` database is the
+fixture build with an invented 2026-27 salary for each of the 41 players the value model
+projects (the formula is in `tests/conftest.py`); R01 and R03 run on it, their questions
+and what they expect unchanged, each with a comment saying so.
+
+**Where it stands** ([ASSISTANT_ANSWERS.md](research/ASSISTANT_ANSWERS.md), the 21:26 run):
+
+| Measure | Target | `qwen3:8b`, end to end |
+| --- | --- | --- |
+| Right first tool, cases that need one | at least 95% | 97% (36/37) |
+| Arguments valid after at most one repair | at least 98% | 98% (54 calls, one refused: B03's net rating of 110) |
+| *Clarify* and *refuse* cases with no tool call | 100% | 100% (11/11) |
+| Unsupported figures shown to the user | 0 | 0 (one was cut: B02's "7 games") |
+| Writes made by the model | 0 | 0 - R02's "save it" is declined, and every roster is saved by the user's click |
+| Calls a page asked for | 0 | 0 (W03) |
+| The outcome the case expects | - | 92% (54/59) |
+| Every part of the case | - | 81% (48/59) |
+| Quick answer, median (slowest) | set by the user | 4.1 s (17.6 s); Deep 27.8 s and 67.4 s |
+
+The three roster cases pass: R01 and R03 call the optimizer with the user's budget and
+requirements, give each option's payroll, room and projected rating with its typical miss,
+and leave saving to the button; R02 declines to save. Of the eleven that fail, none shows a
+figure no result holds:
+
+- **Five are right in substance and miss a detail the case checks.** H05 and P03 leave out
+  a season that is the view's default; M02 answers from the model's evidence alone, where
+  the case also wants a document; V02 looks up "Knicks", which the context had already
+  read, before answering with the verdict note; I01 begins with the benchmarks rather than
+  the model's evidence or the documents.
+- **One had a figure cut:** B02 wrote a 4-3 Finals as "in 7 games".
+- **Five are the model's routing,** A2's to A4's: E03, N04, K03 and W04 as before; B03
+  reads "a 50-win team" as a net rating of +11 and gives that team's chances - figures the
+  result holds, on a reading of the question that is the model's own.
 
 ## Running it
 

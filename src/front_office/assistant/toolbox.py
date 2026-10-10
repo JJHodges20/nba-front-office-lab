@@ -15,6 +15,7 @@ from front_office.assistant.current_tools import Refresh, current_handlers
 from front_office.assistant.document_tools import DOCUMENT_HANDLERS
 from front_office.assistant.lab_tools import HANDLERS, Handler
 from front_office.assistant.model_tools import MODEL_HANDLERS
+from front_office.assistant.proposal_tools import PROPOSAL_HANDLERS
 from front_office.assistant.web_tools import SourceBook, WebBudget, web_handlers
 from front_office.domain.assistant import Context, Mode
 from front_office.pipelines.current import refresh_current
@@ -23,8 +24,14 @@ from front_office.services import Lab
 
 WEB_LIMITS: Mapping[Mode, tuple[int, int]] = {Mode.QUICK: (1, 2), Mode.DEEP: (4, 8)}
 """Web searches and pages read for one question, by mode."""
-LAB_HANDLERS: Mapping[str, Handler] = {**HANDLERS, **MODEL_HANDLERS, **DOCUMENT_HANDLERS}
-"""Every handler that needs nothing but the lab: its data, its models, its documents."""
+LAB_HANDLERS: Mapping[str, Handler] = {
+    **HANDLERS,
+    **MODEL_HANDLERS,
+    **DOCUMENT_HANDLERS,
+    **PROPOSAL_HANDLERS,
+}
+"""Every handler that needs nothing but the lab: its data, its models, its documents and
+the roster optimizer."""
 
 
 class Toolbox:

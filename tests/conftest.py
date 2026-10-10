@@ -179,6 +179,23 @@ def contract_template(
     return root
 
 
+PRICED_CONTRACT_FILE = REPO_ROOT / "tests" / "assistant" / "fixtures" / "priced_contracts.csv"
+"""An invented 2026-27 salary for every player the fixture build projects into that season:
+about $1.25M, plus $6M for each projected win, plus a quarter of a million times the
+player id's remainder after dividing by 7, rounded to $10,000. With every projected player
+priced, the optimizer can build whole rosters (decision 0018, A5)."""
+
+
+@pytest.fixture(scope="session")
+def priced_template(
+    built_template: tuple[Path, BuildReport], tmp_path_factory: pytest.TempPathFactory
+) -> Path:
+    """A built project holding the priced contract file. Never written to: copy it."""
+    root = tmp_path_factory.mktemp("priced") / "lab"
+    with_contracts(built_template[0], root, PRICED_CONTRACT_FILE.read_text(encoding="utf-8"))
+    return root
+
+
 # --- the invented league, for anything that needs a fitted model's output -----------------
 
 VALUE_SPEC = ValueSpec(first_test_season="2004-05", resamples=100)

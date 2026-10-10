@@ -16,7 +16,9 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 import front_office.assistant.api as api
+from front_office.config import load_settings
 from front_office.providers.ollama import OllamaProvider, OllamaUnavailable
+from front_office.services import Lab
 from tests.helpers import BOS, BROWN, WHITE
 from tests.ollama_fakes import ScriptedOllama, chat_chunks, tool_call
 from tests.ui.conftest import drawn, texts
@@ -203,6 +205,56 @@ def test_a_new_conversation_starts_again_and_a_refresh_reports(
     assert app.session_state["ai_turns"] == []
     app.button(key="ai_refresh").click().run()
     assert "Games: none - nothing is fetched in tests" in texts(app)
+
+
+ROSTERS = tool_call("optimize_roster", budget_mode="custom", budget_millions=150, options=3)
+
+
+def test_proposed_rosters_are_saved_only_by_the_users_click(model, page, priced_home: Path) -> None:
+    """A5: the options are shown with what they rest on; one is saved by its button, once."""
+    model(
+        ScriptedOllama(
+            chats=[
+                chat_chunks(tool_calls=[ROSTERS]),
+                chat_chunks("Here are three rosters under the budget [r1]."),
+            ]
+        )
+    )
+    app = ask(page(priced_home, "research"), "Propose three rosters under a $150M budget.")
+    (turn,) = app.session_state["ai_turns"]
+    assert turn.answer is not None
+    (result,) = turn.answer.results
+    proposals = result.proposals
+    assert len(proposals) == 3
+    said = texts(app)
+    assert "Rosters to review" in said and "Nothing is saved until you press" in said
+    for proposal in proposals:
+        assert f"**{proposal.label}** · 2026-27" in said
+    tiles = [(metric.label, metric.value, metric.delta) for metric in app.metric]
+    first = proposals[0]
+    assert ("Projected net rating", f"{first.rating:+.1f}", f"give or take {first.error:.1f}") in (
+        tiles
+    )
+    assert "Asked for: 14 to 15 players. Salaries from your contract file as of" in said
+    assert f"in {proposals[1].added[0]}" in said, "an option is compared with Option A"
+    assert len(app.dataframe) == 5, "each option's players, the result's rows, the chart's"
+
+    with Lab(load_settings(priced_home)) as lab:
+        assert lab.rosters.list().empty, "nothing is saved before the click"
+    app.text_input(key="ai_proposal_name_0_r1_1").set_value("Option B from the assistant")
+    app.button(key="ai_proposal_save_0_r1_1").click().run()
+    assert not app.exception, [error.value for error in app.exception]
+    assert any("Saved as" in item.value for item in app.success)
+    with Lab(load_settings(priced_home)) as lab:
+        rosters = lab.rosters.list()
+        assert rosters["name"].tolist() == ["Option B from the assistant"]
+        members = lab.rosters.players(int(rosters.iloc[0]["roster_id"]))
+    assert set(members["player_id"]) == set(proposals[1].player_ids)
+
+    app.button(key="ai_proposal_save_0_r1_1").click().run()
+    assert any("Already saved" in item.value for item in app.info)
+    with Lab(load_settings(priced_home)) as lab:
+        assert len(lab.rosters.list()) == 1, "a second press saves nothing more"
 
 
 def test_a_dollar_is_shown_as_a_dollar_and_an_image_is_not_fetched() -> None:

@@ -13,6 +13,10 @@
 #                           contract file, the shipped model files
 #               contracts - the same build with the tests' invented contract file imported
 #                           (contract_template), as of 2026-10-01
+#               priced    - the same build with an invented 2026-27 salary for every player
+#                           the value model projects (priced_template; the formula is in
+#                           tests/conftest.py), as of 2026-10-01, so that the optimizer can
+#                           build whole rosters. Added at A5 by the user's decision
 #   context   what the workbench hands the assistant with the question: the sidebar filters,
 #             the names the deterministic pre-pass resolved (several candidates for one
 #             name mean it is ambiguous), and any source the user supplied
@@ -44,6 +48,11 @@ databases:
     Team statistics for 1996-97, 2012-13 and 2025-26; player statistics for 2025-26
     (Celtics and Knicks players only); contracts for 2026-27 to 2028-29 as of 2026-10-01
     (source "invented for tests"); value model r2; data build 2 of 2026-10-01.
+  priced: >-
+    Team statistics for 1996-97, 2012-13 and 2025-26; player statistics for 2025-26
+    (Celtics and Knicks players only); a 2026-27 salary for each of the 41 players the
+    value model projects, as of 2026-10-01 (source "invented for tests"); value model r2;
+    data build 2 of 2026-10-01.
 
 cases:
   # --- historical lookup ----------------------------------------------------------------
@@ -803,7 +812,10 @@ cases:
   - id: R01
     category: rosters
     mode: deep
-    database: contracts
+    # Changed 2026-10-10 by the user's decision (A5): the contracts database prices only
+    # nine players, so no roster of 14 could be built there and the case could never be
+    # answered. The question and what is expected are unchanged; only the database is.
+    database: priced
     context:
       season: "2025-26"
     turns:
@@ -833,7 +845,10 @@ cases:
   - id: R03
     category: rosters
     mode: deep
-    database: contracts
+    # Changed 2026-10-10 by the user's decision (A5): the contracts database prices only
+    # nine players, so no roster of 14 could be built there and the case could never be
+    # answered. The question and what is expected are unchanged; only the database is.
+    database: priced
     context:
       season: "2025-26"
     turns:

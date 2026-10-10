@@ -217,8 +217,18 @@ class RoleMinimum(ToolArgs):
 
 
 class OptimizeRoster(ToolArgs):
-    budget_mode: BudgetModeName = "salary_cap"
-    budget_millions: float | None = Field(None, gt=0, le=1000, description="For custom.")
+    budget_mode: BudgetModeName = Field(
+        "salary_cap",
+        description="A line of the season's cap rules (salary_cap, luxury_tax, first_apron, "
+        "second_apron), or custom when the user names an amount ($150M): then give "
+        "budget_millions.",
+    )
+    budget_millions: float | None = Field(
+        None,
+        gt=0,
+        le=1000,
+        description="Only with budget_mode custom: the user's amount in millions (150 for $150M).",
+    )
     min_players: int | None = Field(None, ge=1, le=MAX_PLAYERS)
     max_players: int | None = Field(None, ge=1, le=MAX_PLAYERS)
     min_guards: int | None = Field(None, ge=0, le=10)
@@ -227,7 +237,9 @@ class OptimizeRoster(ToolArgs):
     role_minimums: list[RoleMinimum] = Field(default_factory=list, max_length=8)
     lock_player_ids: list[int] = Field(default_factory=list, max_length=MAX_PLAYERS)
     exclude_player_ids: list[int] = Field(default_factory=list, max_length=50)
-    options: int = Field(3, ge=2, le=4, description="How many distinct rosters.")
+    options: int = Field(
+        3, ge=2, le=4, description="How many distinct rosters, 2 to 4; 3 unless the user says."
+    )
 
     @model_validator(mode="after")
     def _a_custom_budget_names_its_amount(self) -> OptimizeRoster:
@@ -300,7 +312,7 @@ REGISTRY: tuple[ToolSpec, ...] = (
     ToolSpec("roster_fit", "How a team's or built roster's players fit together, as description; the evidence on whether fit predicts anything.", RosterFit, R, "A4"),
     ToolSpec("postseason_outlook", "The postseason model's chance of each playoff stage, with intervals: a real team's season, a built roster, or a hypothetical team of any net rating; every team of a season; the model's record.", PostseasonOutlook, R, "A4"),
     ToolSpec("simulate_scenario", "Simulate next season for a team or built roster, before and after changes the user assumes.", SimulateScenario, C, "A4"),
-    ToolSpec("optimize_roster", "Find several distinct hypothetical rosters under a payroll budget and role requirements.", OptimizeRoster, C, "A5"),
+    ToolSpec("optimize_roster", "Find several distinct hypothetical rosters under a payroll budget and role requirements. How it chooses them is in research_docs.", OptimizeRoster, C, "A5"),
     ToolSpec("current_games", "Recently completed games, newer than the lab's data build.", CurrentGames, N, "A2"),
     ToolSpec("injury_report", "The league's official injury report, with its time.", InjuryReport, N, "A2"),
     ToolSpec("transactions", "Signings, trades and waivers announced by the league, with dates: what has changed on a roster since the lab's build.", Transactions, N, "A2"),

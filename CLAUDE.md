@@ -198,6 +198,15 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   tools only. Saving a roster is the user's click on a reviewed proposal. Never give the
   model table reads, SQL, code, files, a URL it composed, a fit, a build, an import or a
   setting; outside text reaches it quoted as data.
+- **A proposal is saved only by the user's click, and only as proposed.** `optimize_roster`
+  asks the optimizer what the user asked and nothing else (never the Roster Optimizer
+  page's example requirements); each roster found is a `RosterProposal`
+  (`domain/proposals.py`) that travels with the answer for the session.
+  `assistant.api.save_proposal` -> `ProposalService.save` finds an earlier save by the
+  fingerprint in a roster's notes, refuses when the build, the value model, the contract
+  file or a salary has changed, and writes the roster and its players in one transaction
+  (`RosterRepository.create_with_players`, which `OptimizerService.save` uses too). R01
+  and R03 run on the `priced` test database (`priced_template`), the user's decision at A5.
 - **A handler formats; the services compute.** A tool's handler (`assistant/*_tools.py`)
   calls service methods and writes what they return as the workbench shows it, with the
   evidence: the build, the contract file's date, a source's address and times. It never

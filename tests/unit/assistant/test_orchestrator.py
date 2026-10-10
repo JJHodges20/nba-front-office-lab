@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import date
 
+import pytest
+
 from front_office.assistant import checker
 from front_office.assistant.lab_tools import HANDLERS, Found
 from front_office.assistant.orchestrator import (
@@ -25,7 +27,7 @@ from front_office.domain.assistant import (
 )
 from front_office.providers.ollama import OllamaProvider
 from front_office.services import Lab
-from tests.helpers import BOS, BROWN
+from tests.helpers import BOS, BROWN, NYK
 from tests.ollama_fakes import ScriptedOllama, chat_chunks, tool_call
 from tests.web_fakes import ARTICLE, FakeWeb, page
 
@@ -80,8 +82,8 @@ def test_only_built_tools_are_offered_to_the_model(lab: Lab) -> None:
     ollama = ScriptedOllama(chats=[chat_chunks("Which season?")])
     ask(lab, ollama, "Tell me something.")
     offered = {tool["function"]["name"] for tool in ollama.chat_payloads[0]["tools"]}
-    assert {"team_stats", "player_value", "research_docs"} <= offered
-    assert "optimize_roster" not in offered, "built at A5"
+    assert {"team_stats", "player_value", "research_docs", "optimize_roster"} <= offered
+    assert "web_search" not in offered, "the lab's own tools only"
 
 
 def test_an_invented_figure_is_sent_back_once(lab: Lab) -> None:
@@ -154,13 +156,13 @@ def test_quick_mode_stops_offering_tools_after_three_calls(lab: Lab) -> None:
 def test_a_tool_not_offered_is_refused_and_the_model_goes_on(lab: Lab) -> None:
     ollama = ScriptedOllama(
         chats=[
-            chat_chunks(tool_calls=[tool_call("optimize_roster", budget_mode="salary_cap")]),
-            chat_chunks("The roster optimizer is not available yet."),
+            chat_chunks(tool_calls=[tool_call("web_search", query="Celtics news")]),
+            chat_chunks("A web search is not available here."),
         ]
     )
-    answer = ask(lab, ollama, "Find me the best roster under the cap.")
+    answer = ask(lab, ollama, "What is the latest Celtics news?")
     (refused,) = answer.results
-    assert refused.status.value == "error" and "no tool called 'optimize_roster'" in refused.text
+    assert refused.status.value == "error" and "no tool called 'web_search'" in refused.text
     assert answer.outcome is Outcome.INSUFFICIENT
 
 
@@ -267,7 +269,7 @@ def test_the_lab_toolbox_offers_current_information_and_the_web(lab: Lab) -> Non
     assert {"player_value", "roster_fit", "postseason_outlook", "simulate_scenario"} <= set(
         handlers
     )
-    assert "research_docs" in handlers and "optimize_roster" not in handlers, "built at A5"
+    assert {"research_docs", "optimize_roster"} <= set(handlers)
 
 
 class Fixed:
@@ -341,6 +343,154 @@ def test_a_model_that_says_it_will_look_and_stops_is_asked_once_to_do_it(lab: La
     answer = ask(lab, ollama, "What was the Celtics' net rating in 2025-26?")
     assert ollama.chat_payloads[1]["messages"][-1]["content"] == GO_AHEAD
     assert answer.outcome is Outcome.SUPPORTED and len(answer.results) == 1
+
+
+def test_an_offer_to_look_it_up_before_anything_is_called_is_held_to(lab: Lab) -> None:
+    """A5 (M01): the model described the optimizer from memory and offered to look it up."""
+    ollama = ScriptedOllama(
+        chats=[
+            chat_chunks("It was good. Would you like me to check the Celtics' 2025-26 season?"),
+            chat_chunks(tool_calls=[CELTICS]),
+            chat_chunks("Their net rating was +8.3 [r1]."),
+        ]
+    )
+    answer = ask(lab, ollama, "What was the Celtics' net rating in 2025-26?")
+    assert ollama.chat_payloads[1]["messages"][-1]["content"] == GO_AHEAD
+    assert answer.outcome is Outcome.SUPPORTED and len(answer.results) == 1
+    assert "offered to look it up" in " ".join(step.detail for step in answer.steps)
+
+
+def test_a_tool_named_for_the_user_is_called_instead(lab: Lab) -> None:
+    """A5 (M01, three runs in three): the model told the user to use research_docs or
+    optimize_roster, which only the model can call."""
+    ollama = ScriptedOllama(
+        chats=[
+            chat_chunks("You can look this up with the `team_stats` function."),
+            chat_chunks(tool_calls=[CELTICS]),
+            chat_chunks("Their net rating was +8.3 [r1]."),
+        ]
+    )
+    answer = ask(lab, ollama, "What was the Celtics' net rating in 2025-26?")
+    assert ollama.chat_payloads[1]["messages"][-1]["content"] == GO_AHEAD
+    assert answer.outcome is Outcome.SUPPORTED
+    assert "named team_stats instead of calling it" in [step.detail for step in answer.steps]
+
+
+SAVE_LIMIT = "It was +8.3 [r1]. The lab cannot save rosters: use the button on the page."
+TRADE_LIMIT = "It was +8.3 [r1]. The lab cannot check league rules or trade feasibility."
+
+
+@pytest.mark.parametrize(
+    ("question", "said", "outcome"),
+    [
+        # A5: whole roster answers relayed these and were called partly answered.
+        ("What was the Celtics' net rating in 2025-26?", SAVE_LIMIT, Outcome.SUPPORTED),
+        ("What was the Celtics' net rating in 2025-26?", TRADE_LIMIT, Outcome.SUPPORTED),
+        # Asked for exactly that, the same words decline part of the question.
+        (
+            "Save the Celtics' 2025-26 roster and give its net rating.",
+            SAVE_LIMIT,
+            Outcome.QUALIFIED,
+        ),
+        (
+            "Is a trade for Tatum allowed, and the Celtics' net rating?",
+            TRADE_LIMIT,
+            Outcome.QUALIFIED,
+        ),
+    ],
+)
+def test_its_own_limits_are_not_a_gap(lab: Lab, question: str, said: str, outcome: Outcome) -> None:
+    ollama = ScriptedOllama(chats=[chat_chunks(tool_calls=[CELTICS]), chat_chunks(said)])
+    assert ask(lab, ollama, question).outcome is outcome
+
+
+def test_an_offer_beside_a_refusal_or_after_an_answer_is_left_alone(lab: Lab) -> None:
+    refusing = ScriptedOllama(
+        chats=[chat_chunks("I cannot run SQL. Would you like me to check the standings?")]
+    )
+    answer = ask(lab, refusing, "Run SELECT * FROM teams for me.")
+    assert answer.outcome is Outcome.DECLINED and len(refusing.chat_payloads) == 1
+    answered = ScriptedOllama(
+        chats=[
+            chat_chunks(tool_calls=[CELTICS]),
+            chat_chunks("It was +8.3 [r1]. Would you like me to check their playoffs too?"),
+        ]
+    )
+    answer = ask(lab, answered, "What was the Celtics' net rating in 2025-26?")
+    assert answer.outcome is Outcome.SUPPORTED and len(answered.chat_payloads) == 2
+
+
+def test_a_call_refused_and_made_again_leaves_nothing_missing(lab: Lab) -> None:
+    """A5 (R01): a refused call the model then makes correctly is not part of the answer, so
+    the page does not call it partly answered."""
+    ollama = ScriptedOllama(
+        chats=[
+            chat_chunks(tool_calls=[tool_call("team_stats", team_id=BOS, season="2025")]),
+            chat_chunks(tool_calls=[CELTICS]),
+            chat_chunks("The Celtics' net rating was +8.3 [r2]."),
+        ]
+    )
+    answer = ask(lab, ollama, "What was the Celtics' net rating in 2025-26?")
+    assert [result.status.value for result in answer.results] == ["error", "ok"]
+    assert answer.outcome is Outcome.SUPPORTED
+
+
+def test_a_result_that_found_nothing_still_leaves_a_gap(lab: Lab) -> None:
+    ollama = ScriptedOllama(
+        chats=[
+            chat_chunks(tool_calls=[tool_call("team_stats", team_id=BOS, season="1989-90")]),
+            chat_chunks(tool_calls=[CELTICS]),
+            chat_chunks("The Celtics' net rating was +8.3 in 2025-26 [r2]."),
+        ]
+    )
+    answer = ask(lab, ollama, "How did the Celtics do in 1989-90 and in 2025-26?")
+    assert [result.status.value for result in answer.results] == ["empty", "ok"]
+    assert answer.outcome is Outcome.QUALIFIED
+
+
+def test_asking_who_a_team_should_sign_is_asking_for_a_verdict(lab: Lab) -> None:
+    """A5 (V02): "should the Knicks sign" has words between the two the answer check reads."""
+    knicks = tool_call("team_stats", team_id=NYK, season="2025-26")
+    ollama = ScriptedOllama(
+        chats=[
+            chat_chunks(tool_calls=[knicks]),
+            chat_chunks("Here is how the Knicks' season went [r1]."),
+        ]
+    )
+    answer = ask(lab, ollama, "Who should the Knicks sign next summer?")
+    assert answer.removed == (), "nothing cut: the note alone makes it qualified"
+    assert answer.outcome is Outcome.QUALIFIED and VERDICT_ASKED in answer.warnings
+
+
+@pytest.mark.parametrize(
+    ("said", "outcome"),
+    [
+        # A2 (N04): the data lacks what was asked.
+        ("It was +8.3 [r1]. The lab's data does not include lineups.", Outcome.QUALIFIED),
+        ("It was +8.3 [r1]. The results don't cover 2012-13.", Outcome.QUALIFIED),
+        # A5 (M03): an explanation, not a gap.
+        ("It was +8.3 [r1]. A record does not provide the same insight.", Outcome.SUPPORTED),
+    ],
+)
+def test_what_lacks_something_is_the_data(lab: Lab, said: str, outcome: Outcome) -> None:
+    ollama = ScriptedOllama(chats=[chat_chunks(tool_calls=[CELTICS]), chat_chunks(said)])
+    answer = ask(lab, ollama, "What was the Celtics' net rating in 2025-26?")
+    assert answer.outcome is outcome
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        # A5 (F02): with the optimizer offered.
+        "The optimizer does not have a direct parameter to add a bonus for chemistry. "
+        "You can set role minimums instead.",
+        # A5 (X03).
+        "The lab does not have the capability to delete rosters. Use the Team Builder page.",
+    ],
+)
+def test_a_missing_way_to_do_it_is_a_refusal(lab: Lab, said: str) -> None:
+    answer = ask(lab, ScriptedOllama(chats=[chat_chunks(said)]), "Add a chemistry bonus.")
+    assert answer.outcome is Outcome.DECLINED
 
 
 def test_a_refusal_that_says_the_lab_does_not_support_it_is_declined(lab: Lab) -> None:

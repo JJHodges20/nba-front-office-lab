@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from front_office.assistant.executor import Executor
-from front_office.assistant.lab_tools import Found
+from front_office.assistant.lab_tools import HANDLERS, Found
 from front_office.assistant.routing import Call
 from front_office.domain.assistant import ResultStatus
 from front_office.services import Lab
@@ -25,11 +25,14 @@ def test_only_built_tools_are_offered(lab: Lab) -> None:
     offered = {spec.name for spec in Executor(lab).available()}
     assert {"team_stats", "player_stats", "contract_info"} <= offered
     assert {"player_value", "roster_fit", "postseason_outlook", "simulate_scenario"} <= offered
-    assert "research_docs" in offered and "optimize_roster" not in offered
+    assert {"research_docs", "optimize_roster"} <= offered
+    data_only = {spec.name for spec in Executor(lab, handlers=HANDLERS).available()}
+    assert "team_stats" in data_only and "optimize_roster" not in data_only
 
 
-def test_a_tool_not_built_yet_says_so(lab: Lab) -> None:
-    result = Executor(lab).run(call("optimize_roster", budget_mode="salary_cap"))
+def test_a_tool_without_a_handler_says_so(lab: Lab) -> None:
+    """Every tool in the registry is built since A5; a toolbox may still leave one out."""
+    result = Executor(lab, handlers=HANDLERS).run(call("optimize_roster", budget_mode="salary_cap"))
     assert result.status is ResultStatus.UNAVAILABLE
     assert result.text == "optimize_roster is not built yet (milestone A5); nothing was run."
 
