@@ -1,13 +1,16 @@
-"""Who starts on a saved roster, and where (the user's wish at the A5 review: players keep
-their own positions as far as the roster allows)."""
+"""Who starts on a saved roster, and where: players keep their own positions as far as the
+roster allows (the user's wish at the A5 review), and of the lineups that manage that, the
+one with the most projected impact starts (at the A6 review)."""
 
 from __future__ import annotations
 
 from front_office.domain.lineup import ROTATION, LineupPlayer, starting_slots
 
 
-def player(player_id: int, positions: str, share: float) -> LineupPlayer:
-    return LineupPlayer(player_id, positions, share)
+def player(
+    player_id: int, positions: str, share: float, impact: float | None = None
+) -> LineupPlayer:
+    return LineupPlayer(player_id, positions, share, impact)
 
 
 def test_five_guards_with_the_most_minutes_no_longer_start_at_every_position() -> None:
@@ -32,7 +35,43 @@ def test_five_guards_with_the_most_minutes_no_longer_start_at_every_position() -
     assert all(slots[player_id] == "BENCH" for player_id in (3, 4, 5, 9, 10))
 
 
-def test_of_lineups_that_fit_as_well_the_one_that_plays_most_starts() -> None:
+def test_two_stars_who_play_a_little_less_now_start() -> None:
+    """The case the user saw at A6, Option B of the browser pass: a guard and a forward-center
+    with the roster's best projections came off the bench for players projected to play
+    more. Now the lineup that fits with the most projected impact starts."""
+    roster = [
+        player(1, "G-F", 0.64, 2.6),
+        player(2, "G-F", 0.58, 2.5),
+        player(3, "G", 0.56, 3.0),
+        player(4, "G", 0.55, 2.2),
+        player(5, "G", 0.51, 7.4),
+        player(6, "C", 0.48, 2.7),
+        player(7, "F-C", 0.46, 7.8),
+        player(8, "F", 0.39, 2.2),
+        player(9, "C", 0.39, 3.5),
+        player(10, "G", 0.29, 2.6),
+    ]
+    slots = starting_slots(roster)
+    starters = {player_id: slot for player_id, slot in slots.items() if slot != "BENCH"}
+    assert set(starters) == {1, 3, 5, 7, 9}
+    assert {starters[3], starters[5]} == {"PG", "SG"}, "the guards with the most impact"
+    assert (starters[1], starters[7], starters[9]) == ("SF", "PF", "C")
+
+
+def test_a_player_without_a_projection_starts_only_where_no_one_else_can() -> None:
+    roster = [
+        player(1, "G", 0.60, -1.0),
+        player(2, "G", 0.58, -2.0),
+        player(3, "F", 0.55, -1.5),
+        player(4, "F", 0.50, -0.5),
+        player(5, "C", 0.45, -3.0),
+        player(6, "C", 0.44),
+    ]
+    slots = starting_slots(roster)
+    assert slots[5] == "C" and slots[6] == "BENCH", "a known center below average still starts"
+
+
+def test_of_lineups_that_fit_and_project_alike_the_one_that_plays_most_starts() -> None:
     roster = [
         player(1, "G", 0.60),
         player(2, "G-F", 0.59),

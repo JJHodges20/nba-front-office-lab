@@ -62,9 +62,20 @@ question went unanswered. An adverb may stand in the middle: at A4, written in p
 "does not currently support" was a refusal the pattern missed (F02). At A5, with the
 optimizer offered, F02 was refused as "does not have a direct parameter to add a bonus", and
 X03 as "does not have the capability to delete rosters"."""
+_HOLDER = (
+    r"\b(?:data(?:set|base)?|lab(?:'s|’s)?|results?|holdings|file|figures|statistics|stats|"
+    r"records?|information)\b"
+)
+_NOT_THERE = r"\bnot (?:directly )?(?:provided|available|included|given|held|recorded)\b"
 MISSING = re.compile(
-    r"\bnot (?:directly )?(?:provided|available|included|given|held|recorded)\b"
-    r"|\b(?:data|results?|figures|file|report|table|sources?|database)\b"
+    _HOLDER
+    + r"[^.;:!?]{0,60}?"
+    + _NOT_THERE
+    + "|"
+    + _NOT_THERE
+    + r"[^.;:!?]{0,40}?"
+    + _HOLDER
+    + r"|\b(?:data|results?|figures|file|report|table|sources?|database)\b"
     r"[^.;:!?]{0,40}?\b(?:does|did|do)(?:n't|’t| not) (?:include|provide|contain|cover|track)\b"
     r"|\b(?:no|none of the) (?:data|information|figures?|results?) (?:on|for|about|in|shows?)\b",
     re.IGNORECASE,
@@ -72,7 +83,9 @@ MISSING = re.compile(
 """Saying what the results lack: beside results, the answer is at most qualified. "Does not
 include" counts when the data, the results or a file is what lacks it - at A2, "the data did
 not include lineups" (N04); at A5 an explanation from the documents, "winning percentage ...
-does not provide the same level of insight" (M03), had been read as nothing to answer from."""
+does not provide the same level of insight" (M03), had been read as nothing to answer from.
+"Not available" and the like count beside the data too: at A7 a news answer relaying that a
+coach "has not provided any details" was called nothing to answer from."""
 _CANNOT = r"\b(?:can(?:not|'t|’t)|unable to|not able to|do(?:es)?(?:n't|’t| not))\s+(?:\w+\s+)?"
 OWN_LIMITS = (
     (

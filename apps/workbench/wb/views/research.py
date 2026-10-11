@@ -85,7 +85,12 @@ WEB_HELP = (
     "Web search uses your own Ollama account: put FOL_OLLAMA_API_KEY=your key in the "
     "project's .env file. Links you paste into a question are read either way."
 )
-SOURCES = {"games": "Games", "transactions": "Transactions", "injuries": "Injury report"}
+SOURCES = {
+    "games": "Games",
+    "transactions": "Transactions",
+    "injuries": "Injury report",
+    "news": "News",
+}
 EXAMPLES = (
     "What was the Celtics' net rating in 2025-26, and where did it rank?",
     "Compare Jalen Brunson and Jaylen Brown this season.",

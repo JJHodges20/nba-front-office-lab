@@ -1130,8 +1130,14 @@ def _bracket(lab: Lab, model: PostseasonModel, season: str | None) -> Found:
         return missing(title, report.note)
     teams = report.teams
     key = probability_key(TITLE)
+    # A seed is a place in a conference, and says which, for the answer checker (A7).
     rows = [
-        [row["team_name"], DASH if _absent(row["seed"]) else str(int(row["seed"]))]
+        [
+            row["team_name"],
+            DASH
+            if _absent(row["seed"])
+            else f"{ordinal(int(row['seed']))} in the {row['conference']}",
+        ]
         + [_chance(stage_key, row[probability_key(stage_key)]) for stage_key in ROUND_KEYS]
         + [
             f"{_chance(TITLE, row[f'{key}_low'])} to {_chance(TITLE, row[f'{key}_high'])}",

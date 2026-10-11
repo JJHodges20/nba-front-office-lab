@@ -57,6 +57,7 @@ measured statistics, modeled estimates and user assumptions visibly apart.
 | [`current_games`](#current_games) | current | One row per team per game (two rows per game). | A2 |
 | [`transactions`](#transactions) | current | One row per line of the league's file. | A2 |
 | [`injury_reports`](#injury_reports) | current | One row per player, or per team not yet submitted, in one report. | A2 |
+| [`news_items`](#news_items) | current | One row per article, by its address. | A7 |
 | [`current_refreshes`](#current_refreshes) | current | One row per attempt. | A2 |
 | [`research_schema`](#research_schema) | research | One row per version applied. | A6 |
 | [`research_workspaces`](#research_workspaces) | research | One row per workspace. | A6 |
@@ -756,6 +757,29 @@ The league's official injury report - the latest one fetched - line by line. Kep
 | `source_url` | string | yes | operational |  | The report file's address. |
 | `retrieved_at` | datetime | yes | operational |  | When the lab fetched it. |
 
+### news_items
+
+Reporting from the news feeds the source register allows (A7): each item as its site published it - headline, dates, a short excerpt, the link - once however many feeds carried it, and kept for a set number of days after it was published. Reporting, not the lab's data: nothing here changes a table, a roster or a contract. Kept in data/current.sqlite, not the lab's database.
+
+- **Grain:** One row per article, by its address.
+- **Primary key:** `item_id`
+- **Indexes:** `published_at`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `item_id` | string | yes | identifier |  | Fingerprint of the article's address, without tracking parameters. |
+| `site` | string | yes | identifier |  | The site that published it. |
+| `title` | string | yes | measured |  | Headline, as the site wrote it. |
+| `link` | string | yes | identifier |  | The article's address. |
+| `published_at` | datetime | no | measured |  | When the site says it was published. |
+| `updated_at` | datetime | no | measured |  | When the site says it was last changed, where it says. |
+| `author` | string | no | measured |  | Who wrote it. |
+| `categories` | string | no | measured |  | The site's tags - teams and players, mostly - separated by semicolons. |
+| `summary` | string | no | measured |  | The start of the site's own excerpt, as plain text. |
+| `feeds` | string | yes | operational |  | The feeds that carried it, by their ids in configs/assistant.yaml. |
+| `transactions` | boolean | yes | operational |  | Whether a feed of moves alone carried it: signings, extensions, trades, waivers. |
+| `retrieved_at` | datetime | yes | operational |  | When the lab last fetched a feed carrying it. |
+
 ### current_refreshes
 
 Every attempt to refresh a current source: when, what happened, from where. Never dropped. Kept in data/current.sqlite, not the lab's database.
@@ -767,7 +791,7 @@ Every attempt to refresh a current source: when, what happened, from where. Neve
 | Column | Type | Required | Provenance | Unit | Description |
 | --- | --- | --- | --- | --- | --- |
 | `refresh_id` | integer | yes | operational |  | Attempt id, assigned when recorded. |
-| `source` | string | yes | operational |  | Which source. One of: `games`, `transactions`, `injuries`. |
+| `source` | string | yes | operational |  | Which source. One of: `games`, `transactions`, `injuries`, `news`. |
 | `attempted_at` | datetime | yes | operational |  | When the attempt was made. |
 | `status` | string | yes | operational |  | What happened. One of: `stored`, `unchanged`, `none`, `failed`. |
 | `rows` | integer | no | operational |  | Rows stored. |

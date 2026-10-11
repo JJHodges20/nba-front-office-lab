@@ -745,10 +745,12 @@ def league_context(lab: Lab, args: t.LeagueContext) -> Found:
         )
     if view == "standings":
         standings = lab.league.standings(season)
+        # Each place names its conference, so that the answer checker can tell a team's 3rd
+        # in the East from the league's 3rd (A7).
         rows = [
             [
                 s["conference"],
-                ordinal(s["conference_rank"]),
+                f"{ordinal(s['conference_rank'])} in the {s['conference']}",
                 s["team_name"],
                 f"{s['wins']}-{s['losses']}",
                 f"{s['net_rating']:+.1f}",
@@ -756,7 +758,7 @@ def league_context(lab: Lab, args: t.LeagueContext) -> Found:
             ]  # fmt: skip
             for _, s in standings.iterrows()
         ]
-        header = ["Conference", "Rank", "Team", "Record", "Net rating", "Postseason"]
+        header = ["Conference", "Place", "Team", "Record", "Net rating", "Postseason"]
         return Found(
             ResultStatus.OK,
             f"Standings, {season}",

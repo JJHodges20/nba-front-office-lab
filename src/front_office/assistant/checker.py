@@ -14,16 +14,22 @@ frequency called a chance is caught - a verdict: a contender, a signing that sho
 made, a best roster - and a claim to have saved or changed anything, which the assistant
 cannot do.
 
+A place is checked for what it ranks as well, wherever the answer says (A7, the user's wish
+at the A6 review): "6th in the Eastern Conference" needs a 6th in the East among the
+results, and the league's 6th does not hold it. The tools write every place with its field
+- "4th of 30", "3rd in the East" - and a place a result writes without one is the league's.
+
 What it cannot see: whether a figure is attached to the right thing. A real figure written
-under the wrong label - a league average given as a team's - passes here; the evaluation's
-frozen figures (docs/AI_EVALUATION.md) are what measure that.
+under the wrong label - a league average given as a team's, a team's rank in one measure
+given for another - passes here; the evaluation's frozen figures (docs/AI_EVALUATION.md)
+are what measure that.
 """
 
 from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 NUMBER = re.compile(
     r"(?<![\w.])(?P<sign>[-+−])?(?P<dollar>\$)?(?P<digits>\d{1,3}(?:,\d{3})+|\d+)(?P<fraction>\.\d+)?"
@@ -114,9 +120,58 @@ class Figure:
     signed: bool
     ordinal: bool = False
     """A place - 4th, 21st - which only a place can hold: a 6th is no 6.3."""
+    scope: str | None = None
+    """For a place, what it ranks, where the words around it say: :data:`LEAGUE`,
+    :data:`EAST`, :data:`WEST`, or :data:`CONFERENCE` when they do not say which."""
 
 
 ORDINAL = ("st", "nd", "rd", "th")
+LEAGUE, EAST, WEST, CONFERENCE = "league", "east", "west", "conference"
+FIELD_WORDS = {
+    LEAGUE: "in the league",
+    EAST: "in the East",
+    WEST: "in the West",
+    CONFERENCE: "in a conference",
+}
+SCOPE_AFTER = 60
+"""Characters after a place read for what it ranks - up to the next figure or the end of the
+clause, so that "6th in the East and 10th in the league" gives each its own."""
+CLAUSE_END = re.compile(r"[.;:!?\n|,(\[]|\d")
+OUT_OF = re.compile(r"\s*(?:out\s+)?of\s+(?P<field>\d+)\b", re.IGNORECASE)
+"""\"4th of 30\": 30 teams are the league, 15 a conference."""
+EAST_WORDS = re.compile(r"\beast(?:ern)?\b", re.IGNORECASE)
+WEST_WORDS = re.compile(r"\bwest(?:ern)?\b", re.IGNORECASE)
+CONFERENCE_WORDS = re.compile(r"\b(?:conference|seed(?:ed)?)\b", re.IGNORECASE)
+LEAGUE_WORDS = re.compile(r"\b(?:league|nba|overall)\b|\b30\s+teams\b", re.IGNORECASE)
+OWNER = re.compile(
+    r"\b(?P<field>east(?:ern(?:\s+conference)?)?|west(?:ern(?:\s+conference)?)?|league|nba)"
+    r"(?:'s|’s)\s*$",
+    re.IGNORECASE,
+)
+"""Before a place: "the East's 3rd seed", "the league's 6th-best offense"."""
+
+
+def place_scope(text: str, start: int, end: int) -> str | None:
+    """What the place whose number runs from ``start`` to ``end`` in ``text`` ranks, from
+    the words around it; ``None`` where they do not say."""
+    after = text[end + 2 : end + 2 + SCOPE_AFTER]
+    counted = OUT_OF.match(after)
+    if counted is not None:
+        return {"30": LEAGUE, "15": CONFERENCE}.get(counted.group("field"))
+    stop = CLAUSE_END.search(after)
+    if stop is not None:
+        after = after[: stop.start()]
+    owner = OWNER.search(text[max(0, start - 30) : start])
+    words = f"{after} {owner.group('field') if owner else ''}"
+    for pattern, field in (
+        (EAST_WORDS, EAST),
+        (WEST_WORDS, WEST),
+        (CONFERENCE_WORDS, CONFERENCE),
+        (LEAGUE_WORDS, LEAGUE),
+    ):
+        if pattern.search(words):
+            return field
+    return None
 
 
 def figures(text: str) -> list[Figure]:
@@ -141,15 +196,28 @@ def figures(text: str) -> list[Figure]:
                 bool(match.group("percent")),
                 sign is not None,
                 place,
+                place_scope(text, match.start(), match.end()) if place else None,
             )
         )
     return found
 
 
+def same_field(written: str, given: str | None) -> bool:
+    """Whether a place given for ``given`` holds one written for ``written``. A place a
+    result writes without its field is the league's: the tools name every conference."""
+    given = given or LEAGUE
+    if written == CONFERENCE:
+        return given in (EAST, WEST, CONFERENCE)
+    return written == given
+
+
 def supports(given: Figure, written: Figure) -> bool:
     """Whether a figure the model was given holds one it wrote, at the written precision.
-    A place stands only on a place: "6th in the league" needs a 6th among the results."""
+    A place stands only on a place: "6th in the league" needs a 6th among the results, and
+    a place named for a field - the league, a conference - one for the same field."""
     if written.ordinal and not given.ordinal:
+        return False
+    if written.ordinal and written.scope is not None and not same_field(written.scope, given.scope):
         return False
     tolerance = written.step / 2 + 1e-9 * max(1.0, abs(written.value))
     candidates = [given.value]
@@ -166,8 +234,22 @@ def supports(given: Figure, written: Figure) -> bool:
 
 
 @dataclass(frozen=True, slots=True)
+class Misplaced:
+    """A place the results hold, written for a field they do not hold it for."""
+
+    figure: Figure
+    fields: tuple[str, ...]
+    """The fields the results hold this place for."""
+    held: tuple[str, ...]
+    """The places the results hold for the field the answer named: "3rd". Live at A7 a
+    model told only that its 6th was the league's wrote it again for the East."""
+
+
+@dataclass(frozen=True, slots=True)
 class Check:
     unsupported: tuple[Figure, ...]
+    misplaced: tuple[Misplaced, ...] = ()
+    """Unsupported places the results do hold, for another field."""
 
     @property
     def ok(self) -> bool:
@@ -177,17 +259,39 @@ class Check:
     def listed(self) -> str:
         return ", ".join(dict.fromkeys(figure.text for figure in self.unsupported))
 
+    @property
+    def only_misplaced(self) -> bool:
+        """Whether every figure that does not stand is a place written for the wrong field."""
+        placed = {item.figure for item in self.misplaced}
+        return not self.ok and all(figure in placed for figure in self.unsupported)
+
 
 def check(answer: str, given: Iterable[str]) -> Check:
     """The figures of ``answer`` that nothing in ``given`` holds."""
     known = [figure for text in given for figure in figures(text)]
-    return Check(
-        tuple(
-            written
-            for written in figures(answer)
-            if not any(supports(figure, written) for figure in known)
-        )
+    unsupported = tuple(
+        written
+        for written in figures(answer)
+        if not any(supports(figure, written) for figure in known)
     )
+    misplaced = []
+    for written in unsupported:
+        if not written.ordinal or written.scope is None:
+            continue
+        unnamed = replace(written, scope=None)
+        fields = tuple(
+            dict.fromkeys(figure.scope or LEAGUE for figure in known if supports(figure, unnamed))
+        )
+        if fields:
+            held = sorted(
+                {
+                    int(abs(figure.value))
+                    for figure in known
+                    if figure.ordinal and same_field(written.scope, figure.scope)
+                }
+            )
+            misplaced.append(Misplaced(written, fields, tuple(_nth_of(value) for value in held)))
+    return Check(unsupported, tuple(misplaced))
 
 
 CITATION = re.compile(r"\[(?:table\s+|chart\s+)?(r\d{1,4})\]", re.IGNORECASE)
@@ -267,11 +371,21 @@ def repair_note(
             f"You cite {', '.join(cited)}, which no tool returned: cite only the results above, "
             "or leave the sentence out."
         )
-    if not result.ok:
+    placed = {item.figure for item in result.misplaced}
+    missing = [figure for figure in result.unsupported if figure not in placed]
+    if missing:
+        listed = ", ".join(dict.fromkeys(figure.text for figure in missing))
         parts.append(
-            f"These figures are in no tool result, the question or its context: {result.listed}. "
+            f"These figures are in no tool result, the question or its context: {listed}. "
             "Write the answer again using only figures from the results, each cited like [r1], "
             "or leave them out and say what is missing."
+        )
+    if result.misplaced:
+        said = "; ".join(_misplaced(item) for item in result.misplaced)
+        parts.append(
+            f"These places rank something the results do not: {said}. Give each place as the "
+            "result gives it - for the league, or for the team's conference - or leave it out, "
+            "and keep everything else as it was, each figure cited like [r1]."
         )
     for rule in dict.fromkeys(item.rule for item in phrases):
         said = ", ".join(dict.fromkeys(f'"{item.phrase}"' for item in phrases if item.rule == rule))
@@ -281,6 +395,34 @@ def repair_note(
     if parts:
         parts.append(FOR_THE_USER)
     return " ".join(parts)
+
+
+PLACES_LISTED = 3
+"""Places the note names for a field; more, and it points to the standings instead."""
+
+
+def _misplaced(item: Misplaced) -> str:
+    place, field = _nth(item.figure), FIELD_WORDS[item.figure.scope or LEAGUE]
+    holds = " and ".join(FIELD_WORDS[name] for name in item.fields)
+    if not item.held:
+        instead = f"they give no place {field}"
+    elif len(item.held) > PLACES_LISTED:
+        instead = f"{field} they give every place, in the standings"
+    else:
+        instead = f"{field} they give {' and '.join(item.held)}"
+    return f"{place} {field} (the results' {place} is {holds}; {instead})"
+
+
+def _nth(place: Figure) -> str:
+    """A place as it is said: 1st, 2nd, 3rd, 11th, 22nd."""
+    return _nth_of(int(abs(place.value)))
+
+
+def _nth_of(number: int) -> str:
+    suffix = (
+        "th" if number % 100 in (11, 12, 13) else {1: "st", 2: "nd", 3: "rd"}.get(number % 10, "th")
+    )
+    return f"{number}{suffix}"
 
 
 def cut_wording(answer: str, tools: Iterable[str]) -> tuple[str, tuple[str, ...]]:
@@ -307,7 +449,10 @@ def cut_wording(answer: str, tools: Iterable[str]) -> tuple[str, tuple[str, ...]
 
 def cut(answer: str, given: Sequence[str]) -> tuple[str, tuple[str, ...]]:
     """The answer without the sentences whose figures nothing holds, and those figures.
-    Lines are kept as lines, so that a list stays a list."""
+    Lines are kept as lines, so that a list stays a list. A sentence whose only fault is a
+    place written for the wrong field is cut at that clause instead, when its main clause
+    stands without it (A7): at A7 "a record of 53 wins and 29 losses, placing them 6th in the
+    Eastern Conference" was cut whole, and the answer lost the record it was asked for."""
     removed: list[str] = []
     lines: list[str] = []
     for line in answer.splitlines():
@@ -318,12 +463,56 @@ def cut(answer: str, given: Sequence[str]) -> tuple[str, tuple[str, ...]]:
             result = check(sentence, given)
             if result.ok:
                 kept.append(sentence.strip())
-            else:
-                removed.extend(figure.text for figure in result.unsupported)
+                continue
+            removed.extend(figure.text for figure in result.unsupported)
+            shorter = _without_places(sentence, given) if result.only_misplaced else None
+            if shorter:
+                kept.append(shorter)
         if kept or not line.strip():
             lines.append(" ".join(kept))
     text = "\n".join(lines).strip()
     return re.sub(r"\n{3,}", "\n\n", text), tuple(dict.fromkeys(removed))
+
+
+CLAUSE = re.compile(r",\s+|;\s+|\s+[-–—]\s+")
+
+
+def _without_places(sentence: str, given: Sequence[str]) -> str | None:
+    """The sentence up to its first clause that does not stand, if that is not its first.
+    What follows a cut clause goes with it: at A7 a cut that kept every clause standing left
+    "15 wins and 67 losses, as the league was split into conferences at that time)" - a
+    remark on the place it had taken out, and that place's closing bracket."""
+    text = sentence.strip()
+    end = text[-1] if text[-1] in ".!?" else ""
+    body = text[:-1] if end else text
+    seams = list(CLAUSE.finditer(body))
+    starts = [0, *(seam.end() for seam in seams)]
+    stops = [*(seam.start() for seam in seams), len(body)]
+    standing = 0
+    for start, stop in zip(starts, stops, strict=True):
+        if not check(body[start:stop], given).ok:
+            break
+        standing = stop
+    else:
+        return None  # each clause stands alone: what fails spans them
+    shorter = _closed(body[:standing]).rstrip(",;-–— ")
+    if not shorter:
+        return None
+    shorter += end or "."
+    return shorter if check(shorter, given).ok else None
+
+
+def _closed(text: str) -> str:
+    """The text without a bracket it leaves open and what follows it, and its bold closed."""
+    opened: list[int] = []
+    for index, character in enumerate(text):
+        if character in "([":
+            opened.append(index)
+        elif character in ")]" and opened:
+            opened.pop()
+    if opened:
+        text = text[: opened[0]].rstrip()
+    return text + "**" if text.count("**") % 2 else text
 
 
 REPEATED = 40

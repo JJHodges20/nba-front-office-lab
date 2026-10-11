@@ -31,6 +31,7 @@ from datetime import date
 
 import pandas as pd
 
+from front_office.domain.contract_review import ContractChange
 from front_office.domain.schema import conform_frame
 from front_office.domain.seasons import Season
 from front_office.domain.snapshots import Snapshot
@@ -210,6 +211,61 @@ def build_contracts(
         unmatched=sorted(unmatched.values(), key=lambda row: row.line),
         rows_read=rows_read,
     )
+
+
+def compare_contract_years(
+    in_use: pd.DataFrame,
+    candidate: pd.DataFrame,
+    *,
+    names: Mapping[int, str],
+    teams: Mapping[int, str],
+) -> tuple[list[ContractChange], int]:
+    """Two files' contract seasons side by side (A7): what a candidate adds, drops or
+    changes against the file in use, by player, team and season - largest change first -
+    and how many are the same in both. A player paid by two teams in a season is compared
+    team by team, as the file lists them."""
+    before, after = _salaries(in_use), _salaries(candidate)
+    changes: list[ContractChange] = []
+    unchanged = 0
+    for key in sorted(before.keys() | after.keys()):
+        old, new = before.get(key), after.get(key)
+        if old == new:
+            unchanged += 1
+            continue
+        player, team, season = key
+        detail = []
+        if old is not None and new is not None:
+            for what, was, now in (("option", old[1], new[1]), ("guarantee", old[2], new[2])):
+                if was != now:
+                    detail.append(f"{what}: {was or 'none'} to {now or 'none'}")
+        changes.append(
+            ContractChange(
+                player_id=player,
+                player=names.get(player, f"Player {player}"),
+                team=None if team < 0 else teams.get(team),
+                season=season,
+                in_use=None if old is None else old[0],
+                candidate=None if new is None else new[0],
+                detail="; ".join(detail) or None,
+            )
+        )
+    changes.sort(key=lambda c: (-abs(c.difference), c.season, c.player))
+    return changes, unchanged
+
+
+def _salaries(years: pd.DataFrame) -> dict[tuple[int, int, str], tuple[int, str, str]]:
+    """Salary, options and guarantees by player, team (-1 for none) and season."""
+    if years.empty:
+        return {}
+    keyed = years.assign(team_key=years["team_id"].fillna(-1).astype(int))
+    found = {}
+    for (player, team, season), rows in keyed.groupby(["player_id", "team_key", "season"]):
+        found[(int(player), int(team), str(season))] = (
+            int(rows["salary"].sum()),
+            ", ".join(sorted({str(v) for v in rows["option"].dropna()})),
+            ", ".join(sorted({str(v) for v in rows["guarantee"].dropna()})),
+        )
+    return found
 
 
 def describe_unmatched(unmatched: list[UnmatchedRow]) -> str | None:

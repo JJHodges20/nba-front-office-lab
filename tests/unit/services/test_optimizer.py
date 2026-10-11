@@ -282,7 +282,8 @@ class TestSaving:
         starters = members[members["slot"].isin(STARTING_SLOTS)]
         assert len(starters) == 5 and starters["slot"].is_unique
         # Placed as domain.lineup places them: starters from the rotation, each at a position
-        # they are listed at where the roster allows (the user's wish at the A5 review).
+        # they are listed at where the roster allows (the user's wish at the A5 review), the
+        # most projected impact first among lineups that fit (at the A6 review).
         assert (
             dict(scratch.optimizer.slots(plan.players.index.tolist())) == members["slot"].to_dict()
         )

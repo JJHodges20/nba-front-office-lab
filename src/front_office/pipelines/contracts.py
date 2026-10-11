@@ -1,7 +1,8 @@
 """Bring a user-supplied contract file into the raw store, and write the template for one.
 
 A contract file is validated *before* it is stored. A file that cannot be parsed never
-becomes the newest snapshot, so a bad import cannot break the next build.
+becomes the newest snapshot, so a bad import cannot break the next build. To check a file
+against the one in use before importing it: ``pipelines.contract_review`` (A7).
 """
 
 from __future__ import annotations

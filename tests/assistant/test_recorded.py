@@ -49,6 +49,23 @@ def test_the_knicks_moved_in_october_and_the_celtics_before_the_build(lab: Lab, 
     assert celtics.table.empty and celtics.limits, "no move since the build: a qualified answer"
 
 
+def test_the_news_feeds_report_the_same_moves(lab: Lab, tmp_path: Path) -> None:
+    """A7: the invented feeds agree with the league's file on the case file's day."""
+    tools = handlers(lab, "C03", tmp_path)
+    knicks = tools["moves_and_rumors"](lab, t.MovesAndRumors(team_id=KNICKS, moves_only=True))
+    assert knicks.status is ResultStatus.OK and knicks.table is not None
+    assert knicks.table["headline"].tolist() == [
+        "Knicks Waive Blake Sample",
+        "Knicks Sign Avery Example To Two-Way Contract",
+    ]
+    league = tools["moves_and_rumors"](lab, t.MovesAndRumors(days=7))
+    assert league.table is not None and league.table["headline"].tolist() == [
+        "Atlantic Notes: Knicks, Celtics",
+        "Knicks Waive Blake Sample",
+        "Knicks Sign Avery Example To Two-Way Contract",
+    ]
+
+
 def test_w01s_search_leaves_out_the_refused_site_and_its_pages_read(lab: Lab, tmp_path: Path) -> None:  # fmt: skip
     tools = handlers(lab, "W01", tmp_path)
     found = tools["web_search"](lab, t.WebSearch(query="why the Knicks won the 2025-26 title"))

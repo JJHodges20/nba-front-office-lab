@@ -51,7 +51,8 @@ than reading configuration themselves. Only `pipelines`, `services`, `interfaces
 Two rules are narrower than a layer (decision 0018). The workbench reaches the assistant
 through `front_office.assistant.api` alone. The assistant uses only `providers.ollama`
 and `providers.web` of the providers, and `pipelines.current` (fetching current
-information) and `pipelines.web` (reading a page) of the pipelines, so it cannot reach the
+information), `pipelines.web` (reading a page) and `pipelines.contract_review` (checking a
+contract file, storing nothing - A7) of the pipelines, so it cannot reach the
 stats.nba.com ingest, a build, a fit or a contract import.
 
 Third-party libraries are confined the same way: `nba_api` and `requests` only in
@@ -378,13 +379,21 @@ a question:  domain.assistant.Context (sidebar, resolved names, sources)
                                                  (each roster found, a proposal)
                      assistant.current_tools  -> pipelines.current (when due) -> services.current
                      assistant.web_tools      -> providers.web (search) | pipelines.web (a page)
+                                                 | news: pipelines.current (the feeds, when
+                                                 due) -> services.current.news
+                     assistant.contract_tools -> services.current (moves since the contract
+                                                 file) beside services.contracts
                 -> each result back to the model, quoted as data
              -> assistant.checker: every figure in the answer held by a result, or
                 sent back once and then cut -> domain.assistant.Answer
 current information:  pipelines.current: stats.nba.com game logs (through the ingest, into
              the raw store), the player-movement file and the injury report
-             (providers.nba_current, processing.current) -> data/current.sqlite
+             (providers.nba_current, processing.current), and the news feeds
+             (providers.web.fetch_feed, processing.feeds) -> data/current.sqlite
              (storage.current) -> services.current
+a contract file checked:  fol contracts preview | Contract Explorer -> assistant.api
+             .review_contract_file -> pipelines.contract_review (read as an import reads
+             it; compared with the file in use; nothing stored) -> domain.contract_review
 the AI Research page:  apps/workbench/wb/views/research.py -> front_office.assistant.api
              (status; start -> a Job: a thread with its own Lab, its steps readable, a
              stop; history; refresh_current) -> each answer drawn with the workbench's
@@ -435,7 +444,8 @@ what a build made. The season's game logs go through the existing ingest, so the
 snapshots land in the raw store for the next build. The web provider
 (`providers/web.py`) is the only code that reaches arbitrary addresses, after the checks
 of the spec's Safety section; `processing/web.py` turns a page into text with the standard
-library's HTML parser.
+library's HTML parser, and `processing/feeds.py` a news feed into items (A7): the news
+feeds are a fourth current source, kept article by article (`news_items`).
 
 From A3 the workbench asks. The AI Research page imports `front_office.assistant.api` and
 nothing else of the assistant: `start` answers a question in a background thread with its

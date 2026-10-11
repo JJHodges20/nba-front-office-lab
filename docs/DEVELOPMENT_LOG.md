@@ -3,6 +3,154 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone A7 - AI Research Assistant: wider sources and the contract-update review (2026-10-10)
+
+News comes from feeds the source register allows, every item dated; search quality is
+measured; a contract file can be checked against the one in use before it is imported; and
+the two wishes of the A6 review are done. No league table, model file or contract figure
+changed: nothing was fitted, rebuilt or imported.
+
+**The sources, re-checked as A7 began** (2026-10-10, `docs/DATA_SOURCE_REGISTER.md`): A0
+had planned ESPN's and Yahoo's feeds and Wikipedia's API. ESPN, Yahoo and CBS Sports turn
+AI agents away in robots.txt, which the lab honours by the user's choice at A2; NBC Sports'
+terms bar any automated tool; Wikipedia's robots.txt bars its API. NBA Communications
+(pr.nba.com), RealGM and Hoops Rumors admit the lab and AI agents alike. **The user chose
+Hoops Rumors alone**: it publishes no terms of use and invites feed readers, with a feed
+for each team and one for transactions. pr.nba.com stays behind the rule that refuses
+nba.com; RealGM's terms refused an automated read.
+
+**Built**
+
+- **The feeds** (`configs/assistant.yaml`, `news:`): Hoops Rumors' main feed, its feed of
+  moves and the 30 team feeds, each address checked live and listed, never composed from a
+  question. `WebProvider.fetch_feed` fetches one with every check a page passes - a feed
+  that turns AI agents away is refused like a page - and `processing/feeds.py` reads RSS or
+  Atom (a feed declaring a document type or entities is refused, and so is one in UTF-16
+  or UTF-32, where a declaration would not be seen), keeping each item's headline, dates,
+  author, tags and the start of its excerpt as plain text. One article is
+  one item however many feeds carry it, known by its address without tracking parameters.
+- **News in the current cache**: `news_items` in `data/current.sqlite`, a fourth current
+  source, each feed due on its own after 30 minutes, items kept 120 days after publication.
+  The pipeline's default refresh is still the league's three sources; news is fetched when
+  named - by the `moves_and_rumors` tool, `fol current refresh` and the AI Research page's
+  button. `CurrentDataService.news()` finds a team's items by its own feed, the site's tags
+  or its nickname in a headline, and a player's by their full name in the tags.
+- **The `moves_and_rumors` tool**: the reporting of the last days (14 by default) for a
+  team, a player or the league, moves alone if asked, newest first, each headline with its
+  publication time and how long ago, and a source id to read; credited, and said to change
+  no roster and no contract. A search result for the same article is the same source. It
+  was called `news` until the evaluation showed the name drawing questions about
+  "reporting" away from the web (below).
+- **Dated search results**: a search result carries no date, so `web_search` now says the
+  date its address shows, or that it shows none, and that its results are not in date
+  order.
+- **The search-quality evaluation** (`assistant/search_quality.py`,
+  `scripts/evaluate_search.py`, `tests/assistant/fixtures/search_cases.yaml`,
+  `docs/research/SEARCH_QUALITY.md`, generated): twelve frozen queries through Ollama's
+  web search, each counted for results on the subject, dated, recent, repeated and from
+  refused sites, and held against the feeds. The live run of 2026-10-11 02:17 UTC: 120
+  results, 17 from refused sites left out, no repeats; 90 of the 103 kept on topic but only
+  23 dated by their address, and 11 of the 72 news results dated within their question's
+  days - against 122 dated items in the feeds for the same eight news questions.
+- **The contract-update review**: `pipelines/contract_review.py` reads a candidate file
+  exactly as an import would and compares it with the file in use by player, team and
+  season (`processing.contracts.compare_contract_years`, `domain/contract_review.py`):
+  what is new, changed - salary, option or guarantee - or gone, and what to check first: a
+  source never imported before, figures older than those in use, names the league's index
+  does not hold, seasons without cap rules. It stores nothing. `fol contracts preview`
+  prints it; Contract Explorer's new *Check a new file* tab shows it, through the
+  assistant's facade (`api.review_contract_file`). The assistant may reach this module,
+  which only reads, and still not `pipelines.contracts`, whose import writes - the
+  boundary test names it. On the real project the file in use, previewed against itself,
+  shows 7,228 contract seasons the same and nothing changed.
+- **The `contract_updates` tool**: the moves on the league's transactions file and those
+  reported in the news since the contract file's date, each beside the file's salary for
+  the season, with how to bring the file up to date. Nothing it reads changes the file.
+- **Starters by impact** (the A6 review): `domain/lineup.py` keeps the nine who play the
+  most and the most positions filled, and now starts the lineup with the most projected
+  impact among those that fit - a player without a projection starts only where no one
+  with one can.
+- **Places checked for what they rank** (the A6 review): `assistant/checker.py` reads what
+  a place ranks from the words around it - "in the East", "of 30", "the league's", "the 3rd
+  seed" - and a place named for the league or a conference stands only on a result's place
+  for the same field. A mismatch is sent back with what the results give for that field
+  ("6th in the East (the results' 6th is in the league; in the East they give 3rd)"), and
+  a sentence whose only fault is such a place is cut at that clause rather than lost whole:
+  what follows the clause goes with it, and no bracket or bold is left open. The standings
+  and the bracket now write each place with its conference ("3rd in the East").
+- **Tests**: the feed reader (RSS, Atom, entities refused in any encoding, one article
+  once, items let go after their days); the feed fetch (types, robots, redirects); the news
+  refresh (on
+  request only, a team's feed when asked, due feed by feed, unchanged, a failure keeping
+  what was held, nothing written to the lab's database); the news service (team, player,
+  window, moves); the `moves_and_rumors` tool (dated lines, sources read by id and shared
+  with search, the empty window, never fetched, a failure later); dated search results; the
+  search-quality counting and report; the preview (compared, flagged, nothing stored, no
+  file in use, unreadable); the preview command; the page's *Check a new file* drawn from a
+  preview; `contract_updates` (moves since, a team, nothing since, no contract file, the
+  file unchanged); the lineup by impact; the place check by field, and a cut that ends at
+  the first clause that fails with no bracket or bold left open; the feed settings'
+  validation; the recorded world's feeds; and what the browser pass found (below): a
+  refused id of the other kind, what counts as a gap, and times, source ids and keys in
+  answer tables.
+
+**The evaluation** - five runs on the A7 code: 46, 48, 47, 47 and 49 of 59, the last on
+the code as committed and the report ([AI_EVALUATION.md](AI_EVALUATION.md)). The first two
+shaped the place check: told only that its "6th in the Eastern Conference" was the league's
+6th, the model wrote it again, and the cut took the record the user had asked for with it;
+the note now names what the results give for that field, and a misplaced place costs its
+clause. W01, "Find recent reporting on why the Knicks won the 2025-26 title", opened with
+the feeds' tool in every run while it was called `news`, asked it for moves alone and never
+searched the web. Three wordings of its description changed nothing in probes of the first
+move; the name `moves_and_rumors` did. A wider description of `web_search`, made with it,
+moved K02's payroll question to `team_stats` in two runs, and went back to A6's wording. In
+the last run every case that needs a tool opened with the right one (37 of 37), W01 and K02
+passed, and no figure that no result holds reached the user. The ten that fail are the six
+that have failed in every run since A5, V02 on a budget the model chose itself, and E01,
+P04 and R03, each of which loses a sentence or two to the checks in some runs and not
+others. W01's passing answer still gives the league's 5th place to defensive rating, where
+it is net rating's: a real figure on the wrong thing, which the checker cannot see.
+
+**The browser pass** - the workbench over a scratch copy of the real project, with the
+real model and the live Hoops Rumors feeds, clicked through with Playwright in the light
+and the dark theme: Contract Explorer's *Check a new file* with a copy of the file in use
+changed in three rows (one new, one changed, one gone), the new source flagged and the
+import left to the user as a command; on AI Research, the news chip, "What's the latest
+news on the Golden State Warriors?" answered from the team's feed (Brandin Podziemski's
+extension, posted four hours before), and "Has anything changed for the Knicks since my
+contract file?". It found six faults, each fixed and each with a test:
+
+- **The contract question was given up.** The model called `contract_updates` with the
+  Knicks' team id as the player too; the refusal said only that no player has that id, and
+  the answer said the Knicks could not be found. A refusal now says where an id of the
+  other kind belongs ("the id of the New York Knicks, a team: give it as team_id"); in the
+  later passes the question was answered, from the league's moves since the file's date.
+- **A news answer was "not enough to answer"** for relaying that a coach "has not provided
+  any details". "Not provided", "not available" and the like now mark a gap only beside
+  the data, the results, a file or the lab; every phrasing the evaluation runs had read as
+  a gap still is.
+- **Times showed as 2026-10-10T23:47:27** in answer tables, new and kept (a kept answer's
+  JSON holds a time as text). They now read "2026-10-10 23:47 UTC", or the day alone where
+  every time is midnight.
+- **The transactions table showed each move's internal key**, two columns of hashes. Keys
+  are left to the CSV, as ids are.
+- **"Read more using the source ID s2"** named a row no table showed. A source's id is now
+  the table's first column, *Source*.
+- **"1627 players"** stood under 7,283 rows; it reads "1,627".
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| `pytest -n auto` (everything but live-network and live-model tests) | 3,833 passed (4 min 50 s), after the last change |
+| `pytest -m ollama` (the live model) | 6 passed |
+| The end-to-end evaluation, on the A7 code | 49/59 in the last of five runs, 100% right first tool, no unsupported figure shown; report generated |
+| The search-quality evaluation, live | 12 queries run; report generated |
+| The pages in a browser | Contract Explorer's *Check a new file* and AI Research's news and contract answers, light and dark, over a copy of the real project with the live feeds; six faults found and fixed, each with a test |
+| Sources and boundaries | No paid provider; nothing worked around - the feeds pass the robots and terms checks, and a refused feed fails like a refused page; the assistant reaches `pipelines.contract_review` (reads only) and not the contract import; the boundary tests pass |
+| Data and models | No model file, league table or contract figure changed; a reported move changes no roster or contract (tests); the contract preview stores nothing (tests, and the raw store unchanged on the real project); the browser pass wrote only into a scratch copy |
+
 ## Milestone A6 - AI Research Assistant: workspaces and asking from any page (2026-10-10)
 
 The research is kept. Named workspaces, in a file of their own that no build touches, hold

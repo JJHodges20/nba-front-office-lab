@@ -293,7 +293,12 @@ class OptimizerService:
         )
         placed = starting_slots(
             [
-                LineupPlayer(int(player), _listed(row), float(row["projected_share"]))
+                LineupPlayer(
+                    int(player),
+                    _listed(row),
+                    float(row["projected_share"]),
+                    _known(row["projected_impact"]),
+                )
                 for player, row in chosen.iterrows()
             ]
         )
@@ -360,6 +365,11 @@ class OptimizerService:
         if pool.empty:
             return 1
         return max(1, int(round(float(pool["salary"].median()) * DEFAULT_PLAYERS[0])))
+
+
+def _known(value: object) -> float | None:
+    """A projected figure, or ``None`` where there is none."""
+    return None if value is None or pd.isna(value) else float(value)  # type: ignore[arg-type]
 
 
 def _listed(row: pd.Series) -> str:

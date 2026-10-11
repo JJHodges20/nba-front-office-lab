@@ -19,6 +19,7 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe seasons                  # cap, tax, apron and roster rules by season
 .\.venv\Scripts\fol.exe raw                      # what the raw store holds
 .\.venv\Scripts\fol.exe contracts template       # a contract file to fill in (then import, then build)
+.\.venv\Scripts\fol.exe contracts preview FILE --source "..." --as-of YYYY-MM-DD   # a file against the one in use; stores nothing
 .\.venv\Scripts\python.exe scripts\convert_salary_dataset.py <player_salaries.csv> <out.csv>   # the MrBridge/HoopsHype salary table as a contract file
 .\.venv\Scripts\fol.exe dictionary --write        # regenerate docs/DATA_DICTIONARY.md
 .\.venv\Scripts\fol.exe metrics --write           # regenerate docs/METRICS.md
@@ -44,7 +45,8 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\python.exe -m pytest -m ollama    # the assistant against the local model (Ollama running)
 .\.venv\Scripts\python.exe scripts\benchmark_ollama.py --write   # benchmark the candidate models (docs/research/ASSISTANT_MODELS.md)
 .\.venv\Scripts\python.exe scripts\evaluate_answers.py --write   # the assistant's whole answers, end to end (docs/research/ASSISTANT_ANSWERS.md)
-.\.venv\Scripts\fol.exe current refresh            # fetch what is due: this season's games, transactions, the injury report
+.\.venv\Scripts\python.exe scripts\evaluate_search.py --write    # web search and the news feeds on frozen queries, live (docs/research/SEARCH_QUALITY.md)
+.\.venv\Scripts\fol.exe current refresh            # fetch what is due: this season's games, transactions, the injury report, the news feeds
 .\.venv\Scripts\fol.exe current status             # when each current source was last fetched, and what is held
 .\.venv\Scripts\python.exe scripts\make_fixtures.py   # rebuild tests/fixtures/raw from data/raw
 ```
@@ -99,11 +101,12 @@ Build one roadmap milestone at a time. A milestone is finished only when:
 - **Generated documents are not edited.** `docs/DATA_DICTIONARY.md`, `docs/METRICS.md`,
   `docs/research/BENCHMARKS.md`, `docs/research/PLAYER_VALUE.md`,
   `docs/research/ROSTER_FIT.md`, `docs/research/POSTSEASON.md`,
-  `docs/research/SIMULATOR.md`, `docs/research/ASSISTANT_MODELS.md` and
-  `docs/research/ASSISTANT_ANSWERS.md` come from
+  `docs/research/SIMULATOR.md`, `docs/research/ASSISTANT_MODELS.md`,
+  `docs/research/ASSISTANT_ANSWERS.md` and `docs/research/SEARCH_QUALITY.md` come from
   `fol dictionary|metrics|benchmarks --write`, `fol value report --write`,
   `fol fit report --write`, `fol playoffs report --write`, `fol simulate report --write`,
-  `scripts/benchmark_ollama.py --write` and `scripts/evaluate_answers.py --write`. The
+  `scripts/benchmark_ollama.py --write`, `scripts/evaluate_answers.py --write` and
+  `scripts/evaluate_search.py --write`. The
   first two are checked by tests; the research
   documents depend on the database, so regenerate them at a milestone gate after the
   data, a model, the evidence or the research code changes.
@@ -190,8 +193,9 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   `fol simulate fit --write`, `fol fit test --write`, then the research documents.
 - **The assistant is the outermost layer** (`docs/decisions/0018-ai-research-assistant.md`).
   The workbench imports only `front_office.assistant.api`; of providers and pipelines the
-  assistant uses only `providers.ollama`, `providers.web`, `pipelines.current` and
-  `pipelines.web`. Tests enforce both. Its model is local: `providers/ollama.py` accepts the loopback address
+  assistant uses only `providers.ollama`, `providers.web`, `pipelines.current`,
+  `pipelines.web` and `pipelines.contract_review` (which stores nothing - never
+  `pipelines.contracts`, whose import writes). Tests enforce both. Its model is local: `providers/ollama.py` accepts the loopback address
   only, refuses models Ollama marks remote or names as cloud, and sends the context length
   with every request; `configs/assistant.yaml` has no field for a key.
 - **No tool writes.** The registry (`assistant/tools.py`) has read, compute, net and draft
@@ -222,14 +226,17 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   the model runs (`orchestrator._nobody_named`). Every proposed roster waits in its workspace
   until the user saves or declines it, and every press is logged.
 - **Saved rosters place their starters with `domain/lineup.py`**: from the nine who play the
-  most, each at a position they are listed at where the roster allows - the user's wish at
-  the A5 review, for every save.
+  most, each at a position they are listed at where the roster allows (the user's wish at
+  the A5 review), and of the lineups that fit, the one with the most projected impact (at
+  the A6 review), for every save.
 - **A handler formats; the services compute.** A tool's handler (`assistant/*_tools.py`)
   calls service methods and writes what they return as the workbench shows it, with the
   evidence: the build, the contract file's date, a source's address and times. It never
   computes a metric, ranks, or fits. Every figure in an answer must be in a result the
-  model was given (`assistant/checker.py`), and a place ("6th") only on a place; an empty
-  read of the lab carries the build. A chance or a benchmark's share goes with its interval:
+  model was given (`assistant/checker.py`), and a place ("6th") only on a place - for the
+  same field, the league or a conference, where the answer names one (A7): so a tool writes
+  every place with its field ("4th of 30", "3rd in the East"); an empty read of the lab
+  carries the build. A chance or a benchmark's share goes with its interval:
   an answer without one is sent back once, then noted. A question asking for a verdict gets
   a qualified answer and a note, whatever the model says.
 - **A modeled figure goes out with its error, and the assistant makes none up.**
@@ -247,12 +254,28 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   answers are left out. A section is cited by file and heading (evidence kind `docs`).
 - **Current information is a cache beside the lab.** `data/current.sqlite`
   (`storage/current.py`) holds what `pipelines/current.py` fetched: the season's games,
-  the league's transactions, the latest injury report, and a log of every attempt. A
+  the league's transactions, the latest injury report, the news feeds' items (A7), and a
+  log of every attempt. A
   refresh never touches the lab's database and a build never drops the cache. A source is
   fetched only when its interval (`configs/assistant.yaml`, `current:`) has passed; a
   failure keeps the last copy and says how old it is. "Not on the report" is never
   "healthy". The league's injury report may not be redistributed: never commit one - the
   tests draw their own (`tests/injury_pdf.py`).
+- **News comes only from feeds the source register allows** (A7). `configs/assistant.yaml`
+  (`news:`) lists them - Hoops Rumors alone, the user's choice - and a feed is added only
+  after its robots.txt (AI agents included) and its terms are checked and recorded in
+  `docs/DATA_SOURCE_REGISTER.md`. A feed passes every check a page passes
+  (`WebProvider.fetch_feed`) and is read by `processing/feeds.py` (a declared entity refuses
+  it, and so does a zero byte, which would hide one); each article is one `news_items` row. The pipeline's default refresh leaves the feeds
+  out: name `news`. A report never changes a table, a roster or a contract. The model reads
+  the feeds through `moves_and_rumors`, named for what they carry: called `news`, the tool
+  drew questions about reporting, why a title was won included, away from the web.
+- **A contract file is checked before it is imported, and the check stores nothing.**
+  `pipelines/contract_review.py` reads a candidate exactly as an import would and compares
+  it with the file in use; a source label never imported before is flagged until its terms
+  are checked. `fol contracts preview` and Contract Explorer's *Check a new file* reach it;
+  the import stays `fol contracts import`, the user's command. `contract_updates` puts the
+  moves since the file's date beside the file - never a figure to import.
 - **The web goes through `providers/web.py` alone, and never with a URL the model wrote.**
   `read_source` takes an id: a search result's or a pasted link's. Every address, every
   redirect and the address connected to must be public; robots.txt is read for AI agents

@@ -71,6 +71,7 @@ class CurrentDataService:
                     "games": len(store.read("current_games")),
                     "transactions": len(store.read("transactions")),
                     "injuries": len(store.read("injury_reports")),
+                    "news": len(store.read("news_items")),
                 }
         found = []
         for source in SOURCES:
@@ -147,6 +148,53 @@ class CurrentDataService:
             ["transaction_date", "transaction_key"], ascending=False
         ).reset_index(drop=True)
 
+    def news(
+        self,
+        team_id: int | None = None,
+        player_id: int | None = None,
+        since: datetime | None = None,
+        moves_only: bool = False,
+    ) -> pd.DataFrame:
+        """Reporting from the news feeds as last fetched, newest first (A7). A team's items
+        are those its own feed carried, or that the site tagged or headlined with its
+        nickname; a player's, those tagged or headlined with their full name. Reporting,
+        not the lab's data."""
+        items = self._read("news_items")
+        if team_id is not None and not items.empty:
+            items = items[self._about_team(items, team_id)]
+        if player_id is not None and not items.empty:
+            players = self._lab.entities.players()
+            name = players.at[player_id, "full_name"] if player_id in players.index else None
+            items = items[_mentions(items, str(name))] if isinstance(name, str) else items.iloc[0:0]
+        if since is not None:
+            items = items[items["published_at"] >= pd.Timestamp(since)]
+        if moves_only:
+            items = items[items["transactions"].astype(bool)]
+        return items.sort_values(
+            ["published_at", "item_id"], ascending=False, na_position="last"
+        ).reset_index(drop=True)
+
+    def _about_team(self, items: pd.DataFrame, team_id: int) -> pd.Series:
+        teams = self._lab.read("teams").set_index("team_id")
+        if team_id not in teams.index:
+            return pd.Series(False, index=items.index)
+        nickname = fold(str(teams.at[team_id, "nickname"]))
+        feed = load_assistant_settings(self._lab.settings.config_dir).news.team_feed(
+            str(teams.at[team_id, "abbreviation"])
+        )
+        carried = (
+            items["feeds"].str.split("; ").map(lambda feeds: feed.id in feeds)
+            if feed is not None
+            else pd.Series(False, index=items.index)
+        )
+        tagged = (
+            items["categories"]
+            .fillna("")
+            .map(lambda tags: any(fold(tag).endswith(nickname) for tag in tags.split("; ") if tag))
+        )
+        headlined = items["title"].map(lambda title: nickname in fold(title))
+        return carried | tagged | headlined
+
     def injuries(self, team_id: int | None = None, player_id: int | None = None) -> pd.DataFrame:
         """The latest injury report fetched, with the lab's team and player ids where one
         name matches exactly one."""
@@ -170,6 +218,19 @@ class CurrentDataService:
         if player_id is not None:
             report = report[report["player_id"] == player_id]
         return report.reset_index(drop=True)
+
+
+def _mentions(items: pd.DataFrame, name: str) -> pd.Series:
+    """Items the site tagged with ``name`` - "Brandon Williams (Player)" counts - or whose
+    headline gives it in full."""
+    wanted = fold(name)
+
+    def tagged(tags: str) -> bool:
+        return any(fold(tag.removesuffix(" (Player)")) == wanted for tag in tags.split("; "))
+
+    return items["categories"].fillna("").map(tagged) | items["title"].map(
+        lambda title: wanted in fold(title)
+    )
 
 
 def _player(entities: object, written: object) -> int | None:

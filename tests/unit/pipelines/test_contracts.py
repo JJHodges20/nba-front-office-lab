@@ -16,6 +16,7 @@ import pytest
 from front_office.config import Settings
 from front_office.domain.datasets import CONTRACT_FILE, CONTRACT_FILE_DATASET
 from front_office.pipelines.check import check_store
+from front_office.pipelines.contract_review import ContractReviewError, preview_contract_file
 from front_office.pipelines.contracts import (
     ContractImportError,
     import_contract_file,
@@ -220,3 +221,70 @@ class TestTemplate:
     def test_league_data_must_be_ingested_first(self, settings: Settings) -> None:
         with pytest.raises(ContractImportError, match="run: fol ingest"):
             write_contract_template(settings, today=TODAY)
+
+
+class TestPreview:
+    """A7: a candidate file against the one in use - read as an import reads it, compared
+    season by season, flagged where it needs checking - and nothing stored."""
+
+    LABEL = "Invented test salaries"
+
+    def test_a_candidate_is_compared_and_nothing_is_stored(self, lab, tmp_path) -> None:  # type: ignore[no-untyped-def]
+        import_contract_file(lab, invented_file(tmp_path), source_label=self.LABEL, as_of=TODAY)
+        newer = write(
+            tmp_path,
+            "player_id,player,team,2026-27,2027-28,2028-29\n"
+            f"{TATUM},Jayson Tatum,BOS,40000000,46000000,48000000\n"
+            f"{ANUNOBY},OG Anunoby,NYK,30000000,32000000,\n",
+            "newer.csv",
+        )
+        preview = preview_contract_file(
+            lab, newer, source_label=self.LABEL, as_of=date(2026, 10, 9)
+        )
+        assert stored_imports(lab) == 1, "a preview stores nothing"
+        assert preview.in_use is not None and preview.in_use.as_of == TODAY
+        changed = {(c.player, c.season): (c.kind, c.in_use, c.candidate, c.detail) for c in preview.changes}  # fmt: skip
+        assert changed == {
+            ("Jayson Tatum", "2027-28"): ("changed", 44_000_000, 46_000_000, None),
+            ("OG Anunoby", "2027-28"): ("new", None, 32_000_000, None),
+            ("Jayson Tatum", "2028-29"): (
+                "changed",
+                48_000_000,
+                48_000_000,
+                "option: player to none",
+            ),
+        }
+        assert [c.player for c in preview.changes][:2] == ["OG Anunoby", "Jayson Tatum"], (
+            "largest first"
+        )
+        assert preview.unchanged == 2
+        assert preview.flags == (
+            "No cap rules are configured for 2027-28, 2028-29: salaries there would have no "
+            "share of the cap.",
+        ), "the same source, newer figures: only what the lab cannot say about them"
+        assert preview.command == (
+            f'fol contracts import "{newer}" --source "{self.LABEL}" --as-of 2026-10-09'
+        )
+
+    def test_what_needs_checking_before_an_import_is_said(self, lab, tmp_path) -> None:  # type: ignore[no-untyped-def]
+        import_contract_file(lab, invented_file(tmp_path), source_label=self.LABEL, as_of=TODAY)
+        preview = preview_contract_file(
+            lab, invented_file(tmp_path), source_label="A new site", as_of=date(2026, 9, 1)
+        )
+        assert preview.changes == () and preview.unchanged == 4
+        assert preview.unmatched == ("line 4: Nobody Atall (BOS) - no player with this name",)
+        assert preview.flags[0].startswith("“A new site” has not been imported before. Check")
+        assert "older than those in use (2026-10-01)" in preview.flags[1]
+        assert "1 row(s) name a player or team the league's index does not hold" in preview.flags[2]
+
+    def test_with_no_file_in_use_every_row_is_new(self, lab, tmp_path) -> None:  # type: ignore[no-untyped-def]
+        preview = preview_contract_file(
+            lab, invented_file(tmp_path), source_label=self.LABEL, as_of=TODAY
+        )
+        assert preview.in_use is None and preview.count("new") == 4 and preview.unchanged == 0
+        assert "No contract file is in use yet" in preview.flags[1]
+        assert stored_imports(lab) == 0
+
+    def test_a_file_that_cannot_be_read_is_refused(self, lab, tmp_path) -> None:  # type: ignore[no-untyped-def]
+        with pytest.raises(ContractReviewError, match="contract file not found"):
+            preview_contract_file(lab, tmp_path / "missing.csv", source_label="x", as_of=TODAY)

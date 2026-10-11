@@ -57,7 +57,7 @@ class TestTheRegistry:
         assert not fields & {"sql", "query_sql", "code", "command", "path", "file", "url"}
 
     def test_every_tool_says_when_it_is_built(self) -> None:
-        assert {spec.milestone for spec in REGISTRY} <= {"A2", "A4", "A5"}
+        assert {spec.milestone for spec in REGISTRY} <= {"A2", "A4", "A5", "A7"}
 
     def test_enumerations_are_the_labs_own(self) -> None:
         schema = {spec.name: tool_schema(spec)["function"]["parameters"] for spec in REGISTRY}

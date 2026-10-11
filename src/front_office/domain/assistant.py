@@ -97,6 +97,8 @@ class CurrentSettings(_Settings):
     games_minutes: int = Field(60, ge=5)
     transactions_minutes: int = Field(180, ge=15)
     injuries_minutes: int = Field(30, ge=15)
+    news_minutes: int = Field(30, ge=15)
+    """How long each news feed may age; a team's own feed is counted on its own (A7)."""
     injury_slots: int = Field(4, ge=1, le=12)
     """Quarter hours back to look for the latest injury report."""
 
@@ -105,7 +107,50 @@ class CurrentSettings(_Settings):
             "games": self.games_minutes,
             "transactions": self.transactions_minutes,
             "injuries": self.injuries_minutes,
+            "news": self.news_minutes,
         }[source]
+
+
+class NewsFeed(_Settings):
+    """A feed the assistant reads reporting from (A7): a site the source register allows,
+    read as a feed reader reads it - headlines, dates, a short excerpt and the link."""
+
+    id: str = Field(pattern=r"^[a-z0-9-]{1,40}$")
+    site: str = Field(min_length=1)
+    """The site's name, as every item credits it."""
+    url: str = Field(pattern=r"^https://")
+    transactions: bool = False
+    """Whether the feed carries moves alone: signings, extensions, trades, waivers."""
+    team: str | None = Field(None, pattern=r"^[A-Z]{3}$")
+    """For a team's own feed, the team's abbreviation: read when a question is about it."""
+
+
+class NewsSettings(_Settings):
+    """``news:`` in ``configs/assistant.yaml``: the feeds, and how long items are kept."""
+
+    keep_days: int = Field(120, ge=14)
+    """How long an item is kept after it was published."""
+    feeds: tuple[NewsFeed, ...] = ()
+
+    @field_validator("feeds")
+    @classmethod
+    def _each_once(cls, value: tuple[NewsFeed, ...]) -> tuple[NewsFeed, ...]:
+        for what in ("id", "url"):
+            seen = [getattr(feed, what) for feed in value]
+            if len(seen) != len(set(seen)):
+                raise ValueError(f"a feed {what} is listed twice")
+        teams = [feed.team for feed in value if feed.team is not None]
+        if len(teams) != len(set(teams)):
+            raise ValueError("a team has two feeds")
+        return value
+
+    @property
+    def general(self) -> tuple[NewsFeed, ...]:
+        """The feeds read for every question: those of no one team."""
+        return tuple(feed for feed in self.feeds if feed.team is None)
+
+    def team_feed(self, abbreviation: str | None) -> NewsFeed | None:
+        return next((feed for feed in self.feeds if feed.team == abbreviation), None)
 
 
 class AssistantSettings(_Settings):
@@ -123,6 +168,7 @@ class AssistantSettings(_Settings):
     quick: ModeSettings
     deep: ModeSettings
     current: CurrentSettings = CurrentSettings()
+    news: NewsSettings = NewsSettings()
 
     @field_validator("default_model", "fallback_model")
     @classmethod

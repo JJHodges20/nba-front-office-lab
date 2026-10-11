@@ -246,3 +246,99 @@ class TestPlaces:
 
     def test_a_plain_number_may_still_stand_on_a_place(self) -> None:
         assert check("Ranked 4 of 30.", ["4th of 30"]).ok
+
+
+class TestWhatAPlaceRanks:
+    """A7, the user's wish at the A6 review: a place is checked for its field as well."""
+
+    TEAM = "New York Knicks, 2025-26 regular season, full season. 3rd in the East.\n| Wins | 53 | 6th of 30 | 41 |"  # fmt: skip
+
+    def test_the_league_s_6th_does_not_hold_6th_in_the_east(self) -> None:
+        # Live at A6: "53 wins, placing them 6th in the Eastern Conference" on the league's 6th.
+        result = check("53 wins, 6th in the Eastern Conference.", [self.TEAM])
+        assert result.listed == "6"
+        (item,) = result.misplaced
+        assert (item.figure.text, item.figure.scope, item.fields) == ("6", "east", ("league",))
+        assert item.held == ("3rd",), "what the results do give for the East"
+        note = repair_note(result)
+        assert "These places rank something the results do not: 6th in the East" in note
+        assert "(the results' 6th is in the league; in the East they give 3rd)" in note
+        assert "in no tool result" not in note
+
+    def test_a_misplaced_place_costs_its_clause_not_the_record(self) -> None:
+        """Live at A7, H02: the record and the wrong place were one sentence, cut whole."""
+        given = [self.TEAM, "| Losses | 29 | 6th of 30 | 41 |"]
+        answer = (
+            "The Knicks had a record of 53 wins and 29 losses, placing them 6th in the Eastern "
+            "Conference. They won the title."
+        )
+        text, removed = cut(answer, given)
+        assert text == "The Knicks had a record of 53 wins and 29 losses. They won the title."
+        assert removed == ("6",)
+
+    def test_what_leans_on_a_cut_clause_goes_with_it(self) -> None:
+        """Live at A7, E01: the cut kept "as the league was split into conferences at that
+        time)", a remark on the place it had taken out, and its closing bracket."""
+        given = [self.TEAM, "| Losses | 29 | 6th of 30 | 41 |"]
+        answer = "They had 53 wins and 29 losses, 6th in the Eastern Conference, as it stood then."
+        text, removed = cut(answer, given)
+        assert (text, removed) == ("They had 53 wins and 29 losses.", ("6",))
+
+    @pytest.mark.parametrize(
+        ("answer", "kept"),
+        [
+            (
+                "They had 53 wins (a strong year, 6th in the Eastern Conference).",
+                "They had 53 wins.",
+            ),
+            ("They had **53 wins, 6th in the Eastern Conference**.", "They had **53 wins**."),
+        ],
+    )
+    def test_a_cut_leaves_no_bracket_or_bold_open(self, answer: str, kept: str) -> None:
+        assert cut(answer, [self.TEAM])[0] == kept
+
+    def test_a_place_in_the_main_clause_takes_the_sentence(self) -> None:
+        text, _ = cut("The Knicks were 6th in the East, with 53 wins. They won it.", [self.TEAM])
+        assert text == "They won it."
+
+    def test_a_made_up_figure_still_takes_the_sentence(self) -> None:
+        text, removed = cut("They won 53, placing them 6th in the East, by 99 points.", [self.TEAM])
+        assert (text, removed) == ("", ("6", "99"))
+
+    @pytest.mark.parametrize(
+        "written",
+        [
+            "They won 53, 6th in the league.",
+            "They won 53, the NBA's 6th-most.",
+            "They won 53, 6th overall.",
+            "Their 53 wins were 6th of 30.",
+            "They won 53 games, 6th.",
+            "They finished 3rd in the Eastern Conference with 53 wins.",
+            "They were the 3rd seed.",
+            "They were 3rd in the East and 6th in the league with 53 wins.",
+        ],
+    )
+    def test_a_place_for_its_own_field_stands(self, written: str) -> None:
+        assert check(written, [self.TEAM]).ok
+
+    @pytest.mark.parametrize(
+        "written",
+        [
+            "They were 3rd in the league.",
+            "They were 3rd in the West.",
+            "They were 6th in the East.",
+        ],
+    )
+    def test_a_place_for_another_field_does_not(self, written: str) -> None:
+        assert not check(written, [self.TEAM]).ok
+
+    def test_the_standings_and_the_bracket_name_their_conference(self) -> None:
+        standings = "| East | 3rd in the East | New York Knicks | 53-29 | +6.3 | Lost in the second round |"  # fmt: skip
+        assert check("The Knicks were 3rd in the East at 53-29.", [standings]).ok
+        assert not check("The Knicks were 3rd in the league at 53-29.", [standings]).ok
+
+    def test_a_place_a_result_writes_alone_is_the_league_s(self) -> None:
+        given = ["| Points | 28.7 | 12th of 211 |", "| Assists | 99th percentile |"]
+        assert check("He was 12th in the league in points.", given).ok
+        assert not check("He was 12th in the West in points.", given).ok
+        assert check("He was in the 99th percentile.", given).ok

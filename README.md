@@ -102,14 +102,14 @@ Stop it with Ctrl+C. [docs/WORKBENCH.md](docs/WORKBENCH.md) is the guide.
 | Player Explorer | Every player of a season; one player's profile, form, seasons, games and contract; up to three players side by side. |
 | Player Value | What a fitted, tested model makes of every player: impact, wins above replacement, projections, value against salary, the roles each player fills - and the evidence for the model. |
 | Team Explorer | One team: record, ratings and ranks, the four factors, form, games, rotation, history, payroll. |
-| Contract Explorer | Salaries, team payrolls against the cap, tax and aprons, and the cap rules with their sources. |
+| Contract Explorer | Salaries, team payrolls against the cap, tax and aprons, and the cap rules with their sources. *Check a new file* compares a contract file with the one in use before you import it, and says what to check first. |
 | Analytics Lab | Any two metrics against each other, how one is spread, and the metric glossary. |
 | Team Builder | Rosters you assemble by hand: payroll, cap share, room under each line, roster rules, pooled indicators. |
 | Roster Fit | Do these players make sense together? A team or a built roster described in the roadmap's areas of fit, placed among the season's teams, with the sum of its parts - and the evidence on whether fit adds anything to it. |
 | Roster Optimizer | Several strong, distinct rosters under a payroll budget and the requirements you set, from the value model's projections; any of them can be saved into the Team Builder. |
 | Postseason Outlook | How likely each stage of the playoffs is: for a team, a built roster or a strength you set, for every team of a season, and for a decided season's bracket and series - with intervals, and the model's record on seasons it had not seen. |
 | Scenario Simulator | What a change to a roster would do to its season: players in and out, games missed, development and minutes as your assumptions, and thousands of seasons drawn before and after - payroll, rating, wins and the chance of every stage. |
-| AI Research | Ask in plain words: a model on this machine answers from the lab's data and fitted models, its own documents, games, moves and injuries since the build, and the web - every figure checked against what the tools returned, each modeled figure with its interval, each answer shown with its rows, charts and dated sources. Ask for rosters under a budget and get two to four to review, each saved only when you press its button. Research is kept in named workspaces on this computer - questions and answers, findings, notes, proposed rosters - and *Ask AI about this* on the other pages asks about what they show. |
+| AI Research | Ask in plain words: a model on this machine answers from the lab's data and fitted models, its own documents, games, moves and injuries since the build, dated news from the feeds the lab may read, and the web - every figure checked against what the tools returned, each modeled figure with its interval, each answer shown with its rows, charts and dated sources. Ask for rosters under a budget and get two to four to review, each saved only when you press its button. Research is kept in named workspaces on this computer - questions and answers, findings, notes, proposed rosters - and *Ask AI about this* on the other pages asks about what they show. |
 | Data Health | Freshness, failed fetches, missing data, quality checks and source status. |
 
 Season, phase, team, player and comparison window are chosen once in the sidebar and
@@ -143,6 +143,7 @@ lab derived or estimated, and which you assumed.
 .\.venv\Scripts\fol.exe raw         # what the raw store holds
 .\.venv\Scripts\fol.exe check       # validate the raw store without writing anything
 .\.venv\Scripts\fol.exe contracts template            # a contract file to fill in
+.\.venv\Scripts\fol.exe contracts preview FILE --source "where the figures came from"   # what it would change; stores nothing
 .\.venv\Scripts\fol.exe contracts import FILE --source "where the figures came from"
 .\.venv\Scripts\fol.exe dictionary  # the data dictionary, generated from the table contracts
 .\.venv\Scripts\fol.exe metrics     # the metric glossary, generated from the metric catalogs
@@ -159,7 +160,7 @@ lab derived or estimated, and which you assumed.
 .\.venv\Scripts\fol.exe simulate show    # the simulator's measured parameters and the wins test
 .\.venv\Scripts\fol.exe simulate fit     # measure them again on the built database (--write to save)
 .\.venv\Scripts\fol.exe simulate report  # the simulator research, with the season ahead drawn for every team
-.\.venv\Scripts\fol.exe current refresh  # for the AI assistant: this season's games, transactions and the injury report, when due
+.\.venv\Scripts\fol.exe current refresh  # for the AI assistant: this season's games, transactions, the injury report and the news feeds, when due
 .\.venv\Scripts\fol.exe current status   # when each of them was last fetched
 .\.venv\Scripts\fol.exe ui --port 8600 --no-browser   # the workbench on another port
 ```

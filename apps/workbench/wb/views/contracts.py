@@ -5,7 +5,9 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
+import front_office.assistant.api as api
 from front_office.domain.cap_rules import PayrollLine
+from front_office.domain.contract_review import ContractPreview
 from wb import charts, components, data, formats, state
 from wb.components import DERIVED, EMPTY_CELL, MEASURED, Figure
 from wb.state import Filters
@@ -32,6 +34,8 @@ CAP_ROWS = {
     "max_two_way_contracts": "Two-way contracts, most",
 }
 COUNT_ROWS = ("max_standard_contracts", "min_standard_contracts", "max_two_way_contracts")
+REVIEW = "contracts_review"
+"""The last file checked against the one in use, for the session."""
 
 
 def render() -> None:
@@ -46,6 +50,8 @@ def render() -> None:
         _no_contracts()
         st.subheader("Cap rules")
         _cap_rules(filters)
+        st.subheader("Check a file before importing it")
+        _review()
         return
 
     default = filters.payroll_season if filters.payroll_season in seasons else seasons[0]
@@ -97,13 +103,111 @@ def render() -> None:
             f"{summary.unassigned} salary row(s) in the file name no team and are in no payroll."
         )
 
-    payrolls, listing, rules = st.tabs(["Team payrolls", "Contracts", "Cap rules"])
+    payrolls, listing, rules, review = st.tabs(
+        ["Team payrolls", "Contracts", "Cap rules", "Check a new file"]
+    )
     with payrolls:
         _payrolls(filters, season)
     with listing:
         _listing(filters, season)
     with rules:
         _cap_rules(filters)
+    with review:
+        _review()
+
+
+def _review() -> None:
+    """The contract-update review (A7): a file checked against the one in use, before the
+    user decides to import it. Nothing here imports or stores anything."""
+    st.caption(
+        "Check a contract file before importing it - a newer copy of the dataset you use, or "
+        "another source's. It is read exactly as an import would read it and compared with the "
+        "file in use, season by season. Nothing is stored: importing stays your own command, "
+        "once you have checked that the source may be used."
+    )
+    with st.form("contracts_review_form", border=False):
+        upload = st.file_uploader(
+            "Contract file (CSV, UTF-8)", type=["csv"], key="contracts_review_file"
+        )
+        with st.container(horizontal=True, vertical_alignment="bottom", gap="medium"):
+            source = st.text_input(
+                "Where the figures came from",
+                key="contracts_review_source",
+                help="As an import would record it: the site or dataset, and its terms.",
+            )
+            as_of = st.date_input("Figures current as of", key="contracts_review_as_of", width=200)
+        asked = st.form_submit_button("Compare with the file in use", type="primary")
+    if asked:
+        if upload is None or not source.strip():
+            st.warning(
+                "Choose a file, and say where its figures came from.", icon=":material/info:"
+            )
+        else:
+            try:
+                st.session_state[REVIEW] = api.review_contract_file(
+                    upload.getvalue(), upload.name, source_label=source, as_of=as_of
+                )
+            except api.ContractReviewError as error:
+                st.session_state.pop(REVIEW, None)
+                st.error(f"Not read: {error}", icon=":material/error:")
+    preview: ContractPreview | None = st.session_state.get(REVIEW)
+    if preview is not None:
+        _preview(preview)
+
+
+def _preview(preview: ContractPreview) -> None:
+    components.figures(
+        [
+            Figure(
+                "Rows read",
+                formats.number(preview.rows_read),
+                f"{formats.number(preview.players)} players",
+            ),
+            Figure("New", formats.number(preview.count("new")), "only in this file"),
+            Figure("Changed", formats.number(preview.count("changed")), "salary or terms"),
+            Figure("Gone", formats.number(preview.count("gone")), "only in the one in use"),
+            Figure("The same", formats.number(preview.unchanged), "in both files"),
+        ],
+        per_row=5,
+    )
+    used = preview.in_use
+    st.caption(
+        f"{preview.file_name} ({preview.source_label}), as of {formats.day(preview.as_of)}, "
+        + (
+            "against no file: none is in use yet."
+            if used is None
+            else f"against {used.file_name} ({used.source_label}), as of {formats.day(used.as_of)}."
+        )
+    )
+    for flag in preview.flags:
+        components.tagged(("Check", ":material/warning:", "orange"), flag)
+    if preview.changes:
+        rows = pd.DataFrame(
+            [
+                {
+                    "Season": change.season,
+                    "Player": change.player,
+                    "Team": change.team or EMPTY_CELL,
+                    "In use": formats.money(change.in_use),
+                    "In this file": formats.money(change.candidate),
+                    "Change": ("+" if change.difference >= 0 else "-")
+                    + formats.money(abs(change.difference)),
+                    "Also": change.detail or EMPTY_CELL,
+                }
+                for change in preview.changes
+            ]
+        )
+        st.dataframe(
+            rows,
+            hide_index=True,
+            height=components.table_height(min(len(rows), 15)),
+            row_height=components.ROW,
+        )
+    if preview.unmatched:
+        with st.expander(f"Rows an import would leave out ({len(preview.unmatched)})"):
+            st.markdown("\n".join(f"- {line}" for line in preview.unmatched))
+    st.markdown("**Nothing was imported.** Once the source is checked, from the file's folder:")
+    st.code(f"{preview.command}\nfol build", language="powershell")
 
 
 def _no_contracts() -> None:

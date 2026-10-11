@@ -34,6 +34,48 @@ def test_the_shipped_settings_load_and_stay_local() -> None:
     assert settings.mode(Mode.DEEP) is settings.deep
 
 
+def test_the_shipped_feeds_are_the_registers_and_every_team_has_one() -> None:
+    """A7: Hoops Rumors alone, by the user's choice of 2026-10-10 - its general feed, its
+    feed of moves, and each team's own."""
+    news = load_assistant_settings(REPO_CONFIGS).news
+    assert {feed.site for feed in news.feeds} == {"Hoops Rumors"}
+    assert all(feed.url.startswith("https://www.hoopsrumors.com/") for feed in news.feeds)
+    assert [feed.id for feed in news.general] == ["hoopsrumors", "hoopsrumors-transactions"]
+    assert [feed.transactions for feed in news.general] == [False, True]
+    assert len([feed for feed in news.feeds if feed.team]) == 30
+    assert news.team_feed("BOS") is not None and news.team_feed("XYZ") is None
+
+
+@pytest.mark.parametrize(
+    ("feeds", "why"),
+    [
+        (
+            '[{id: a, site: S, url: "http://example.org/feed"}]',
+            "String should match pattern",
+        ),
+        (
+            '[{id: a, site: S, url: "https://example.org/1"}, {id: a, site: S, url: "https://example.org/2"}]',
+            "a feed id is listed twice",
+        ),
+        (
+            '[{id: a, site: S, url: "https://example.org/1"}, {id: b, site: S, url: "https://example.org/1"}]',
+            "a feed url is listed twice",
+        ),
+        (
+            '[{id: a, site: S, team: BOS, url: "https://example.org/1"}, {id: b, site: S, team: BOS, url: "https://example.org/2"}]',
+            "a team has two feeds",
+        ),
+    ],
+)
+def test_a_feed_list_that_cannot_be_right_is_refused(project: Path, feeds: str, why: str) -> None:
+    text = (
+        VALID.format(host="http://127.0.0.1:11434", model="qwen3:8b") + f"news:\n  feeds: {feeds}\n"
+    )
+    write(project / "configs", text)
+    with pytest.raises(ConfigError, match=why):
+        load_assistant_settings(project / "configs")
+
+
 def test_an_address_off_this_machine_is_refused(project: Path) -> None:
     write(project / "configs", VALID.format(host="http://192.168.1.20:11434", model="qwen3:8b"))
     with pytest.raises(ConfigError, match="loopback"):

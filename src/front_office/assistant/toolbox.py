@@ -11,12 +11,13 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 
+from front_office.assistant.contract_tools import contract_handlers
 from front_office.assistant.current_tools import Refresh, current_handlers
 from front_office.assistant.document_tools import DOCUMENT_HANDLERS
 from front_office.assistant.lab_tools import HANDLERS, Handler
 from front_office.assistant.model_tools import MODEL_HANDLERS
 from front_office.assistant.proposal_tools import PROPOSAL_HANDLERS
-from front_office.assistant.web_tools import SourceBook, WebBudget, web_handlers
+from front_office.assistant.web_tools import NewsRefresh, SourceBook, WebBudget, web_handlers
 from front_office.domain.assistant import Context, Mode
 from front_office.pipelines.current import refresh_current
 from front_office.providers.web import WebProvider
@@ -40,25 +41,32 @@ class Toolbox:
         *,
         refresh: Refresh | None = None,
         web: WebProvider | None = None,
+        news_refresh: NewsRefresh | None = None,
         current: bool = True,
         online: bool = True,
         now: Callable[[], datetime] | None = None,
     ) -> None:
         self._refresh = refresh
         self._web = web
+        self._news_refresh = news_refresh
         self._current = current
         self._online = online
         self._now = now
 
     @classmethod
     def for_lab(cls, lab: Lab) -> Toolbox:
-        """Everything: current data fetched when due, and the web through the user's key."""
+        """Everything: current data and the news feeds fetched when due, and the web through
+        the user's key."""
         settings = lab.settings
+        web = WebProvider(env_file=settings.project_root / ".env")
 
         def refresh(sources: Sequence[str]) -> object:
             return refresh_current(settings, sources=sources)
 
-        return cls(refresh=refresh, web=WebProvider(env_file=settings.project_root / ".env"))
+        def news_refresh(teams: Sequence[str]) -> object:
+            return refresh_current(settings, sources=("news",), teams=teams, web=web)
+
+        return cls(refresh=refresh, web=web, news_refresh=news_refresh)
 
     @classmethod
     def lab_only(cls) -> Toolbox:
@@ -74,5 +82,14 @@ class Toolbox:
         if self._online:
             searches, pages = WEB_LIMITS[context.mode]
             book = SourceBook(context.sources)
-            found |= web_handlers(self._web, book, WebBudget(searches, pages))
+            clock = {} if self._now is None else {"now": self._now}
+            found |= web_handlers(
+                self._web,
+                book,
+                WebBudget(searches, pages),
+                news_refresh=self._news_refresh,
+                **clock,
+            )
+            if self._current:
+                found |= contract_handlers(self._refresh, self._news_refresh, book, **clock)
         return found

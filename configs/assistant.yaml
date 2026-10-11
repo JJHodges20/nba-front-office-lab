@@ -38,4 +38,48 @@ current:
   games_minutes: 60
   transactions_minutes: 180
   injuries_minutes: 30
+  news_minutes: 30
   injury_slots: 4
+
+# News feeds (A7): reporting read as a feed reader reads it - headlines, dates, a short
+# excerpt and the link - credited to the site. Only sites docs/DATA_SOURCE_REGISTER.md
+# allows: Hoops Rumors, which invites feed readers and whose robots.txt admits the lab and
+# AI agents alike (the user's choice, 2026-10-10). The two general feeds are read for any
+# question about news; a team's own feed when a question is about that team. Items are kept
+# for keep_days after they were published. Reporting never changes the lab's data, a roster
+# or the contract file.
+news:
+  keep_days: 120
+  feeds:
+    - {id: hoopsrumors, site: Hoops Rumors, url: "https://www.hoopsrumors.com/feed"}
+    - {id: hoopsrumors-transactions, site: Hoops Rumors, url: "https://www.hoopsrumors.com/transactions/feed", transactions: true}
+    - {id: hoopsrumors-atl, site: Hoops Rumors, team: ATL, url: "https://www.hoopsrumors.com/atlanta-hawks/feed/atom"}
+    - {id: hoopsrumors-bos, site: Hoops Rumors, team: BOS, url: "https://www.hoopsrumors.com/boston-celtics/feed/atom"}
+    - {id: hoopsrumors-bkn, site: Hoops Rumors, team: BKN, url: "https://www.hoopsrumors.com/brooklyn-nets/feed/atom"}
+    - {id: hoopsrumors-cha, site: Hoops Rumors, team: CHA, url: "https://www.hoopsrumors.com/charlotte-hornets/feed/atom"}
+    - {id: hoopsrumors-chi, site: Hoops Rumors, team: CHI, url: "https://www.hoopsrumors.com/chicago-bulls/feed/atom"}
+    - {id: hoopsrumors-cle, site: Hoops Rumors, team: CLE, url: "https://www.hoopsrumors.com/cleveland-cavaliers/feed/atom"}
+    - {id: hoopsrumors-dal, site: Hoops Rumors, team: DAL, url: "https://www.hoopsrumors.com/dallas-mavericks/feed/atom"}
+    - {id: hoopsrumors-den, site: Hoops Rumors, team: DEN, url: "https://www.hoopsrumors.com/denver-nuggets/feed/atom"}
+    - {id: hoopsrumors-det, site: Hoops Rumors, team: DET, url: "https://www.hoopsrumors.com/detroit-pistons/feed/atom"}
+    - {id: hoopsrumors-gsw, site: Hoops Rumors, team: GSW, url: "https://www.hoopsrumors.com/golden-state-warriors/feed/atom"}
+    - {id: hoopsrumors-hou, site: Hoops Rumors, team: HOU, url: "https://www.hoopsrumors.com/houston-rockets/feed/atom"}
+    - {id: hoopsrumors-ind, site: Hoops Rumors, team: IND, url: "https://www.hoopsrumors.com/indiana-pacers/feed/atom"}
+    - {id: hoopsrumors-lac, site: Hoops Rumors, team: LAC, url: "https://www.hoopsrumors.com/los-angeles-clippers/feed/atom"}
+    - {id: hoopsrumors-lal, site: Hoops Rumors, team: LAL, url: "https://www.hoopsrumors.com/los-angeles-lakers/feed/atom"}
+    - {id: hoopsrumors-mem, site: Hoops Rumors, team: MEM, url: "https://www.hoopsrumors.com/memphis-grizzlies/feed/atom"}
+    - {id: hoopsrumors-mia, site: Hoops Rumors, team: MIA, url: "https://www.hoopsrumors.com/miami-heat/feed/atom"}
+    - {id: hoopsrumors-mil, site: Hoops Rumors, team: MIL, url: "https://www.hoopsrumors.com/milwaukee-bucks/feed/atom"}
+    - {id: hoopsrumors-min, site: Hoops Rumors, team: MIN, url: "https://www.hoopsrumors.com/minnesota-timberwolves/feed/atom"}
+    - {id: hoopsrumors-nop, site: Hoops Rumors, team: NOP, url: "https://www.hoopsrumors.com/new-orleans-pelicans/feed/atom"}
+    - {id: hoopsrumors-nyk, site: Hoops Rumors, team: NYK, url: "https://www.hoopsrumors.com/new-york-knicks/feed/atom"}
+    - {id: hoopsrumors-okc, site: Hoops Rumors, team: OKC, url: "https://www.hoopsrumors.com/oklahoma-city-thunder/feed/atom"}
+    - {id: hoopsrumors-orl, site: Hoops Rumors, team: ORL, url: "https://www.hoopsrumors.com/orlando-magic/feed/atom"}
+    - {id: hoopsrumors-phi, site: Hoops Rumors, team: PHI, url: "https://www.hoopsrumors.com/philadelphia-76ers/feed/atom"}
+    - {id: hoopsrumors-phx, site: Hoops Rumors, team: PHX, url: "https://www.hoopsrumors.com/phoenix-suns/feed/atom"}
+    - {id: hoopsrumors-por, site: Hoops Rumors, team: POR, url: "https://www.hoopsrumors.com/portland-trail-blazers/feed/atom"}
+    - {id: hoopsrumors-sac, site: Hoops Rumors, team: SAC, url: "https://www.hoopsrumors.com/sacramento-kings/feed/atom"}
+    - {id: hoopsrumors-sas, site: Hoops Rumors, team: SAS, url: "https://www.hoopsrumors.com/san-antonio-spurs/feed/atom"}
+    - {id: hoopsrumors-tor, site: Hoops Rumors, team: TOR, url: "https://www.hoopsrumors.com/toronto-raptors/feed/atom"}
+    - {id: hoopsrumors-uta, site: Hoops Rumors, team: UTA, url: "https://www.hoopsrumors.com/utah-jazz/feed/atom"}
+    - {id: hoopsrumors-was, site: Hoops Rumors, team: WAS, url: "https://www.hoopsrumors.com/washington-wizards/feed/atom"}

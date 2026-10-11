@@ -6,6 +6,7 @@ The projects are built from the fixture store: every team's 1996-97, 2012-13 and
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -14,9 +15,9 @@ from streamlit.testing.v1 import AppTest
 
 from front_office.config import load_settings
 from front_office.services import DEFAULT_QUALIFICATION, Lab, floor, relationship
-from tests.helpers import ABDELNABY, BOS, BROWN, NYK, PRITCHARD, TATUM, TOWNS, WHITE
+from tests.helpers import ABDELNABY, BOS, BROWN, HART, NYK, PRITCHARD, TATUM, TOWNS, WHITE
 from tests.ui.conftest import TIMEOUT, drawn, figures, texts
-from wb import state
+from wb import formats, state
 from wb.views import builder as builder_view
 from wb.views import teams as teams_view
 
@@ -350,6 +351,54 @@ class TestContracts:
         said = texts(page(contract_template, "contracts"))
         assert "Source as stated at import: invented for tests, current as of Oct 01, 2026" in said
         assert "1 salary row(s) in the file name no team" in said
+
+    def test_a_new_file_is_checked_before_it_is_imported(
+        self, page, contract_template: Path
+    ) -> None:
+        """A7: the preview the facade returns, drawn - what would change, what to check, and
+        the import left to the user. AppTest cannot upload a file, so the preview is given."""
+        from front_office.domain.contract_review import ContractChange, ContractPreview, InUse
+
+        preview = ContractPreview(
+            file_name="newer.csv",
+            source_label="A new site",
+            as_of=date(2026, 10, 9),
+            rows_read=12,
+            players=10,
+            seasons=("2026-27", "2027-28"),
+            in_use=InUse(
+                "contracts.csv", "invented for tests", date(2026, 10, 1), datetime(2026, 10, 1, 12)
+            ),  # fmt: skip
+            changes=(
+                ContractChange(TATUM, "Jayson Tatum", "BOS", "2026-27", 40_000_000, 42_000_000),
+                ContractChange(HART, "Josh Hart", None, "2027-28", None, 13_000_000),
+            ),
+            unchanged=9,
+            unmatched=("line 4: Nobody Atall (BOS) - no player with this name",),
+            flags=(
+                "“A new site” has not been imported before. Check that its terms allow this use.",
+            ),  # fmt: skip
+            command='fol contracts import "newer.csv" --source "A new site" --as-of 2026-10-09',
+        )
+        opened = page(contract_template, "contracts", contracts_review=preview)
+        shown = figures(opened)
+        assert shown["Rows read"] == ("12", "10 players")
+        assert (shown["New"][0], shown["Changed"][0], shown["Gone"][0], shown["The same"][0]) == (
+            "1",
+            "1",
+            "0",
+            "9",
+        )
+        said = texts(opened)
+        assert "“A new site” has not been imported before" in said
+        assert "against contracts.csv (invented for tests), as of Oct 01, 2026" in said
+        changes = frame_with(opened, "Season", "Player", "Change")
+        assert changes["Change"].tolist() == ["+$2,000,000", "+$13,000,000"]
+        assert changes["In use"].tolist()[1] == formats.MISSING, "missing is a dash"
+        assert any(
+            code.value.startswith('fol contracts import "newer.csv"') and "fol build" in code.value
+            for code in opened.code
+        )
 
     def test_the_team_filter_narrows_the_contract_list(self, page, contract_template: Path) -> None:
         opened = page(contract_template, "contracts", **{state.TEAM: BOS})

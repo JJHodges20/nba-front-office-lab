@@ -6,12 +6,13 @@ environment variable ``FOL_OLLAMA_API_KEY``, else from that line of the project'
 - is sent to ollama.com alone, and never appears in a message, a log or an error. It is
 never ``OLLAMA_API_KEY``: Ollama's own tools pick that one up by themselves.
 
-A page is fetched only once its address passes every check, again after every redirect:
-http or https on the standard port, no credentials in it, not a site the lab refuses,
-every address its name resolves to public, and robots.txt allowing the page to AI agents as
-well as to the lab. Nothing is sent but the lab's name - no cookies, no credentials - and a
-page that asks for a login, a payment or a bot check is not worked around. What comes back
-is returned as it came, bounded in size and time; ``processing.web`` reads it.
+A page - or a news feed, from A7 - is fetched only once its address passes every check,
+again after every redirect: http or https on the standard port, no credentials in it, not a
+site the lab refuses, every address its name resolves to public, and robots.txt allowing it
+to AI agents as well as to the lab. Nothing is sent but the lab's name - no cookies, no
+credentials - and a page that asks for a login, a payment or a bot check is not worked
+around. What comes back is returned as it came, bounded in size and time;
+``processing.web`` reads it.
 """
 
 from __future__ import annotations
@@ -57,6 +58,17 @@ REFUSED_SITES: Mapping[str, str] = {
 }
 """Sites never read, each with the reason (docs/DATA_SOURCE_REGISTER.md)."""
 PAGE_TYPES = ("text/html", "application/xhtml+xml", "text/plain")
+PAGE_ACCEPT = "text/html,application/xhtml+xml,text/plain;q=0.9"
+FEED_TYPES = (
+    "application/rss+xml",
+    "application/atom+xml",
+    "application/xml",
+    "text/xml",
+    "text/html",
+)
+"""A feed's types - and a web page's, since some sites label their feeds so (Hoops Rumors'
+general feeds, at A7); what is not a feed fails to read as one."""
+FEED_ACCEPT = "application/rss+xml,application/atom+xml,application/xml;q=0.9,text/xml;q=0.9"
 PORTS = {"http": 80, "https": 443}
 REDIRECTS = {301, 302, 303, 307, 308}
 GATED = {401, 402, 403, 407, 429, 451}
@@ -307,11 +319,19 @@ class WebProvider:
 
     def fetch(self, url: str) -> Fetched:
         """A page, after the checks; redirects are followed, each checked again."""
+        return self._fetch(url, PAGE_TYPES, PAGE_ACCEPT, "a web page")
+
+    def fetch_feed(self, url: str) -> Fetched:
+        """A news feed, after the same checks as a page (A7). Some sites send their feeds
+        labelled as web pages; ``processing.feeds`` decides whether it is a feed."""
+        return self._fetch(url, FEED_TYPES, FEED_ACCEPT, "a feed")
+
+    def _fetch(self, url: str, types: Sequence[str], accept: str, wanted: str) -> Fetched:
         current = url
         for _ in range(MAX_REDIRECTS + 1):
             host = self.check(current)
             self._allowed_by_robots(current, host)
-            response = self._get(current, self._page_bytes, html=True)
+            response = self._get(current, self._page_bytes, accept=accept)
             if response.status in REDIRECTS:
                 location = response.headers.get("location")
                 if not location:
@@ -326,17 +346,17 @@ class WebProvider:
             if response.status != 200:
                 raise WebError(f"{host} answered {response.status}")
             kind, charset = _content_type(response.headers.get("content-type", ""))
-            if kind not in PAGE_TYPES:
-                raise Refused(f"{host} sent {kind or 'something untyped'}, not a web page")
+            if kind not in types:
+                raise Refused(f"{host} sent {kind or 'something untyped'}, not {wanted}")
             return Fetched(
                 url, current, kind, charset, response.body, response.truncated, self.now()
             )
         raise WebError(f"more than {MAX_REDIRECTS} redirects from {_host(url)}")
 
-    def _get(self, url: str, limit: int, *, html: bool = False) -> Response:
+    def _get(self, url: str, limit: int, *, accept: str | None = None) -> Response:
         headers = {"User-Agent": USER_AGENT}
-        if html:
-            headers["Accept"] = "text/html,application/xhtml+xml,text/plain;q=0.9"
+        if accept:
+            headers["Accept"] = accept
         response = self._send("GET", url, headers, None, self._timeout, limit)
         if response.peer is not None and not is_public(response.peer):
             raise Refused(f"{_host(url)} led to an address that is not public")

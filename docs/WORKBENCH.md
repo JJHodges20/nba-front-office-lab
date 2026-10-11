@@ -153,7 +153,11 @@ split by team, so a player who changed teams within a season is listed under eac
 seasons without configured rules (before 2024-25). Payroll is priced by default in the
 league year the file was current for, the one that holds its as-of date (2026-27 for
 this file); the control at the top of the page picks another season. To replace the
-file, see [CONTRACT_DATA.md](CONTRACT_DATA.md).
+file, see [CONTRACT_DATA.md](CONTRACT_DATA.md). The *Check a new file* tab compares a file
+you are thinking of importing with the one in use - what is new, changed or gone, by
+player, team and season - and says what to check first: a source never imported before,
+figures older than those in use, names the league's index does not hold. It stores
+nothing, and shows the import command to run yourself once the source is checked.
 
 **Analytics Lab.** Any two metrics against each other, for players or teams, with how
 strongly they move together. How one metric is spread. The metric glossary.
@@ -265,8 +269,15 @@ played are answered from that season's figures.
 
 - *Above the conversation*: whether the assistant can answer (and, when it cannot, what to
   do: start Ollama, or pull the model), whether web search is set up, and how fresh each
-  current source is. *Fetch current information* fetches what is due by hand; a question
-  fetches what it needs anyway.
+  current source is, the news feeds included. *Fetch current information* fetches what is
+  due by hand; a question fetches what it needs anyway.
+- *News and contracts*: recent reporting comes from Hoops Rumors' feeds - the one news site
+  the lab reads directly, since the others it checked turn AI agents away or forbid
+  automated reading - each headline with its date and how long ago it was; web search
+  finds the rest, with the date a result's address shows where it shows one. Ask what has
+  changed since your contract file, and the answer lists the moves since its date beside
+  what the file holds, and how to update the file. A report never changes the lab's data,
+  a roster or the contract file.
 - *Quick or Deep*: Quick for one fact or one comparison, Deep for a longer look - more
   tool calls, more time, the model thinking first. A question under way shows its steps
   as they come, and *Stop* ends it at the next step, keeping what was gathered.
@@ -275,10 +286,11 @@ played are answered from that season's figures.
   name with several readings - two players called Brown, a year that could be either
   season - is asked about before anything runs; choose one and the question is asked
   again with it. Under the answer: notes and limits, the kinds of number it rests on, each
-  result's rows with the chart its tool chose and a CSV, the evidence (every source with
-  its address and its dates: published, effective, fetched; each model file with its
-  revision; each section of the lab's documents by file and heading), and how it was
-  answered (each step, the model, the rules' version, the time).
+  result's rows with the chart its tool chose and a CSV (an article or web page the answer
+  names as "s2" is the row marked s2 under *Source*; times are UTC), the evidence (every
+  source with its address and its dates: published, effective, fetched; each model file
+  with its revision; each section of the lab's documents by file and heading), and how it
+  was answered (each step, the model, the rules' version, the time).
 - *Names and sidebar*: names, seasons and teams are read from the question; where it names
   none, the workspace's focus stands in, then the sidebar's season and team. A "he" or
   "they" with nothing to point to is asked about. A link pasted into a question can be read.
@@ -316,8 +328,9 @@ played are answered from that season's figures.
   proposed; otherwise it says what changed and saves nothing. A saved option says so, and
   is never saved a second time. *Decline* sets an option aside.
   Every option stays in the workspace's *Proposed rosters*, saved, declined or waiting, so
-  you can come back and save one later. A saved roster's starters are the players who play
-  the most, each at a position they are listed at where the roster allows.
+  you can come back and save one later. A saved roster's starters come from the nine
+  players who play the most: each at a position they are listed at where the roster
+  allows, and the best players by forecast first.
 - *Ask AI about this*: the player, value, team, benchmark, Team Builder, roster fit,
   postseason and simulator pages have this button. It asks a question about what the page
   shows - its season, team, player or roster - in the workspace open here, without changing
@@ -348,6 +361,5 @@ whose record on past seasons is a tab away, never a verdict on a team. A role is
 applied to a player's statistics, not a measurement of how they play, and the page says
 so. Roster fit describes a roster and reports what the evidence found; it does not score
 one. The optimizer's rosters are the parts added up under a budget, several of them,
-never one answer. The AI Research assistant cannot yet propose rosters from the optimizer
-or keep a conversation past the session; those come with the assistant's later
-milestones.
+never one answer. The AI Research assistant reads one news site's feeds and the web; it
+does not yet propose experiments for the models, which comes with its next milestone.

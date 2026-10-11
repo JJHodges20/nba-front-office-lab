@@ -10,9 +10,13 @@ For each source asked for whose last attempt is older than its interval
   has not changed since the last time;
 - **injuries**: the latest official report of the last hour or so, into
   ``injury_reports``; when none was published the last one stays.
+- **news** (A7): the feeds of ``configs/assistant.yaml`` - the general ones, and a team's
+  own for the teams asked for - each due on its own, through the guarded web provider,
+  into ``news_items``: each article once, kept for its days.
 
 Every attempt is logged in ``data/current.sqlite``, failures included, and a failure leaves
-what was cached in place. Nothing here touches the lab's database or refits anything.
+what was cached in place. Nothing here touches the lab's database or refits anything; a
+transaction or a report never changes a roster or a contract.
 """
 
 from __future__ import annotations
@@ -27,6 +31,7 @@ import pandas as pd
 
 from front_office.config.assistant import load_assistant_settings
 from front_office.config.settings import Settings
+from front_office.domain.assistant import NewsFeed
 from front_office.domain.datasets import NBA_STATS, NbaStatsDataset
 from front_office.domain.seasons import Season, SeasonType
 from front_office.domain.tables.current import SOURCES
@@ -40,6 +45,7 @@ from front_office.pipelines.ingest import (
     SnapshotProvider,
 )
 from front_office.processing.current import CurrentPayloadError, injury_frame, transactions_frame
+from front_office.processing.feeds import FeedError, merge_news, news_frame, parse_feed
 from front_office.processing.nba_stats.resultsets import PayloadError
 from front_office.processing.nba_stats.teams import build_team_games
 from front_office.providers.nba_current import (
@@ -49,6 +55,7 @@ from front_office.providers.nba_current import (
     CurrentSourceError,
 )
 from front_office.providers.nba_stats import NbaStatsProvider, ProviderError
+from front_office.providers.web import WebError, WebProvider
 from front_office.rawstore import RawStore
 from front_office.storage.current import CurrentStore
 
@@ -59,6 +66,10 @@ FAILURES = (
     PayloadError,
     json.JSONDecodeError,
 )
+LEAGUE_SOURCES = ("games", "transactions", "injuries")
+"""The league's own sources: what is refreshed when no source is named. The news feeds are
+fetched when asked for - by the news tool, ``fol current refresh`` and the AI Research
+page's button - since they reach a site the lab does not run (A7)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,23 +95,35 @@ class CurrentRefresh:
 def refresh_current(
     settings: Settings,
     *,
-    sources: Sequence[str] = SOURCES,
+    sources: Sequence[str] = LEAGUE_SOURCES,
+    teams: Sequence[str] = (),
     force: bool = False,
     now: Callable[[], datetime] = utc_now,
     provider: CurrentProvider | None = None,
     stats: SnapshotProvider | None = None,
+    web: WebProvider | None = None,
 ) -> CurrentRefresh:
-    """Fetch what is due of ``sources`` into ``data/current.sqlite``."""
+    """Fetch what is due of ``sources`` into ``data/current.sqlite``; for news, the general
+    feeds and those of ``teams`` (abbreviations)."""
     unknown = sorted(set(sources) - set(SOURCES))
     if unknown:
         raise ValueError(f"no current source called {unknown}; the sources are {SOURCES}")
-    limits = load_assistant_settings(settings.config_dir).current
+    assistant = load_assistant_settings(settings.config_dir)
+    limits = assistant.current
     provider = provider or CurrentProvider(slots=limits.injury_slots)
     results = []
     with CurrentStore(settings.current_path) as store:
         for source in sources:
             moment = now()
             minutes = limits.minutes(source)
+            if source == "news":
+                feeds = [*assistant.news.general]
+                feeds += [feed for team in teams if (feed := assistant.news.team_feed(team))]
+                web = web or WebProvider()
+                kept_since = moment - timedelta(days=assistant.news.keep_days)
+                for feed in feeds:
+                    results.append(_news(store, web, feed, now(), minutes, kept_since, force))
+                continue
             if not force and not _due(store, source, minutes, moment):
                 results.append(
                     SourceRefresh(source, "skipped", None, f"fetched in the last {minutes} minutes")
@@ -130,12 +153,78 @@ def refresh_current(
     return CurrentRefresh(tuple(results))
 
 
-def _due(store: CurrentStore, source: str, minutes: int, moment: datetime) -> bool:
+def _due(
+    store: CurrentStore, source: str, minutes: int, moment: datetime, url: str | None = None
+) -> bool:
     attempts = store.refreshes(source)
+    if url is not None and not attempts.empty:
+        attempts = attempts[attempts["url"] == url]
     if attempts.empty:
         return True
     last = pd.Timestamp(attempts.iloc[0]["attempted_at"]).to_pydatetime()
     return moment - last >= timedelta(minutes=minutes)
+
+
+def _news(
+    store: CurrentStore,
+    web: WebProvider,
+    feed: NewsFeed,
+    moment: datetime,
+    minutes: int,
+    kept_since: datetime,
+    force: bool,
+) -> SourceRefresh:
+    """One feed, when it is due: each article once, joined to those held, logged."""
+    if not force and not _due(store, "news", minutes, moment, feed.url):
+        return SourceRefresh(
+            "news", "skipped", None, f"{feed.id}: fetched in the last {minutes} minutes", feed.url
+        )
+    try:
+        fetched = web.fetch_feed(feed.url)
+        items = parse_feed(fetched.body)
+    except (WebError, FeedError) as error:
+        result = SourceRefresh("news", "failed", None, f"{feed.id}: {error}", feed.url)
+    else:
+        digest = hashlib.sha256(fetched.body).hexdigest()[:20]
+        previous = store.refreshes("news")
+        previous = previous[(previous["url"] == feed.url) & (previous["status"] == "stored")]
+        if not previous.empty and previous.iloc[0]["content_hash"] == digest:
+            result = SourceRefresh(
+                "news", "unchanged", len(items), f"{feed.id}: no new items", feed.url, digest
+            )
+        else:
+            fresh = news_frame(
+                items,
+                site=feed.site,
+                feed_id=feed.id,
+                transactions=feed.transactions,
+                retrieved_at=fetched.retrieved_at,
+            )
+            store.replace(
+                "news_items", merge_news(store.read("news_items"), fresh, kept_since=kept_since)
+            )
+            dated = [item.published_at for item in items if item.published_at is not None]
+            newest = f", the newest of {max(dated):%Y-%m-%d %H:%M} UTC" if dated else ""
+            result = SourceRefresh(
+                "news",
+                "stored" if items else "none",
+                len(items),
+                f"{feed.id}: {len(items)} items{newest}",
+                feed.url,
+                digest,
+            )
+    store.record(
+        {
+            "source": "news",
+            "attempted_at": moment,
+            "status": result.status,
+            "rows": result.rows,
+            "detail": result.detail,
+            "url": result.url,
+            "content_hash": result.content_hash,
+        }
+    )
+    return result
 
 
 def _games(

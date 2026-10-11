@@ -69,7 +69,7 @@ from front_office.services import Lab  # noqa: E402
 CASES = ROOT / "tests" / "assistant" / "fixtures" / "cases.yaml"
 RESULTS = ROOT / "data" / "assistant" / "benchmarks"
 REPORT = ROOT / "docs" / "research" / "ASSISTANT_ANSWERS.md"
-MILESTONE = "A6"
+MILESTONE = "A7"
 
 
 def build_labs(where: Path) -> dict[str, Path]:

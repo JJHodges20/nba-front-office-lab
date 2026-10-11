@@ -24,10 +24,12 @@ places a test puts a scripted model and recorded tools in.
 
 from __future__ import annotations
 
+import re
+import tempfile
 import threading
 import time
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -43,9 +45,13 @@ from front_office.domain.assistant import (
     NameCandidate,
     Step,
 )
+from front_office.domain.contract_review import ContractPreview
 from front_office.domain.proposals import RosterProposal
 from front_office.domain.research import RESEARCH_PAGE, Focus, SavedTurn
 from front_office.domain.seasons import Season
+from front_office.domain.tables.current import SOURCES
+from front_office.pipelines.contract_review import ContractReviewError as _Unreadable
+from front_office.pipelines.contract_review import preview_contract_file
 from front_office.pipelines.current import refresh_current as fetch_current
 from front_office.providers.ollama import (
     ModelNotAvailable,
@@ -442,6 +448,38 @@ def decline_proposal(
 # --- workspace notes -----------------------------------------------------------------------
 
 
+class ContractReviewError(ValueError):
+    """The file could not be read as a contract file; the message says why."""
+
+
+def review_contract_file(
+    content: bytes,
+    file_name: str,
+    *,
+    source_label: str,
+    as_of: date,
+    project_root: Path | None = None,
+) -> ContractPreview:
+    """A contract file the user chose, against the one in use - the contract-update review
+    (A7). Read exactly as ``fol contracts import`` reads a file, from a copy in a temporary
+    folder that is gone when this returns; nothing is stored. The import the preview names
+    is the file as the user has it, for them to run once the source is checked."""
+    name = re.sub(r"[^\w.\- ]", "_", Path(file_name).name) or "contracts.csv"
+    with tempfile.TemporaryDirectory() as folder:
+        copy = Path(folder) / name
+        copy.write_bytes(content)
+        try:
+            preview = preview_contract_file(
+                load_settings(project_root), copy, source_label=source_label, as_of=as_of
+            )
+        except (_Unreadable, ConfigError) as error:
+            raise ContractReviewError(str(error)) from error
+    return replace(
+        preview,
+        command=preview.command.replace(str(copy), file_name),
+    )
+
+
 class SummaryError(ValueError):
     """A summary cannot be written; the message says why, in plain words."""
 
@@ -526,7 +564,7 @@ class Refreshed:
 def refresh_current(
     project_root: Path | None = None, *, force: bool = False
 ) -> tuple[Refreshed, ...]:
-    """Fetch what is due of the season's games, the transactions and the injury report;
-    with ``force``, fetch them all now."""
-    report = fetch_current(load_settings(project_root), force=force)
+    """Fetch what is due of the season's games, the transactions, the injury report and the
+    news feeds; with ``force``, fetch them all now."""
+    report = fetch_current(load_settings(project_root), sources=SOURCES, force=force)
     return tuple(Refreshed(r.source, r.status, r.detail) for r in report.results)

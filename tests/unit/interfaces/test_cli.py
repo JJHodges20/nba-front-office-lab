@@ -283,6 +283,39 @@ class TestContracts:
         assert "1 row(s) could not be matched" in result.output
         assert "line 3: Nobody Atall (NYK) - no player with this name" in result.output
 
+    def test_a_preview_compares_flags_and_stores_nothing(
+        self, tmp_path: Path, project: Path
+    ) -> None:
+        """A7: what a candidate changes, what to check, and the import left to the user."""
+        first = self.contract_file(tmp_path, "player,team,2026-27\nJayson Tatum,BOS,40000000\n")
+        runner.invoke(
+            app,
+            ["contracts", "import", str(first), "--source", "invented", "--as-of", "2026-10-01"],
+        )
+        candidate = tmp_path / "newer.csv"
+        candidate.write_text("player,team,2026-27\nJayson Tatum,BOS,42000000\n", encoding="utf-8")
+        snapshots = list((project / "data" / "raw").rglob("*contract*"))
+        result = runner.invoke(
+            app,
+            [
+                "contracts",
+                "preview",
+                str(candidate),
+                "--source",
+                "[a new site]",
+                "--as-of",
+                "2026-10-09",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        output = " ".join(result.output.split())
+        assert "In use: contracts.csv (invented), as of 2026-10-01" in output
+        assert "Against it: 0 new, 1 changed, 0 gone, and 0 the same" in output
+        assert "2026-27 Jayson Tatum (BOS): $40,000,000 to $42,000,000" in output
+        assert "“[a new site]” has not been imported before" in output, "never read as markup"
+        assert f'fol contracts import "{candidate}" --source "[a new site]"' in output
+        assert list((project / "data" / "raw").rglob("*contract*")) == snapshots
+
     def test_importing_twice_says_nothing_new_was_stored(self, tmp_path: Path) -> None:
         path = self.contract_file(tmp_path, "player,team,2026-27\nJayson Tatum,BOS,40000000\n")
         arguments = [
@@ -969,7 +1002,9 @@ class TestCurrent:
     def test_refresh_says_what_happened_to_each_source(self, asked: list[dict]) -> None:
         result = runner.invoke(app, ["current", "refresh"])
         assert result.exit_code == 0, result.output
-        assert asked == [{"sources": ("games", "transactions", "injuries"), "force": False}]
+        assert asked == [
+            {"sources": ("games", "transactions", "injuries", "news"), "force": False}
+        ], "the news feeds too (A7)"
         assert "injuries: [injuries] 3 lines" in result.output, "data is never read as markup"
 
     def test_refresh_one_source_by_force_and_a_failure_exits_non_zero(

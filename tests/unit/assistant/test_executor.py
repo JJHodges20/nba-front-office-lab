@@ -57,6 +57,21 @@ def test_an_invented_player_id_in_a_list_is_refused(lab: Lab) -> None:
     assert result.status is ResultStatus.ERROR and "no player with id 99" in result.text
 
 
+def test_a_team_s_id_given_for_a_player_is_sent_where_it_belongs(lab: Lab) -> None:
+    """Live at A7: asked what had changed for the Knicks since the contract file, the model
+    gave the team's id for the player as well, was told only that no player has it, and
+    gave up."""
+    result = Executor(lab).run(call("player_stats", player_id=BOS, season="2025-26"))
+    assert result.status is ResultStatus.ERROR
+    assert f"{BOS} is the id of the Boston Celtics, a team: give it as team_id" in result.text
+    assert "resolve_entities" not in result.text
+
+
+def test_a_player_s_id_given_for_a_team_is_sent_where_it_belongs(lab: Lab) -> None:
+    result = Executor(lab).run(call("team_stats", team_id=BROWN, season="2025-26"))
+    assert f"{BROWN} is the id of Jaylen Brown, a player: give it as player_id" in result.text
+
+
 def test_a_failing_handler_becomes_an_error_result(lab: Lab) -> None:
     def broken(lab: Lab, args: object) -> Found:
         raise KeyError("no such row")

@@ -135,7 +135,8 @@ class TestLeague:
 
     def test_standings_and_ranks(self, lab: Lab) -> None:
         standings = run(lab, "league_context", view="standings", season="2025-26")
-        assert "| East | 1st | Detroit Pistons | 60-22 |" in standings.text
+        # Each place names its conference, for the answer checker (A7).
+        assert "| East | 1st in the East | Detroit Pistons | 60-22 |" in standings.text
         ranks = run(lab, "league_context", view="team_ranks", season="2025-26")
         assert len(ranks.table) == 30
 

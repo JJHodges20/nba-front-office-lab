@@ -268,6 +268,21 @@ class Transactions(ToolArgs):
     since: date | None = None
 
 
+class MovesAndRumors(ToolArgs):
+    team_id: int | None = None
+    player_id: int | None = None
+    moves_only: bool = Field(
+        False,
+        description="Only signings, extensions, trades and waivers, as the site reports them.",
+    )
+    days: int = Field(14, ge=1, le=120, description="How many days back.")
+
+
+class ContractUpdates(ToolArgs):
+    team_id: int | None = None
+    player_id: int | None = None
+
+
 class WebSearch(ToolArgs):
     query: str = Field(min_length=3, max_length=200)
     max_results: int = Field(5, ge=1, le=10)
@@ -276,8 +291,8 @@ class WebSearch(ToolArgs):
 class ReadSource(ToolArgs):
     source_id: str = Field(
         pattern=r"^[a-z]{1,2}\d{1,4}$",
-        description="A source's id: s1, s2... from web_search, u1... from a pasted link. Never "
-        "a result id like r1, never a URL.",
+        description="A source's id: s1, s2... from moves_and_rumors or web_search, u1... from "
+        "a pasted link. Never a result id like r1, never a URL.",
     )
 
 
@@ -316,6 +331,8 @@ REGISTRY: tuple[ToolSpec, ...] = (
     ToolSpec("current_games", "Recently completed games, newer than the lab's data build.", CurrentGames, N, "A2"),
     ToolSpec("injury_report", "The league's official injury report, with its time.", InjuryReport, N, "A2"),
     ToolSpec("transactions", "Signings, trades and waivers announced by the league, with dates: what has changed on a roster since the lab's build.", Transactions, N, "A2"),
+    ToolSpec("moves_and_rumors", "Recent roster moves and rumors from the news feeds the lab reads, dated: signings, extensions, trades, waivers, injuries, for a team, a player or the league, from the last few weeks.", MovesAndRumors, N, "A7"),
+    ToolSpec("contract_updates", "Only when the user asks whether their contract file or its salaries are out of date: the moves since the file's date, beside what the file holds. Nothing is imported.", ContractUpdates, N, "A7"),
     ToolSpec("web_search", "Search the web for reporting; returns sources with ids.", WebSearch, N, "A2"),
     ToolSpec("read_source", "Read one source by its id: a search result, a feed item or a link the user pasted.", ReadSource, N, "A2"),
     ToolSpec("research_docs", "Search the lab's own documentation and research: how a figure is computed, how a tool or model works and was tested, why something was decided.", ResearchDocs, R, "A4"),

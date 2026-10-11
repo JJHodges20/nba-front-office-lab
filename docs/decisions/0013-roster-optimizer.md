@@ -76,7 +76,9 @@ roles and groups it holds; and what it swaps against the first. A roster can be 
 the Team Builder, where the five largest projected shares start in slots that suit their
 groups, and the Roster Fit page will describe it like any other. (Amended at A6, at the
 user's wish: the starters are chosen from the nine who play the most, each at a position
-they are listed at where the roster allows - `domain/lineup.py`, decision 0018.)
+they are listed at where the roster allows - `domain/lineup.py`, decision 0018. Amended
+again at A7, also at the user's wish: of the lineups that fit, the one with the most
+projected impact starts, not the one that plays the most.)
 
 ## Alternatives considered
 

@@ -471,6 +471,18 @@ def test_asking_who_a_team_should_sign_is_asking_for_a_verdict(lab: Lab) -> None
         ("It was +8.3 [r1]. The results don't cover 2012-13.", Outcome.QUALIFIED),
         # A5 (M03): an explanation, not a gap.
         ("It was +8.3 [r1]. A record does not provide the same insight.", Outcome.SUPPORTED),
+        # A2-A7 runs: what the data lacks, however it is put.
+        ("It was +8.3 [r1]. Lineup data is not available in the lab.", Outcome.QUALIFIED),
+        (
+            "It was +8.3 [r1]. Minutes together are not directly provided in the data.",
+            Outcome.QUALIFIED,
+        ),  # fmt: skip
+        # A7, live: news relayed - what a coach did not say, a player who did not play.
+        (
+            "It was +8.3 [r1]. The coach has not provided any details on a timeline.",
+            Outcome.SUPPORTED,
+        ),  # fmt: skip
+        ("It was +8.3 [r1]. Tatum was not available for the opener.", Outcome.SUPPORTED),
     ],
 )
 def test_what_lacks_something_is_the_data(lab: Lab, said: str, outcome: Outcome) -> None:

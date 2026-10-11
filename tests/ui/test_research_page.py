@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 
@@ -484,6 +485,38 @@ def test_a_dollar_is_shown_as_a_dollar_and_an_image_is_not_fetched() -> None:
     assert answers.prose("Tatum earns $40M; Brown $30M.") == "Tatum earns \\$40M; Brown \\$30M."
     assert answers.prose("See ![x](https://example.com/t.png) now") == "See (image left out) now"
     assert answers.escaped("[r1] *bold* $5") == "\\[r1\\] \\*bold\\* \\$5"
+
+
+def test_a_time_is_written_plainly() -> None:
+    # Live at A7: a news item's time showed as 2026-10-10T23:47:27.
+    times = pd.Series(pd.to_datetime(["2026-10-10 23:47:27", None]))
+    assert [answers.moments(times)(v) for v in times] == ["2026-10-10 23:47 UTC", "—"]
+    days = pd.Series(pd.to_datetime(["2026-10-10", "2026-10-09"]))
+    assert [answers.moments(days)(v) for v in days] == ["2026-10-10", "2026-10-09"]
+
+
+def test_a_kept_answer_s_times_are_times_again() -> None:
+    # A kept answer's JSON holds a time as ISO text; drawn again it read 2026-09-30T00:00:00.
+    # As the page reads it back: pandas' own text type, and plain objects too.
+    values = ["2026-09-30T00:00:00", None, "2026-09-26T00:00:00"]
+    for kept in (pd.DataFrame({"date": values})["date"], pd.Series(values, dtype=object)):
+        times = answers.times_from_text(kept)
+        assert times is not None and [answers.moments(times)(v) for v in times] == [
+            "2026-09-30",
+            "—",
+            "2026-09-26",
+        ]
+    timed = answers.times_from_text(pd.Series(["2026-10-11T04:13:32.385472"]))
+    assert timed is not None and answers.moments(timed)(timed[0]) == "2026-10-11 04:13 UTC"
+    assert answers.times_from_text(pd.Series(["2026-27", "2025-26"], dtype=object)) is None
+    assert answers.times_from_text(pd.Series(["Waive", "2026-09-30"], dtype=object)) is None
+
+
+def test_a_reader_sees_a_source_s_id_and_no_internal_key() -> None:
+    # Live at A7: a news answer named "the source ID s2", which no table showed, while the
+    # transactions table showed each move's internal key.
+    columns = ["source_id", "transaction_key", "group_key", "player_id", "headline", "published"]
+    assert answers.shown_columns(columns) == ["source_id", "headline", "published"]
 
 
 def test_a_figure_no_catalog_describes_has_no_tail_of_zeros() -> None:

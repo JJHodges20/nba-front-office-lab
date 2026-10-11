@@ -153,20 +153,38 @@ class Executor:
                 self._players = {int(i) for i in self._lab.entities.players().index}
             strangers = sorted(set(players) - self._players)
             if strangers:
-                return (
-                    f"the lab holds no player with id {', '.join(map(str, strangers))}. Use an id "
-                    "from the names in the question, or look the name up with resolve_entities."
-                )
+                return self._not_held("player", strangers)
         if teams:
             if self._teams is None:
                 self._teams = {int(i) for i in self._lab.team_labels().index}
             strangers = sorted(set(teams) - self._teams)
             if strangers:
-                return (
-                    f"the lab holds no team with id {', '.join(map(str, strangers))}. Use an id "
-                    "from the names in the question, or look the name up with resolve_entities."
-                )
+                return self._not_held("team", strangers)
         return None
+
+    def _not_held(self, kind: str, strangers: Sequence[int]) -> str:
+        """Why ids are refused - and, where one is an id of the other kind, where it belongs:
+        live at A7 a model gave the Knicks' team id for the player as well, and when told
+        only that no player has it, gave up."""
+        said = f"the lab holds no {kind} with id {', '.join(map(str, strangers))}."
+        if kind == "player":
+            other, field = "team", "team_id"
+            named = {int(k): f"the {v}" for k, v in self._lab.team_labels()["full_name"].items()}
+        else:
+            other, field = "player", "player_id"
+            named = {int(k): str(v) for k, v in self._lab.entities.players()["full_name"].items()}
+        crossed = [
+            f"{key} is the id of {named[key]}, a {other}" for key in strangers if key in named
+        ]
+        if crossed:
+            return (
+                f"{said} {'; '.join(crossed)}: give it as {field}, and leave the {kind} out "
+                "unless the question names one."
+            )
+        return (
+            f"{said} Use an id from the names in the question, or look the name up with "
+            "resolve_entities."
+        )
 
     def _bounded(self, text: str) -> str:
         if len(text) <= self._max:

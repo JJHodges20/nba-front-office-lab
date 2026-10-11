@@ -1,0 +1,220 @@
+"""How well the assistant's two ways of finding reporting serve typical questions (A7).
+
+The search-quality evaluation of decision 0018: frozen research queries
+(``tests/assistant/fixtures/search_cases.yaml``), each run through Ollama's web search and
+held against the news feeds, and counted - how many results are on the question's subject,
+how many carry a date and how many are recent, how many repeat an article already found,
+how many come from sites the lab refuses, and what the feeds hold for the same team in the
+same days. Counts, not thresholds: one run is one sample of a web that changes by the hour.
+``scripts/evaluate_search.py`` runs it and writes ``docs/research/SEARCH_QUALITY.md``.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from front_office.config.settings import read_yaml
+
+
+class SearchCase(BaseModel):
+    """One frozen research query and what a result on its subject must name."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    id: str = Field(pattern=r"^[A-Z]{1,2}\d{2}$")
+    query: str = Field(min_length=3, max_length=200)
+    kind: str = Field(pattern=r"^(news|background|contract)$")
+    """news: what happened lately; background: history and context; contract: money."""
+    names: tuple[str, ...] = Field(min_length=1)
+    """Words a result's title or snippet must all contain to count as on the subject."""
+    days: int | None = Field(None, ge=1, le=365)
+    """For news: how recent a dated result must be to count as fresh."""
+    team: str | None = Field(None, pattern=r"^[A-Z]{3}$")
+    """The team whose own feed is held against the search."""
+
+
+class SearchCaseFile(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    version: int
+    frozen_on: str
+    cases: tuple[SearchCase, ...]
+
+
+def load_search_cases(path: Path) -> SearchCaseFile:
+    return SearchCaseFile.model_validate(read_yaml(path))
+
+
+@dataclass(frozen=True, slots=True)
+class Result:
+    """A search result, or a feed item, as the evaluation counts it."""
+
+    title: str
+    url: str
+    text: str
+    published: datetime | None
+    """When the address - or, for a feed item, the feed - says it was published."""
+    refused: bool = False
+    """From a site the lab refuses: removed before the model sees it."""
+    duplicate: bool = False
+    """The same article as an earlier result."""
+
+
+@dataclass(frozen=True, slots=True)
+class CaseScore:
+    case: str
+    query: str
+    kind: str
+    results: int
+    """Results the search returned, before any were removed."""
+    left_out: int
+    duplicates: int
+    dated: int
+    fresh: int | None
+    """For a news case: kept results dated within its days."""
+    on_topic: int
+    feed_items: int | None
+    """For a news case: the feeds' items within its days - its team's own feed, or the
+    general feeds."""
+    feed_on_topic: int | None
+    error: str | None = None
+
+
+def on_topic(result: Result, names: Sequence[str]) -> bool:
+    words = f"{result.title} {result.text}".casefold()
+    return all(name.casefold() in words for name in names)
+
+
+def score_case(
+    case: SearchCase,
+    found: Sequence[Result],
+    feed: Sequence[Result] | None,
+    *,
+    now: datetime,
+    error: str | None = None,
+) -> CaseScore:
+    kept = [result for result in found if not result.refused and not result.duplicate]
+    window = now - timedelta(days=case.days or 30)
+    recent_feed = (
+        None
+        if feed is None
+        else [item for item in feed if item.published and item.published >= window]
+    )
+    return CaseScore(
+        case=case.id,
+        query=case.query,
+        kind=case.kind,
+        results=len(found),
+        left_out=sum(result.refused for result in found),
+        duplicates=sum(result.duplicate and not result.refused for result in found),
+        dated=sum(result.published is not None for result in kept),
+        fresh=(
+            None
+            if case.days is None
+            else sum(r.published is not None and r.published >= window for r in kept)
+        ),
+        on_topic=sum(on_topic(result, case.names) for result in kept),
+        feed_items=None if recent_feed is None else len(recent_feed),
+        feed_on_topic=(
+            None if recent_feed is None else sum(on_topic(item, case.names) for item in recent_feed)
+        ),
+        error=error,
+    )
+
+
+def report(run: dict[str, Any]) -> str:
+    """``docs/research/SEARCH_QUALITY.md`` from a saved run."""
+    scores = [CaseScore(**score) for score in run["scores"]]
+    ran = [score for score in scores if score.error is None]
+    kept = sum(score.results - score.left_out - score.duplicates for score in ran)
+    lines = [
+        "<!-- Generated by `scripts/evaluate_search.py --write`. Do not edit by hand. -->",
+        "",
+        "# Search quality",
+        "",
+        "How well the assistant's two ways of finding reporting serve typical research "
+        "questions: Ollama's web search, and the news feeds the source register allows "
+        f"(decision 0018, A7). {len(scores)} frozen queries "
+        "(`tests/assistant/fixtures/search_cases.yaml`), run "
+        f"{run['ran_at']} UTC. Counts, not thresholds: one run is one sample of a web that "
+        "changes by the hour.",
+        "",
+        "## What is counted",
+        "",
+        f"- **Results**: what the search returned for the query (at most {run['max_results']}).",
+        "- **Left out**: results from sites the lab refuses, removed before the model sees them.",
+        "- **Repeats**: results that are the same article as an earlier one, by its address "
+        "without tracking parameters.",
+        "- **On topic**: kept results whose title or snippet names every word the case lists.",
+        "- **Dated**: kept results whose address gives a date - a search result carries none "
+        "of its own; reading the page may give one.",
+        "- **Fresh**: for a news question, kept results dated within its days.",
+        "- **Feeds**: for a news question, the items the news feeds held within the same days "
+        "- a team's own feed for a question about a team, the general feeds for the league - "
+        "and how many were on topic.",
+        "",
+        "## By query",
+        "",
+        "| Case | Query | Kind | Results | Left out | Repeats | On topic | Dated | Fresh | Feeds (on topic) |",  # fmt: skip
+        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+    ]
+    for score in scores:
+        if score.error is not None:
+            lines.append(
+                f"| {score.case} | {score.query} | {score.kind} | not run: {score.error} | | | | | | |"
+            )
+            continue
+        fresh = "-" if score.fresh is None else str(score.fresh)
+        feeds = "-" if score.feed_items is None else f"{score.feed_items} ({score.feed_on_topic})"
+        lines.append(
+            f"| {score.case} | {score.query} | {score.kind} | {score.results} | "
+            f"{score.left_out} | {score.duplicates} | {score.on_topic} | {score.dated} | "
+            f"{fresh} | {feeds} |"
+        )
+    news = [score for score in ran if score.fresh is not None]
+    teamed = [score for score in ran if score.feed_items is not None]
+    lines += [
+        "",
+        "## Over all queries",
+        "",
+        f"- Queries run: {len(ran)} of {len(scores)}.",
+        f"- Results: {sum(s.results for s in ran)}; left out from refused sites: "
+        f"{sum(s.left_out for s in ran)}; repeats: {sum(s.duplicates for s in ran)}; kept: "
+        f"{kept}.",
+        f"- On topic: {sum(s.on_topic for s in ran)} of {kept} kept results.",
+        f"- Dated by their address: {sum(s.dated for s in ran)} of {kept}.",
+    ]
+    if news:
+        news_kept = sum(s.results - s.left_out - s.duplicates for s in news)
+        lines.append(
+            f"- Fresh, for the {len(news)} news queries: {sum(s.fresh or 0 for s in news)} of "
+            f"{news_kept} kept results dated within each query's days."
+        )
+    if teamed:
+        lines.append(
+            f"- Feeds, for the {len(teamed)} news queries: "
+            f"{sum(s.feed_items or 0 for s in teamed)} items in the same days, "
+            f"{sum(s.feed_on_topic or 0 for s in teamed)} of them on topic."
+        )
+    lines += [
+        "",
+        "## Reading it",
+        "",
+        "A search result's date comes only from its address, so an undated result may be "
+        "recent; the assistant reads a page for its date before calling it new. The feeds date "
+        "every item, and the `moves_and_rumors` tool says how old each one is. What is on "
+        "topic is a count of names, not a judgement of quality: a result can name a team and "
+        "say nothing useful about the question.",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def score_record(score: CaseScore) -> dict[str, Any]:
+    return asdict(score)

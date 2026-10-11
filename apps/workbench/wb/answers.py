@@ -14,7 +14,7 @@ that a widget keeps its state as the page reruns and never clashes with another 
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -428,9 +428,13 @@ def results(answer: Answer, *, key: str) -> None:
 
 def _rows(table: pd.DataFrame, *, key: str) -> None:
     """A result's rows as the workbench writes them: a metric under its label and in its
-    format, any other column in words, the lab's internal ids left to the CSV."""
-    shown = table[[column for column in table.columns if not str(column).endswith("_id")]]
-    shown = shown.reset_index(drop=True)
+    format, any other column in words, a time as a time, the lab's internal ids and keys left
+    to the CSV."""
+    shown = table[shown_columns(table.columns)].reset_index(drop=True)
+    for column in shown.columns:
+        times = times_from_text(shown[column])
+        if times is not None:
+            shown[column] = times
     specs = {
         column: spec
         for column in shown.columns
@@ -452,8 +456,17 @@ def _rows(table: pd.DataFrame, *, key: str) -> None:
         and pd.api.types.is_numeric_dtype(shown[column])
         and not pd.api.types.is_bool_dtype(shown[column])
     }
+    time_columns = {
+        column: moments(shown[column])
+        for column in shown.columns
+        if pd.api.types.is_datetime64_any_dtype(shown[column])
+    }
     styled = shown.style.format(
-        {**plain_columns, **{column: spec.format_value for column, spec in specs.items()}},
+        {
+            **plain_columns,
+            **time_columns,
+            **{column: spec.format_value for column, spec in specs.items()},
+        },
         na_rep=components.EMPTY_CELL,
     )
     st.dataframe(
@@ -475,7 +488,54 @@ def plain(value: object) -> str:
     return f"{number:,.3f}".rstrip("0").rstrip(".")
 
 
+ISO_MOMENT = re.compile(r"\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?")
+
+
+def times_from_text(column: pd.Series) -> pd.Series | None:
+    """A column of times a kept answer holds as ISO text - its JSON has no other way - as
+    times again, or ``None`` when it is not one."""
+    values = column.dropna()
+    textual = pd.api.types.is_string_dtype(column) or pd.api.types.is_object_dtype(column)
+    if not textual or values.empty:
+        return None
+    if not all(isinstance(value, str) and ISO_MOMENT.fullmatch(value) for value in values):
+        return None
+    return pd.to_datetime(column, format="ISO8601")
+
+
+def moments(column: pd.Series) -> Callable[[object], str]:
+    """How a column of times is written: the day alone where every time is midnight, else
+    the day and the time in UTC, as the lab keeps them. Live at A7 a news item's time showed
+    as 2026-10-10T23:47:27."""
+    times = pd.to_datetime(column.dropna())
+    timed = bool(((times.dt.hour != 0) | (times.dt.minute != 0)).any())
+    pattern = "%Y-%m-%d %H:%M UTC" if timed else "%Y-%m-%d"
+
+    def written(value: object) -> str:
+        if formats.is_missing(value):
+            return components.EMPTY_CELL
+        return pd.Timestamp(value).strftime(pattern)  # type: ignore[arg-type]
+
+    return written
+
+
+INTERNAL = ("_id", "_key")
+SHOWN_IDS = {"source_id": "Source"}
+"""Ids a reader needs: at A7 news answers sent the user to "the source ID s2", which no
+table or evidence line showed."""
+
+
+def shown_columns(columns: Iterable[object]) -> list[object]:
+    """A result's columns a reader sees: not the lab's internal ids and keys - a
+    transaction's key showed at A7 - but a source's id, by which an answer names it."""
+    return [
+        column for column in columns if column in SHOWN_IDS or not str(column).endswith(INTERNAL)
+    ]
+
+
 def _words(column: str) -> str:
+    if column in SHOWN_IDS:
+        return SHOWN_IDS[column]
     text = column.replace("_", " ").strip()
     return text[:1].upper() + text[1:]
 

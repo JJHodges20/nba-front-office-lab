@@ -18,7 +18,8 @@ something new.
 | NBA official injury report | Injury status, for the assistant | Public PDF files, found by their published names | In use from A2 |
 | Ollama web search | General web search, for the assistant | API on the user's free account, with the user's own key | In use from A2 (checked live 2026-10-09) |
 | Links the user pastes; pages found by a search | Reporting, for the assistant | Single pages, after the address, redirect, robots, size and type checks | In use from A2 |
-| ESPN and Yahoo NBA feeds; Wikipedia's API | Headlines and background, for the assistant | Public RSS, public API | Planned for A7 |
+| Hoops Rumors news feeds: the main feed, the transactions feed and the 30 team feeds | Reporting, for the assistant: headlines, dates, a short excerpt and the link | Public RSS and Atom feeds, read as a feed reader reads them, through the guarded web provider | In use from A7 (the user's choice, 2026-10-10; see [The AI research assistant](#the-ai-research-assistant)) |
+| ESPN, Yahoo Sports and CBS Sports feeds; NBC Sports; Wikipedia's API; NBA Communications (pr.nba.com); RealGM | - | - | Not used: see [The AI research assistant](#the-ai-research-assistant) |
 | cdn.nba.com live data; nba.com pages; SearXNG's default engines | - | - | Not used: see [The AI research assistant](#the-ai-research-assistant) |
 
 ## Salary-cap figures
@@ -105,6 +106,14 @@ Whoever supplies the figures is responsible for the terms they came under. Figur
 from a site whose terms resemble §5(k) above may not be used in the lab's modeling
 stages.
 
+From A7 a new file can be checked against the one in use before it is imported: `fol
+contracts preview FILE --source "..." --as-of YYYY-MM-DD`, or Contract Explorer's *Check a
+new file*. It is read exactly as an import reads it and stores nothing; it flags a source
+label never imported before, so that its terms are checked and recorded here first. A
+salary reported in the news is never a figure to import: the assistant's `contract_updates`
+shows the moves reported since the file's date beside what the file holds, and the import
+stays the user's own command.
+
 ## The contract file in use
 
 On 2026-10-05 the user supplied MrBridge's dataset *NBA Salary Cap & Contracts
@@ -143,8 +152,12 @@ Every source is re-verified when the milestone that first uses it begins.
 | stats.nba.com player movement (`/js/data/playermovement/NBA_Player_Movement.json`) | Transactions | Public and undocumented; carries the league's player and team ids. Same terms. No robots.txt is published for the host. Fetched with nba_api's request headers, as the lab's ingest has always fetched stats.nba.com, at most once in three hours, and kept only when it has changed. Verified at A2, 2026-10-09: 9,943 lines, 10 of them repeats kept once (9,933 stored), the newest dated 2026-10-07; ids are written as decimals and 0 means none (a rule and a test in `processing/current.py`). |
 | Official injury report (official.nba.com, PDF files) | Injury status with the report's time | Personal download allowed; "no portion... may be duplicated, redistributed or manipulated". The page's robots rules allow it; the PDF host's could not be read. Published about every 15 minutes in season. Read with `pypdf` (BSD licence). The page loads its links by script, so the latest report is found by its published name (`Injury-Report_YYYY-MM-DD_HH_MM{AM,PM}.pdf`, Eastern time; an hourly name on the hour), the last four quarter hours, one request a second, under the lab's own name (`NBAFrontOfficeLab/0.1`). A missing report answers 403 or 404. Verified at A2, 2026-10-09: the report of 2026-04-17 8:30 PM read line for line (29 lines, two pages), and none published in the preseason. No report is committed: the tests draw their own (`tests/injury_pdf.py`). Kept only in `data/current.sqlite`, never redistributed. |
 | Ollama web search | General web search | Free account, no card; the free allowance is unpublished. Queries leave the machine. The key is the user's own, read by the web provider alone from `FOL_OLLAMA_API_KEY` (the environment, else the project's git-ignored `.env`), sent to ollama.com only, never shown. `POST https://ollama.com/api/web_search` with a query and at most 10 results; each result is a title, an address and the page's text, which the assistant shows as the site's. Searches are budgeted per question (one in Quick mode, four in Deep). Checked live at A2, 2026-10-09: a query answered in 0.9 s with five results, each a title, an address and up to about 4,700 characters of the page's text; a whole answer then read the first result by its id. Three searches were made in all. |
-| ESPN and Yahoo NBA RSS feeds | Headlines and links | Allowed on their terms: shown unmodified, credited, linked to the full article. |
-| Wikipedia's API | Background | Allowed with an identifying User-Agent, 200 requests a minute; text CC BY-SA. |
+| Hoops Rumors (hoopsrumors.com) news feeds | Reporting: headlines, dates, a short excerpt and the link, credited | Re-checked at A7, 2026-10-10. robots.txt admits the lab and every AI agent the lab checks for; the site publishes no terms of use and invites readers to "subscribe to our feed through your RSS reader of choice", with a feed for each team and one for transactions alone. The user chose it on 2026-10-10. Read as a feed reader reads it - each feed at most every 30 minutes, a team's own only when a question is about that team - through the same checks as any page; kept in `data/current.sqlite` for 120 days. A report never changes the lab's data, a roster or the contract file. |
+| ESPN, Yahoo Sports and CBS Sports NBA feeds | - | Not used. Re-checked at A7, 2026-10-10: their robots.txt turns away AI agents (ESPN: ChatGPT-User and GPTBot; Yahoo: ChatGPT-User, GPTBot, ClaudeBot and PerplexityBot; CBS: GPTBot), which the lab honours by the user's choice of A2. ESPN and Yahoo were planned at A0 on their feed terms. |
+| NBC Sports (ProBasketballTalk) feeds | - | Not used: robots.txt admits AI agents, but the terms bar "any software robot, spider, crawler, or other data gathering or extraction tool ... to access, acquire, copy, monitor, scrape or aggregate Content" (read 2026-10-10). |
+| Wikipedia's API | - | Not used. Planned at A0 for background; re-checked at A7, 2026-10-10: its robots.txt bars `/w/` and `/api/` to every agent. A Wikipedia page a search finds, or a link the user pastes, is still read as any page. |
+| NBA Communications (pr.nba.com) | - | Not used: robots.txt admits AI agents (2026-10-10), but the lab refuses every nba.com host and the user kept that rule at A7. |
+| RealGM | - | Not used: robots.txt admits AI agents, but its terms page refused an automated read (HTTP 403, 2026-10-10) and the user did not choose it at A7. |
 | Links the user pastes; pages a search found | Evidence | Fetched once each, by id, after the checks of `providers/web.py`: http or https on the standard port, no credentials, every resolved address public (and the one connected to), robots.txt allowing the lab and AI agents alike, at most 2 MB in 20 seconds, a web page and nothing else; no login, payment or bot-check workarounds. The page's text is the site's reporting, quoted to the model as data. Checked live at A2, 2026-10-09: Wikipedia, RotoWire and a Substack newsletter read; ESPN and AP refused by their robots rules for AI agents, which the user chose to keep honouring (their search snippets still show). |
 | cdn.nba.com live data | - | Not used: its firewall refuses clients that do not imitate a browser, and the terms bar play-by-play products. |
 | nba.com pages | - | Not used: www.nba.com's robots.txt shuts out AI agents (ChatGPT-User, ClaudeBot, PerplexityBot and others). The page fetch refuses every nba.com host: the league's data comes through the lab's own sources above. |

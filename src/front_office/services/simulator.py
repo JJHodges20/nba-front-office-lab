@@ -445,6 +445,7 @@ class SimulatorService:
                     if isinstance(row["position"], str) and row["position"].strip()
                     else GROUP_POSITION.get(row["position_group"], ""),
                     0.0 if pd.isna(row["projected_share"]) else float(row["projected_share"]),
+                    None if pd.isna(row["projected_impact"]) else float(row["projected_impact"]),
                 )
                 for player_id, row in active.iterrows()
             ]

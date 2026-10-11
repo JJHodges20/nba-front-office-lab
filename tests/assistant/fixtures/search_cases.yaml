@@ -1,0 +1,25 @@
+# Frozen research queries for the search-quality evaluation (A7, decision 0018).
+#
+# scripts/evaluate_search.py runs each through Ollama's web search and holds it against the
+# news feeds (docs/research/SEARCH_QUALITY.md). A result is on topic when its title or
+# snippet names every word in `names`; a news result is fresh when its address dates it
+# within `days`; `team` names the team whose own feed is held against the search.
+#
+# Never edit a case to make a run look better. A case the user decides is wrong changes by
+# that decision alone, logged in docs/DEVELOPMENT_LOG.md.
+
+version: 1
+frozen_on: "2026-10-10"
+cases:
+  - {id: Q01, query: "Boston Celtics injury news", kind: news, names: [Celtics], days: 14, team: BOS}
+  - {id: Q02, query: "New York Knicks contract extension", kind: news, names: [Knicks], days: 30, team: NYK}
+  - {id: Q03, query: "Golden State Warriors roster moves", kind: news, names: [Warriors], days: 30, team: GSW}
+  - {id: Q04, query: "Oklahoma City Thunder preseason", kind: news, names: [Thunder], days: 30, team: OKC}
+  - {id: Q05, query: "Los Angeles Lakers trade rumors", kind: news, names: [Lakers], days: 30, team: LAL}
+  - {id: Q06, query: "NBA free agent signings this week", kind: news, names: [sign], days: 14}
+  - {id: Q07, query: "Victor Wembanyama Spurs season outlook", kind: news, names: [Wembanyama], days: 60, team: SAS}
+  - {id: Q08, query: "Denver Nuggets news", kind: news, names: [Nuggets], days: 30, team: DEN}
+  - {id: B01, query: "Boston Celtics 2008 championship team", kind: background, names: [Celtics, "2008"]}
+  - {id: B02, query: "history of the NBA three-point line", kind: background, names: [three]}
+  - {id: K01, query: "NBA luxury tax line 2026-27", kind: contract, names: [tax]}
+  - {id: K02, query: "NBA rookie scale extension deadline", kind: contract, names: [extension]}

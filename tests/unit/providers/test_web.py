@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -17,7 +18,7 @@ from front_office.providers.web import (
     refused_site,
     search_key,
 )
-from tests.web_fakes import ARTICLE, FakeWeb, page, redirect, robots, search_results
+from tests.web_fakes import ARTICLE, FakeWeb, Story, page, redirect, robots, rss, search_results
 
 URL = "https://news.example.org/knicks"
 KEY = "test-key-not-real-0123456789"
@@ -130,6 +131,41 @@ class TestFetching:
         web = FakeWeb({URL: page("<p>" + "word " * 5000 + "</p>")})
         fetched = web.provider(page_bytes=1000).fetch(URL)
         assert len(fetched.body) == 1000 and fetched.truncated
+
+
+class TestFeeds:
+    """A7: a news feed is fetched with every check a page passes."""
+
+    FEED = "https://news.example.org/feed"
+    STORY = Story("A signing", "https://news.example.org/a-signing", datetime(2026, 10, 10))
+
+    @pytest.mark.parametrize(
+        "kind",
+        ["application/rss+xml", "application/atom+xml", "text/xml", "text/html; charset=UTF-8"],
+    )
+    def test_a_feed_comes_as_a_feed_or_labelled_as_a_page(self, kind: str) -> None:
+        web = FakeWeb({self.FEED: rss(self.STORY, kind=kind)})
+        fetched = web.provider().fetch_feed(self.FEED)
+        assert fetched.body.startswith(b"<?xml") and fetched.url == self.FEED
+        (_, _, headers, _) = web.requests[-1]
+        assert "application/rss+xml" in headers["Accept"]
+
+    def test_anything_else_is_not_a_feed(self) -> None:
+        web = FakeWeb({self.FEED: page("{}", kind="application/json")})
+        with pytest.raises(Refused, match="not a feed"):
+            web.provider().fetch_feed(self.FEED)
+
+    def test_robots_rules_for_ai_agents_hold_for_feeds_too(self) -> None:
+        rules = robots("User-agent: ChatGPT-User\nDisallow: /\n")
+        web = FakeWeb({"https://news.example.org/robots.txt": rules, self.FEED: rss(self.STORY)})
+        with pytest.raises(Refused, match=r"AI agents \(ChatGPT-User\)"):
+            web.provider().fetch_feed(self.FEED)
+        assert self.FEED not in web.urls
+
+    def test_a_feed_redirected_elsewhere_is_checked_again(self) -> None:
+        web = FakeWeb({self.FEED: redirect("https://www.nba.com/feed")})
+        with pytest.raises(Refused, match="the league's data comes through"):
+            web.provider().fetch_feed(self.FEED)
 
 
 class TestRobots:

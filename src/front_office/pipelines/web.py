@@ -10,8 +10,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from front_office.processing.feeds import canonical_link
 from front_office.processing.web import page_text
 from front_office.providers.web import WebProvider
+
+
+def article_address(link: str) -> str:
+    """An address as the lab tells articles apart: without tracking parameters or a
+    fragment, so that a search result and a feed's item for one article are one source."""
+    return canonical_link(link)
 
 
 @dataclass(frozen=True, slots=True)

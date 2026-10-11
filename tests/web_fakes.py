@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from email.utils import format_datetime
+from html import escape
 
 from front_office.providers.web import SEARCH_URL, Response, WebError, WebProvider
 
@@ -31,6 +34,56 @@ def robots(text: str) -> Response:
 def search_results(*hits: tuple[str, str, str]) -> Response:
     payload = {"results": [{"title": t, "url": u, "content": c} for t, u, c in hits]}
     return Response(200, {"content-type": "application/json"}, json.dumps(payload).encode())
+
+
+@dataclass(frozen=True, slots=True)
+class Story:
+    """One invented news item, for a feed made up by :func:`rss` or :func:`atom`."""
+
+    title: str
+    link: str
+    published: datetime
+    """Naive UTC."""
+    tags: tuple[str, ...] = ()
+    summary: str = ""
+    author: str = "A Writer"
+
+
+def rss(*stories: Story, kind: str = "text/html; charset=UTF-8") -> Response:
+    """An RSS 2.0 feed - labelled as a web page by default, as Hoops Rumors labels its own."""
+    items = "".join(
+        f"<item><title>{escape(s.title)}</title><link>{escape(s.link)}</link>"
+        f"<dc:creator>{escape(s.author)}</dc:creator>"
+        f"<pubDate>{format_datetime(s.published.replace(tzinfo=UTC))}</pubDate>"
+        + "".join(f"<category>{escape(tag)}</category>" for tag in s.tags)
+        + f"<description>{escape(s.summary)}</description></item>"
+        for s in stories
+    )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" '
+        'xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><title>Invented feed</title>'
+        f"{items}</channel></rss>"
+    )
+    return Response(200, {"content-type": kind}, xml.encode("utf-8"))
+
+
+def atom(*stories: Story, kind: str = "application/atom+xml; charset=UTF-8") -> Response:
+    """An Atom feed, as a team's own feed comes."""
+    entries = "".join(
+        f"<entry><author><name>{escape(s.author)}</name></author>"
+        f'<title type="html">{escape(s.title)}</title>'
+        f'<link rel="alternate" type="text/html" href="{escape(s.link)}"/><id>{escape(s.link)}</id>'
+        f"<updated>{s.published:%Y-%m-%dT%H:%M:%S}Z</updated>"
+        f"<published>{s.published:%Y-%m-%dT%H:%M:%S}Z</published>"
+        + "".join(f'<category term="{escape(tag)}"/>' for tag in s.tags)
+        + f'<summary type="html">{escape(s.summary)}</summary></entry>'
+        for s in stories
+    )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">'
+        f"<title>Invented team feed</title>{entries}</feed>"
+    )
+    return Response(200, {"content-type": kind}, xml.encode("utf-8"))
 
 
 class FakeWeb:

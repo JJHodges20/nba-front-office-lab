@@ -285,15 +285,15 @@ def test_a_refresh_by_hand_reports_each_source(project: Path, monkeypatch: pytes
 
     asked = []
 
-    def fake(settings, *, force):  # type: ignore[no-untyped-def]
-        asked.append(force)
+    def fake(settings, *, sources, force):  # type: ignore[no-untyped-def]
+        asked.append((tuple(sources), force))
         return CurrentRefresh((SourceRefresh("games", "none", 0, "no 2026-27 games played yet"),))
 
     monkeypatch.setattr(api, "fetch_current", fake)
     assert api.refresh_current(project, force=True) == (
         api.Refreshed("games", "none", "no 2026-27 games played yet"),
     )
-    assert asked == [True]
+    assert asked == [(("games", "transactions", "injuries", "news"), True)], "the news too (A7)"
 
 
 # --- an approved roster proposal ---------------------------------------------------------------

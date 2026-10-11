@@ -94,10 +94,13 @@ class TestFromReport:
             assert sorted(starting) == sorted(STARTING_SLOTS)
             assert slots.count("BENCH") == len(slots) - 5
             # Placed by domain.lineup: starters from the rotation, each kept at a listed
-            # position where the roster allows (the user's wish at the A5 review).
+            # position where the roster allows (the user's wish at the A5 review), the most
+            # projected impact first among lineups that fit (at the A6 review).
             expected = starting_slots(
                 [
-                    LineupPlayer(p.player_id, p.position or "", p.projected_share)
+                    LineupPlayer(
+                        p.player_id, p.position or "", p.projected_share, p.projected_impact
+                    )
                     for p in proposal.players
                 ]
             )

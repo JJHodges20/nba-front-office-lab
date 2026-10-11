@@ -4,7 +4,8 @@ The AI research assistant's cache (decision 0018), kept in ``data/current.sqlite
 not in the lab's database: a refresh never touches what a build made, and a build never
 drops what a refresh fetched. The games are the season in progress as last fetched, in the
 lab's own box-score shape; the transactions and the injury report are as the league
-publishes them. The refresh log is only ever added to.
+publishes them; the news items are reporting, as the sites publish it (A7). The refresh log
+is only ever added to.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ _MEASURED = Provenance.MEASURED
 _OPS = Provenance.OPERATIONAL
 _KEPT = "Kept in data/current.sqlite, not the lab's database."
 
-SOURCES = ("games", "transactions", "injuries")
+SOURCES = ("games", "transactions", "injuries", "news")
 REFRESH_STATUSES = ("stored", "unchanged", "none", "failed")
 INJURY_STATUSES = ("Out", "Doubtful", "Questionable", "Probable", "Available", "Not Yet Submitted")
 
@@ -182,6 +183,89 @@ INJURY_REPORTS = TableContract(
     introduced_in="A2",
 )
 
+NEWS_ITEMS = TableContract(
+    name="news_items",
+    domain="current",
+    description=(
+        "Reporting from the news feeds the source register allows (A7): each item as its site "
+        "published it - headline, dates, a short excerpt, the link - once however many feeds "
+        "carried it, and kept for a set number of days after it was published. Reporting, "
+        f"not the lab's data: nothing here changes a table, a roster or a contract. {_KEPT}"
+    ),
+    grain="One row per article, by its address.",
+    fields=(
+        Field(
+            "item_id",
+            DType.STRING,
+            "Fingerprint of the article's address, without tracking parameters.",
+            nullable=False,
+            provenance=_ID,
+        ),
+        Field("site", DType.STRING, "The site that published it.", nullable=False, provenance=_ID),
+        Field(
+            "title",
+            DType.STRING,
+            "Headline, as the site wrote it.",
+            nullable=False,
+            provenance=_MEASURED,
+        ),
+        Field("link", DType.STRING, "The article's address.", nullable=False, provenance=_ID),
+        Field(
+            "published_at",
+            DType.DATETIME,
+            "When the site says it was published.",
+            nullable=True,
+            provenance=_MEASURED,
+        ),
+        Field(
+            "updated_at",
+            DType.DATETIME,
+            "When the site says it was last changed, where it says.",
+            nullable=True,
+            provenance=_MEASURED,
+        ),
+        Field("author", DType.STRING, "Who wrote it.", nullable=True, provenance=_MEASURED),
+        Field(
+            "categories",
+            DType.STRING,
+            "The site's tags - teams and players, mostly - separated by semicolons.",
+            nullable=True,
+            provenance=_MEASURED,
+        ),
+        Field(
+            "summary",
+            DType.STRING,
+            "The start of the site's own excerpt, as plain text.",
+            nullable=True,
+            provenance=_MEASURED,
+        ),
+        Field(
+            "feeds",
+            DType.STRING,
+            "The feeds that carried it, by their ids in configs/assistant.yaml.",
+            nullable=False,
+            provenance=_OPS,
+        ),
+        Field(
+            "transactions",
+            DType.BOOLEAN,
+            "Whether a feed of moves alone carried it: signings, extensions, trades, waivers.",
+            nullable=False,
+            provenance=_OPS,
+        ),
+        Field(
+            "retrieved_at",
+            DType.DATETIME,
+            "When the lab last fetched a feed carrying it.",
+            nullable=False,
+            provenance=_OPS,
+        ),
+    ),
+    primary_key=("item_id",),
+    indexes=(("published_at",),),
+    introduced_in="A7",
+)
+
 CURRENT_REFRESHES = TableContract(
     name="current_refreshes",
     domain="current",
@@ -241,4 +325,10 @@ CURRENT_REFRESHES = TableContract(
     introduced_in="A2",
 )
 
-TABLES: tuple[TableContract, ...] = (CURRENT_GAMES, TRANSACTIONS, INJURY_REPORTS, CURRENT_REFRESHES)
+TABLES: tuple[TableContract, ...] = (
+    CURRENT_GAMES,
+    TRANSACTIONS,
+    INJURY_REPORTS,
+    NEWS_ITEMS,
+    CURRENT_REFRESHES,
+)

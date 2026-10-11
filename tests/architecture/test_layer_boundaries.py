@@ -54,7 +54,13 @@ APP_ASSISTANT_MODULES: set[str] = {"front_office.assistant.api"}
 # page - never the stats.nba.com ingest, a build, a fit or a contract import (decision 0018).
 ASSISTANT_REACH: dict[str, set[str]] = {
     "providers": {"front_office.providers.ollama", "front_office.providers.web"},
-    "pipelines": {"front_office.pipelines.current", "front_office.pipelines.web"},
+    "pipelines": {
+        "front_office.pipelines.current",
+        "front_office.pipelines.web",
+        # A7: reads a contract file and the raw store, and stores nothing - unlike the
+        # import beside it in pipelines.contracts, which the assistant may not reach.
+        "front_office.pipelines.contract_review",
+    },
 }
 
 # Third-party libraries that belong to exactly one place. "apps" is the Streamlit UI.

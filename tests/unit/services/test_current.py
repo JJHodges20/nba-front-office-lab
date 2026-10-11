@@ -14,6 +14,7 @@ from front_office.services import Lab
 from front_office.storage.current import CurrentStore
 from tests.current_fakes import FakeGet, FakeStats, fixture_game_logs, league_files
 from tests.helpers import BOS, BROWN, HART, NYK, TATUM
+from tests.web_fakes import FakeWeb, Story, atom, rss
 
 GAME_DAY = datetime(2026, 10, 21, 21, 50)
 
@@ -35,6 +36,7 @@ def test_reading_before_anything_is_fetched_creates_nothing(built_lab: Settings)
         ("games", "absent", 0),
         ("transactions", "absent", 0),
         ("injuries", "absent", 0),
+        ("news", "absent", 0),
     ]
     assert games.empty and {"team", "opponent", "in_build"} <= set(games.columns)
     assert report.empty
@@ -112,3 +114,72 @@ def test_the_report_names_are_matched_to_the_labs_ids(built_lab: Settings) -> No
     assert hart["status"].tolist() == ["Available"]
     unmatched = report[report["team_name"] == "Milwaukee Bucks"]
     assert unmatched["player_id"].isna().all(), "a name the lab does not hold gets no id"
+
+
+# --- news (A7) -------------------------------------------------------------------------------
+
+EXTENSION = Story(
+    "Celtics Sign Pritchard To Extension",
+    "https://www.hoopsrumors.com/2026/10/pritchard.html",
+    GAME_DAY - timedelta(hours=3),
+    ("Boston Celtics", "Transactions", "Payton Pritchard"),
+)
+TATUM_NOTE = Story(
+    "Injury Notes: Tatum Ahead Of Schedule",
+    "https://www.hoopsrumors.com/2026/10/tatum.html",
+    GAME_DAY - timedelta(days=2),
+    ("Jayson Tatum",),
+)
+KNICKS = Story(
+    "Knicks Pause Extension Talks With Josh Hart",
+    "https://www.hoopsrumors.com/2026/10/hart.html",
+    GAME_DAY - timedelta(days=5),
+    ("New York Knicks", "Josh Hart"),
+)
+BROWN_NOTE = Story(
+    "Atlantic Notes: Brown, Embiid",
+    "https://www.hoopsrumors.com/2026/09/atlantic.html",
+    GAME_DAY - timedelta(days=20),
+    ("Jaylen Brown (Player)", "Philadelphia 76ers"),
+)
+
+
+def fill_news(settings: Settings) -> None:
+    web = FakeWeb(
+        {
+            "https://www.hoopsrumors.com/feed": rss(EXTENSION, KNICKS),
+            "https://www.hoopsrumors.com/transactions/feed": rss(EXTENSION),
+            "https://www.hoopsrumors.com/boston-celtics/feed/atom": atom(TATUM_NOTE, BROWN_NOTE),
+        }
+    )
+    refresh_current(
+        settings, sources=["news"], teams=["BOS"], now=lambda: GAME_DAY, web=web.provider()
+    )
+
+
+def test_news_for_a_team_is_its_feed_its_tags_and_its_headlines(built_lab: Settings) -> None:
+    fill_news(built_lab)
+    with Lab(built_lab) as lab:
+        celtics = lab.current.news(team_id=BOS)["title"].tolist()
+        knicks = lab.current.news(team_id=NYK)["title"].tolist()
+        status = {s.source: s for s in lab.current.status(now=GAME_DAY)}["news"]
+    assert celtics == [EXTENSION.title, TATUM_NOTE.title, BROWN_NOTE.title], "newest first"
+    assert knicks == [KNICKS.title]
+    assert (status.state, status.rows) == ("ok", 4)
+
+
+def test_news_for_a_player_is_what_the_site_tagged_with_their_name(built_lab: Settings) -> None:
+    fill_news(built_lab)
+    with Lab(built_lab) as lab:
+        assert lab.current.news(player_id=TATUM)["title"].tolist() == [TATUM_NOTE.title]
+        assert lab.current.news(player_id=BROWN)["title"].tolist() == [BROWN_NOTE.title]
+        assert lab.current.news(player_id=HART)["title"].tolist() == [KNICKS.title]
+
+
+def test_news_since_a_day_and_moves_alone(built_lab: Settings) -> None:
+    fill_news(built_lab)
+    with Lab(built_lab) as lab:
+        week = lab.current.news(since=GAME_DAY - timedelta(days=7))
+        moves = lab.current.news(moves_only=True)
+    assert week["title"].tolist() == [EXTENSION.title, TATUM_NOTE.title, KNICKS.title]
+    assert moves["title"].tolist() == [EXTENSION.title]

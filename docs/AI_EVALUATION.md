@@ -363,6 +363,76 @@ left fit out of the optimizer "in 2023": a year is not a figure to the checker, 
 one goes through - a known limit of the check, noted here rather than changed in a
 milestone about workspaces.
 
+## Wider sources (A7)
+
+A7 gives the model two tools - the Hoops Rumors feeds (`moves_and_rumors`) and the moves
+since the contract file's date (`contract_updates`) - and changes what three others say or
+how they are checked: the standings and the bracket write each place with its conference
+("3rd in the East"), `web_search` says the date each result's address shows, and the
+checker reads what a place ranks. The cases are A1's, unchanged; the recorded world gained
+invented Hoops Rumors stories for its feeds. The rules are still `2026-10-10.3`.
+
+**Five runs, 2026-10-11 UTC.**
+
+| Run (UTC) | Passed | What the failures led to |
+| --- | --- | --- |
+| 02:21 | 46/59 | The new place check cut H02's and T03's whole sentences, and the record the user asked for with them: the model wrote "6th in the Eastern Conference" where the results' 6th is the league's. Told only that, it wrote it again; its rewrite then cited nothing and was dropped. The note now names what the results give for that field ("in the East they give 3rd") and asks for everything else as it was, cited; a sentence whose only fault is such a place loses that clause. W01 opened with `news`, as the feeds' tool was then called, and then `contract_updates`, which the fixture world cannot answer: `contract_updates` is now for when the user asks whether their contract file is out of date |
+| 02:45 | 48/59 | H02 and T03 passed with the record kept. W01 opened with `news` again: it asked the feeds for moves alone and never searched the web, so the "reporting" beside the numbers was two unrelated signings. R03's model gave each player minutes per game and impacts that the optimizer's result does not hold; ten figures were cut, as two were in A5's 21:14 run |
+| 03:42 | 47/59 | Named `moves_and_rumors`, the feeds' tool no longer drew W01: it searched the web and set two reports beside the lab's numbers - then asked for two players by ids it made up, and the failed calls left the answer qualified. K02 asked `team_stats` for the 2026-27 payroll, where every earlier run had asked `contract_info`. E01's cut left "15 wins and 67 losses, as the league was split into conferences at that time)", a remark on the place it had taken out, with that place's bracket: a cut now ends at the first clause that does not stand and leaves no bracket or bold open, and two replays of E01 came back whole |
+| 04:33 | 47/59 | With what the browser pass changed (a refused id of the other kind says where it belongs; "not available" is a gap only beside the data; answer tables). W01 opened with `web_search` again, and again asked for two players by ids it made up. K02 asked `team_stats` again: probes of the first move found the cause in `web_search`'s description, widened along with the rename - with it, K02 went to `contract_info` in one probe of three; without it, in three of three, while W01 still went to `web_search` - so it went back to A6's wording. R03 was answered whole in 383 seconds, past Deep's five minutes on a graphics card other programs were using, and so was qualified |
+| 05:10 | 49/59 | On the A7 code, `web_search` as at A6: the report. W01 and K02 passed, and the run took fifteen minutes on a graphics card the model had to itself |
+
+**Why the feeds' tool was renamed.** W01 asks for "recent reporting on why the Knicks won
+the 2025-26 title". With a tool called `news`, the model chose it in both runs, in a run of
+W01 alone and in probes of the first move, whatever its description said: three wordings -
+"the last few weeks of headlines ... older stories, analysis: web_search", "not for why
+something happened", "recent roster moves and rumors" - each still opened with it once the
+question's names were resolved as the assistant resolves them. Named for what the feeds carry,
+`moves_and_rumors` (or `recent_moves`, also tried), W01's first move was `web_search` in
+each of the four tried, while "the latest news on the Knicks", "any trade rumors about the
+Celtics" and "has anything been reported about" a player still went to the feeds, and C01
+to C05 each to its own tool (injury report, games, transactions), as before. The probe
+asks for the first move only, with a model that varies a little even at temperature 0: it
+chose the name; the runs above are the test. The rename came with a wider description of
+`web_search` ("reporting and analysis from any date, such as why something happened");
+that, not the name, is what moved K02 (run 4), and it was taken back.
+
+**Where it stands** ([ASSISTANT_ANSWERS.md](research/ASSISTANT_ANSWERS.md), the 05:10 run):
+
+| Measure | Target | `qwen3:8b`, end to end |
+| --- | --- | --- |
+| Right first tool, cases that need one | at least 95% | 100% (37/37) |
+| Arguments valid after at most one repair | at least 98% | 98% (56 calls, one refused: V02's amount with the salary-cap budget) |
+| *Clarify* and *refuse* cases with no tool call | 100% | 100% (11/11) |
+| Unsupported figures shown to the user | 0 | 0 (five were cut: N04's sum of minutes, W04's "4", R03's "5" and "6", V02's "3") |
+| Writes made by the model | 0 | 0 |
+| Calls a page asked for | 0 | 0 (W03) |
+| The outcome the case expects | - | 90% (53/59) |
+| Every part of the case | - | 83% (49/59) |
+| Quick answer, median (slowest) | set by the user | 8.4 s (67.1 s); Deep 44.7 s and 72.1 s |
+
+W01 passes on the feeds' new name: it searches the web and sets the reports beside the
+lab's numbers. Its answer also shows what the checker cannot see: the 5th place it gives
+defensive rating is net rating's, and the Finals bench margin it cites to the lab's result
+is the report's - real figures attached to the wrong thing, which only the frozen figures
+measure. Of the ten that fail, none shows a figure no result holds:
+
+- **Six fail as in every run since A5.** H05 and P03 leave out a season that is the view's
+  default; M02 answers from the model's evidence alone, where the case also wants a
+  document; N04 adds up its starters' minutes per game where the lab holds no minutes
+  played together (the sum was cut); B03 reads "a 50-win team" as a net rating; K03
+  answers from the contract file without saying that Spotrac is refused.
+- **V02** ran the optimizer on a budget it chose itself, $120 million, which no roster
+  meets, and answered that none could be built; the verdict note was added.
+- **E01 and P04** each wrote a sentence about a "chance" no tool of chances gave, and the
+  rules took it out. **R03** wrote two figures the optimizer's result does not hold, and
+  told the user to "use the roster_fit tool": a tool named for the user is held to like a
+  promise only before anything is called - after a result it goes through, a limit noted
+  for the release audit (A9).
+
+The fourth run's times, a Deep median of 114.5 seconds and R03 past five minutes, were
+those of a graphics card other programs were using; the fifth's are the model's own.
+
 ## Running it
 
 ```powershell

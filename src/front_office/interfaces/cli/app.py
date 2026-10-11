@@ -48,6 +48,7 @@ from front_office.domain.tables.current import SOURCES
 from front_office.domain.value_model import Comparison, ValueModel
 from front_office.pipelines.build import build_database, database_status, log_fetches
 from front_office.pipelines.check import CheckSeverity, DataReport, check_raw_data
+from front_office.pipelines.contract_review import ContractReviewError, preview_contract_file
 from front_office.pipelines.contracts import (
     TEMPLATE_SEASONS,
     ContractImportError,
@@ -623,6 +624,70 @@ def contracts_import(
     _say(
         "Run fol build to rebuild the database with the contracts (fol check validates them against the rest first, writing nothing)."
     )
+
+
+PREVIEW_SHOWN = 15
+"""Changes a preview lists, largest first."""
+
+
+@contracts_app.command("preview")
+def contracts_preview(
+    file: Annotated[Path, typer.Argument(help="The candidate contract file (CSV, UTF-8).")],
+    source: Annotated[
+        str,
+        typer.Option("--source", help="Where the figures came from, as an import would record it."),
+    ],
+    as_of: Annotated[
+        str | None,
+        typer.Option("--as-of", help="Date the figures were current (YYYY-MM-DD). Default: today."),
+    ] = None,
+) -> None:
+    """Compare a contract file with the one in use, and say what to check. Stores nothing.
+
+    The file is read and matched exactly as fol contracts import would read it. Importing it
+    stays your own command, once you have checked that its source may be used.
+    """
+    try:
+        settings = load_settings()
+        current = date.fromisoformat(as_of) if as_of else date.today()
+    except ConfigError as error:
+        raise _fail(error) from error
+    except ValueError:
+        raise _fail(ValueError(f"--as-of must be a date like 2026-10-01, not {as_of!r}")) from None
+    try:
+        preview = preview_contract_file(settings, file, source_label=source, as_of=current)
+    except ContractReviewError as error:
+        raise _fail(error) from error
+    seasons = f"{preview.seasons[0]} to {preview.seasons[-1]}" if preview.seasons else "no season"
+    _say(f"Read {preview.rows_read} rows: {preview.players} players, {seasons}.")
+    if preview.in_use is None:
+        _say("No contract file is in use yet.")
+    else:
+        used = preview.in_use
+        _say(
+            f"In use: {used.file_name} ({used.source_label}), as of {used.as_of:%Y-%m-%d}, "
+            f"imported {used.imported_at:%Y-%m-%d}."
+        )
+    _say(
+        f"Against it: {preview.count('new')} new, {preview.count('changed')} changed, "
+        f"{preview.count('gone')} gone, and {preview.unchanged} the same (by player, team and "
+        "season)."
+    )
+    for change in preview.changes[:PREVIEW_SHOWN]:
+        team = f" ({change.team})" if change.team else ""
+        was = "none" if change.in_use is None else f"${change.in_use:,}"
+        now = "none" if change.candidate is None else f"${change.candidate:,}"
+        detail = f"; {change.detail}" if change.detail else ""
+        _say(f"  {change.season} {change.player}{team}: {was} to {now}{detail}")
+    if len(preview.changes) > PREVIEW_SHOWN:
+        _say(f"  ... and {len(preview.changes) - PREVIEW_SHOWN} more.")
+    for flag in preview.flags:
+        _tagged("check", "yellow", flag)
+    for row in preview.unmatched[:PREVIEW_SHOWN]:
+        _say(f"         {row}")
+    if len(preview.unmatched) > PREVIEW_SHOWN:
+        _say(f"         ... and {len(preview.unmatched) - PREVIEW_SHOWN} more.")
+    _say(f"Nothing was imported. Once the source is checked: {preview.command}, then fol build.")
 
 
 @value_app.command("fit")

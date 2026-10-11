@@ -427,3 +427,88 @@ the chart, and nothing fetched on opening the page - on 2026-10-10.
 - **At the A6 review** (2026-10-10) the user decided that starters are chosen by projected
   impact and role rather than minutes, and that a place in an answer is checked for what it
   ranks - the league or a conference. Both are A7's.
+
+## Settled while building A7 (2026-10-10)
+
+- **News comes from feeds the register allows, read as a feed reader reads them.** A0
+  planned ESPN's and Yahoo's feeds and Wikipedia's API. Re-checked as A7 began, ESPN, Yahoo
+  and CBS Sports turn AI agents away in robots.txt, which the lab honours (the user's choice
+  at A2); NBC Sports' terms bar automated tools; Wikipedia's robots.txt bars its API. Of the
+  feeds that admit the lab and AI agents alike, the user chose Hoops Rumors (2026-10-10): its
+  main feed, its feed of moves and the 30 team feeds, listed in `configs/assistant.yaml`
+  (`news:`) and never composed from a question. NBA Communications stays behind the rule
+  that refuses every nba.com host; RealGM's terms refused an automated read, and it was not
+  chosen.
+- **A feed passes every check a page passes** (`WebProvider.fetch_feed`) and is read by
+  `processing/feeds.py`: RSS or Atom; a feed that declares a document type or entities is
+  refused, and so is one with a zero byte - in UTF-16 or UTF-32 a declaration is not the
+  bytes the check looks for, and XML never holds one; each item keeps the site's headline,
+  dates, author, tags and the start of its
+  excerpt, as plain text. The same article in several feeds is one item, known by its
+  address without tracking parameters, and a search result for it is the same source.
+- **News is a fourth current source** (`news_items` in `data/current.sqlite`): each feed
+  due on its own after 30 minutes, a team's only when a question is about that team, items
+  kept for 120 days after publication. It is fetched when asked for - by the
+  `moves_and_rumors` tool, `fol current refresh` and the AI Research page's button - and
+  not by default, since it reaches a site the lab does not run.
+- **The feeds' tool is named for what they carry.** Called `news`, it drew W01's "Find
+  recent reporting on why the Knicks won the 2025-26 title" in each of three evaluation
+  runs: the model asked the feeds for moves alone and never searched the web, so the
+  "reporting" it set beside the numbers was two unrelated signings. Three wordings of the
+  description changed nothing once the question's names were resolved as the assistant
+  resolves them. Named `moves_and_rumors`, with a description of moves and rumors, W01
+  went to `web_search` in each of four first moves tried, while "the latest news on the
+  Knicks", "any trade rumors" and "anything reported about" a player still reached the
+  feeds, and each current-information case its own tool (scratch probes of the first
+  move, 2026-10-11; the evaluation is the test). The name did the work: `web_search`'s
+  description, widened with it to "reporting and analysis from any date, such as why
+  something happened", moved K02's payroll question from `contract_info` to `team_stats`
+  in two runs and two of three probes; back as it was, K02 went to `contract_info` and W01
+  to `web_search` in three probes of three each.
+- **Every item is dated.** `moves_and_rumors` gives each headline its publication time and
+  how long ago it was; a search result, which carries no date, says the date its address
+  shows or that it shows none. The search-quality run showed why the feeds matter: 23 of
+  103 kept search results were dated by their address, while the feeds held 122 dated items
+  for the same eight news questions.
+- **Search quality is measured, not asserted** (`assistant/search_quality.py`,
+  `scripts/evaluate_search.py`, `docs/research/SEARCH_QUALITY.md`): twelve frozen queries
+  (`tests/assistant/fixtures/search_cases.yaml`), each counted for results on the subject,
+  dated, recent, repeated and from refused sites, and held against the feeds. Counts, not
+  thresholds.
+- **The contract-update review compares, flags and stores nothing.**
+  `pipelines/contract_review.py` reads a candidate contract file exactly as an import would,
+  compares it with the file in use by player, team and season, and says what to check
+  first: a source never imported before (its terms unchecked), figures older than those in
+  use, names the league's index does not hold, seasons without cap rules. `fol contracts
+  preview` and Contract Explorer's *Check a new file* reach it - the page through the
+  assistant's facade - and the assistant may reach this module and not
+  `pipelines.contracts`, whose import writes. Importing stays `fol contracts import`, the
+  user's own command.
+- **A report is never a contract figure.** `contract_updates` lists the moves on the
+  league's transactions file and those reported in the news since the contract file's date,
+  each beside the file's salary for the season, and says how to bring the file up to date.
+  Nothing it reads changes a table, a roster or the file.
+- **The user's wishes from the A6 review**: starters are chosen by projected impact among
+  the lineups that fit their listed positions (`domain/lineup.py`), and a place in an
+  answer is checked for what it ranks - the league or a conference - with every tool
+  writing its places so ("4th of 30", "3rd in the East"). The first evaluation run showed
+  how the check must work with a small model: told only that its "6th in the Eastern
+  Conference" was the league's 6th, the model wrote it again; and the cut took the whole
+  sentence, the record the user asked for with it. So the note now names what the results
+  give for that field ("in the East they give 3rd") and asks for everything else as it
+  was; and a sentence whose only fault is such a place is cut at that clause, not lost
+  whole. What follows the clause goes too: the third run's E01 showed a cut that kept every
+  clause standing leaving "15 wins and 67 losses, as the league was split into conferences
+  at that time)" - a remark on the place taken out, with its bracket.
+- **A refused id says where it belongs.** In the browser pass, asked what had changed for
+  the Knicks since the contract file, the model gave the team's id as the player as well;
+  told only that no player has that id, it gave up. A refusal now names an id of the other
+  kind - "the id of the New York Knicks, a team" - and the field it belongs in.
+- **A gap is what the data lacks, not what a story says.** "Not available", "not provided"
+  and the like mark an answer as saying something is missing only beside the data, the
+  results, a file or the lab: a news answer relaying that a coach "has not provided any
+  details" had been called not enough to answer. Every phrasing the evaluation runs had
+  read as a gap still is.
+- **A reader sees what an answer names.** Answer tables write times plainly, in UTC (a
+  kept answer's too, which its JSON holds as text), show a source's id - an answer names an
+  article "s2" - and leave the lab's internal keys, as its ids, to the CSV.

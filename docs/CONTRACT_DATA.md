@@ -33,6 +33,20 @@ against the rest of the data without writing anything.
 where it came from. `--as-of 2026-10-01` records the date the figures were current; it
 defaults to today.
 
+To see what a file would change before importing it - a newer copy of the dataset you
+use, or another source's:
+
+```powershell
+.\.venv\Scripts\fol.exe contracts preview newer.csv --source "where the figures came from" --as-of 2026-10-09
+```
+
+It reads the file exactly as the import would and compares it with the file in use,
+player by player, team by team and season by season: what is new, what changed (salary,
+option or guarantee) and what is gone. It says what to check first - a source never
+imported before, figures older than those in use, names the league's index does not hold,
+seasons without cap rules - and stores nothing. Contract Explorer's *Check a new file* tab
+does the same in the workbench.
+
 You do not have to use the template. Any CSV in one of the two layouts below works.
 
 ## Layouts
