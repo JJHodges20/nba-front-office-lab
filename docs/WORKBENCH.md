@@ -279,8 +279,28 @@ played are answered from that season's figures.
   its address and its dates: published, effective, fetched; each model file with its
   revision; each section of the lab's documents by file and heading), and how it was
   answered (each step, the model, the rules' version, the time).
-- *Names and sidebar*: names, seasons and teams are read from the question; the sidebar's
-  season and team stand in where it names none. A link pasted into a question can be read.
+- *Names and sidebar*: names, seasons and teams are read from the question; where it names
+  none, the workspace's focus stands in, then the sidebar's season and team. A "he" or
+  "they" with nothing to point to is asked about. A link pasted into a question can be read.
+- *Workspaces*: each piece of research has its own workspace, chosen at the top of the
+  page. A workspace keeps every question and its answer as it came back - on this computer,
+  apart from the lab's data, so rebuilding the data never touches it. A follow-up question
+  reads only the conversation under way in its own workspace. *New conversation* starts
+  afresh and keeps the earlier questions (*Show earlier conversations*). Under *Workspace*:
+  its name, what you are working on, its focus (the season, phase, team and Team Builder
+  roster its questions are about when they name nothing), and notes - yours, and summaries
+  the assistant writes when you press *Summarize into the notes*. The assistant reads the
+  notes as background, never as evidence. *Export* gives the workspace as a document to
+  read or as data. *Archive or delete* puts a workspace away (restore it any time), clears
+  its questions (notes, findings and rosters stay) or deletes it - each only once you tick
+  the box.
+- *Findings*: *Save as finding* under an answer keeps a copy of it, with your title and
+  note, in the workspace's findings - it stays even if the history is cleared.
+- *Old answers*: each answer records the data build and player value model it read. When
+  either has changed since, it says so, and *Ask again with today's data* asks the same
+  question again beside it; the old answer is never rewritten. An answer that read recent
+  games, moves, the injury report or the web offers the same once enough time has passed
+  for the lab to fetch any of them again (half an hour, as the lab is set up).
 - *Rosters to review*: ask for rosters - "three rosters for next season under a $150M
   budget", "a roster under the luxury tax with at least two rim protectors" - and the
   assistant runs the Roster Optimizer with what you asked for and nothing else. Each
@@ -293,11 +313,18 @@ played are answered from that season's figures.
   get them are allowed. The assistant cannot
   save one. *Save approved roster* under an option saves it for the Team Builder - only
   if the data, the player value model and the salaries are the same as when it was
-  proposed; otherwise it says what changed and saves nothing. Pressing it again finds the
-  roster already saved instead of saving a second one.
+  proposed; otherwise it says what changed and saves nothing. A saved option says so, and
+  is never saved a second time. *Decline* sets an option aside.
+  Every option stays in the workspace's *Proposed rosters*, saved, declined or waiting, so
+  you can come back and save one later. A saved roster's starters are the players who play
+  the most, each at a position they are listed at where the roster allows.
+- *Ask AI about this*: the player, value, team, benchmark, Team Builder, roster fit,
+  postseason and simulator pages have this button. It asks a question about what the page
+  shows - its season, team, player or roster - in the workspace open here, without changing
+  the sidebar. The answer comes back in short in the dialog, and in full in the workspace:
+  *Open in AI Research*.
 
-The conversation lasts until the tab is closed or reloaded; nothing is saved but a roster
-you approve. Web
+Nothing is saved to the Team Builder but a roster you approve. Web
 search needs your own Ollama account's key, in the project's `.env` file as
 `FOL_OLLAMA_API_KEY` (copy `.env.example` to `.env` and fill it in); without it the page
 says so, and pasted links are still read. Some

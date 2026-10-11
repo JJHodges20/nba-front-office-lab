@@ -26,7 +26,7 @@ from front_office.domain.scenario import (
 from front_office.domain.simulator import SimulatorModel
 from front_office.services import ScenarioReport, SimulatorStatus, probability_key
 from front_office.services.simulator import ADDED, KEPT, REMOVED
-from wb import charts, components, data, formats, state
+from wb import ask, charts, components, data, formats, state
 from wb.components import ASSUMPTION, EMPTY_CELL, MODELED, Figure
 from wb.state import Filters
 
@@ -59,6 +59,7 @@ def render() -> None:
         "The roster and its assumptions are yours; what they come to is the model's.",
         kinds=[MODELED, ASSUMPTION],
     )
+    ask.button(ask.from_filters("Scenario Simulator", filters))
     if not status.is_available:
         components.empty(
             "The simulator cannot run yet",

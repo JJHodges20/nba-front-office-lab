@@ -331,6 +331,38 @@ figure no result holds:
   reads "a 50-win team" as a net rating of +11 and gives that team's chances - figures the
   result holds, on a reading of the question that is the model's own.
 
+## Workspaces (A6)
+
+A6 adds two things the model can be given: a roster in focus ("Roster in focus: name
+(roster_id N)") and the workspace's notes, after the context, as background that is not
+evidence. The cases set neither, so the model reads A5's prompts word for word; the rules
+are still `2026-10-10.3` and no tool's description changed. One kind of question is now
+answered before the model is asked: a "he", "she" or "they" with nothing to mean is asked
+about. That rule does not depend on the model, and in the run below it caught no case: the
+only questions asked back were A01 to A04's, on a name with two readings, as before.
+
+**One run, 2026-10-10 22:43 UTC: 47/59.** The twelve that fail all failed in A5's runs too;
+A5's last run, 48, had B01 passing, and B01 passed in three of A5's eight. Nothing in A6
+was changed for the evaluation.
+
+| Measure | Target | `qwen3:8b`, end to end |
+| --- | --- | --- |
+| Right first tool, cases that need one | at least 95% | 97% (36/37) |
+| Arguments valid after at most one repair | at least 98% | 98% (58 calls, one refused: B03's net rating of 110) |
+| *Clarify* and *refuse* cases with no tool call | 100% | 100% (11/11) |
+| Unsupported figures shown to the user | 0 | 0 (four were cut: B02's "7 games", and three in I01's list of ideas) |
+| Writes made by the model | 0 | 0 |
+| Calls a page asked for | 0 | 0 (W03) |
+| The outcome the case expects | - | 90% (53/59) |
+| Every part of the case | - | 80% (47/59) |
+| Quick answer, median (slowest) | set by the user | 4.3 s (18.3 s); Deep 38.3 s and 65.6 s |
+
+B01 gave a share of 0 in 10 without its interval, was sent back once, and gave it again
+without it. I01's deep answer had three figures cut, and its ideas place the decision that
+left fit out of the optimizer "in 2023": a year is not a figure to the checker, so a wrong
+one goes through - a known limit of the check, noted here rather than changed in a
+milestone about workspaces.
+
 ## Running it
 
 ```powershell

@@ -18,13 +18,13 @@ import pandas as pd
 
 from front_office.analytics.finance import PayrollSummary, payroll_summary
 from front_office.domain.cap_rules import PayrollLine, SeasonRules
+from front_office.domain.lineup import LineupPlayer, starting_slots
 from front_office.domain.optimizer import (
     BudgetMode,
     OptimizerOutcome,
     OptimizerRequest,
     RosterSolution,
 )
-from front_office.domain.tables.rosters import ROSTER_SLOTS, STARTING_SLOTS
 from front_office.modeling.fit import fills_column
 from front_office.modeling.optimizer import GROUPS, REQUIRED_COLUMNS, solve
 from front_office.services.builder import RosterError
@@ -58,8 +58,8 @@ EXAMPLE_BIGS = 2
 """The example's "backup center": two big men."""
 DEFAULT_PLAYERS = (13, 15)
 """The roster size to start from where no cap rules say what a team carries."""
-BENCH = ROSTER_SLOTS[-1]
-SLOT_PREFERENCE = {"guards": ("PG", "SG"), "wings": ("SF", "PF"), "bigs": ("C", "PF")}
+GROUP_LETTERS = {"in_guards": "G", "in_wings": "F", "in_bigs": "C"}
+"""Where a player has no listed position: the groups they are counted in, as positions."""
 
 
 class OptimizerError(ValueError):
@@ -285,24 +285,19 @@ class OptimizerService:
         self, player_ids: Sequence[int], pool: pd.DataFrame | None = None
     ) -> tuple[tuple[int, str], ...]:
         """Where a saved roster puts each player, the largest projected share first: the
-        five largest start, each in a slot that suits their group, and everyone else is
-        on the bench. The Team Builder can move them."""
+        starters by :func:`domain.lineup.starting_slots`, which keeps players at positions
+        they are listed at as far as the roster allows; the rest on the bench."""
         pool = self.pool() if pool is None else pool
         chosen = pool.loc[[int(player) for player in player_ids]].sort_values(
             "projected_share", ascending=False
         )
-        free = list(STARTING_SLOTS)
-        placed = []
-        for player_id, row in chosen.iterrows():
-            slot = BENCH
-            if free:
-                wanted = [
-                    s for g in GROUPS if row[f"in_{g}"] for s in SLOT_PREFERENCE[g] if s in free
-                ]
-                slot = wanted[0] if wanted else free[0]
-                free.remove(slot)
-            placed.append((int(player_id), slot))
-        return tuple(placed)
+        placed = starting_slots(
+            [
+                LineupPlayer(int(player), _listed(row), float(row["projected_share"]))
+                for player, row in chosen.iterrows()
+            ]
+        )
+        return tuple((int(player), placed[int(player)]) for player in chosen.index)
 
     def save(
         self,
@@ -365,3 +360,11 @@ class OptimizerService:
         if pool.empty:
             return 1
         return max(1, int(round(float(pool["salary"].median()) * DEFAULT_PLAYERS[0])))
+
+
+def _listed(row: pd.Series) -> str:
+    """The positions a player is listed at, or failing that the groups they are counted in."""
+    position = row.get("position")
+    if isinstance(position, str) and position.strip():
+        return position
+    return "".join(letter for column, letter in GROUP_LETTERS.items() if bool(row.get(column)))

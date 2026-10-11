@@ -16,7 +16,7 @@ import streamlit as st
 from front_office.domain.postseason import Comparison, PostseasonModel, ReliabilityBin
 from front_office.domain.stages import BRACKET_STAGE_KEYS, ROUND_STAGE_KEYS, stage
 from front_office.services import Outlook, PostseasonStatus, SubjectOutlook, probability_key
-from wb import charts, components, data, formats, state
+from wb import ask, charts, components, data, formats, state
 from wb.components import ASSUMPTION, EMPTY_CELL, MEASURED, MODELED, Figure
 from wb.state import Filters
 
@@ -53,6 +53,7 @@ def render() -> None:
         "estimates it. Whole regular seasons only.",
         kinds=[MODELED, MEASURED, ASSUMPTION],
     )
+    ask.button(ask.from_filters("Postseason Outlook", filters))
     if not status.is_fitted:
         components.empty(
             "No postseason model has been fitted",

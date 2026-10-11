@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from front_office.services.simulator import SimulatorService
     from front_office.services.teams import TeamService
     from front_office.services.value import ValueService
+    from front_office.services.workspaces import WorkspaceService
 
 
 class LabNotBuilt(RuntimeError):
@@ -345,6 +346,12 @@ class Lab:
         from front_office.services.proposals import ProposalService
 
         return ProposalService(self)
+
+    @property
+    def workspaces(self) -> WorkspaceService:
+        from front_office.services.workspaces import WorkspaceService
+
+        return WorkspaceService(self)
 
     @property
     def simulator(self) -> SimulatorService:

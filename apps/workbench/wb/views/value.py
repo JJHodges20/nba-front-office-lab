@@ -13,7 +13,7 @@ import streamlit as st
 
 from front_office.domain.metrics import MetricCatalog
 from front_office.services import ModelCard, ValueStatus
-from wb import charts, components, data, formats, state
+from wb import ask, charts, components, data, formats, state
 from wb.components import DERIVED, EMPTY_CELL, MODELED, Figure
 from wb.state import Filters
 
@@ -52,6 +52,7 @@ def render() -> None:
         "it had not seen. Whole regular seasons only.",
         kinds=[MODELED, DERIVED],
     )
+    ask.button(ask.from_filters("Player Value", filters))
     if not status.is_available:
         _unavailable(status)
         return

@@ -17,14 +17,14 @@ import numpy as np
 import pandas as pd
 
 from front_office.config.models import load_simulator_model
+from front_office.domain.lineup import GROUP_POSITION, LineupPlayer, starting_slots
 from front_office.domain.scenario import Scenario, SubjectKind
 from front_office.domain.simulator import DevelopmentBand, SimulatorModel
 from front_office.domain.stages import BRACKET_STAGE_KEYS, stage
-from front_office.domain.tables.rosters import STARTING_SLOTS
 from front_office.modeling.postseason import probability_key
 from front_office.modeling.simulator import ROSTER_COLUMNS, expected_rating, simulate
 from front_office.modeling.simulator.monte_carlo import interval, stage_frame, summarise_wins
-from front_office.services.builder import ASSUMED, BENCH, FROM_CONTRACT
+from front_office.services.builder import ASSUMED, FROM_CONTRACT
 from front_office.services.lab import Lab
 
 FIT_COMMAND = "fol simulate fit --write"
@@ -87,7 +87,6 @@ POOL_COLUMNS = (
     "projected_wins",
     "label",
 )
-SLOT_PREFERENCE = {"Guard": ("PG", "SG"), "Forward": ("SF", "PF"), "Center": ("C", "PF")}
 MONEY, SIGNED, NUMBER, PERCENT = "money", "signed", "number", "percent"
 
 
@@ -423,9 +422,10 @@ class SimulatorService:
     def save(self, scenario: Scenario, name: str) -> int:
         """Create a Team Builder roster from the scenario's players and return its id.
 
-        The five largest projected shares start, each in a slot that suits the player's
-        position; everyone else is on the bench. A salary the scenario assumed is kept as
-        the roster's assumption. The Team Builder can change all of it.
+        The starters are placed by :func:`domain.lineup.starting_slots`, which keeps
+        players at their own positions as far as the roster allows; everyone else is on the
+        bench. A salary the scenario assumed is kept as the roster's assumption. The Team
+        Builder can change all of it.
         """
         status = self.status()
         if status.upcoming is None or status.stats_season is None:
@@ -437,13 +437,20 @@ class SimulatorService:
         roster = self._lab.builder.create(
             name, stats_season=status.stats_season, payroll_season=status.upcoming
         )
-        free = list(STARTING_SLOTS)
+        placed = starting_slots(
+            [
+                LineupPlayer(
+                    int(player_id),
+                    row["position"]
+                    if isinstance(row["position"], str) and row["position"].strip()
+                    else GROUP_POSITION.get(row["position_group"], ""),
+                    0.0 if pd.isna(row["projected_share"]) else float(row["projected_share"]),
+                )
+                for player_id, row in active.iterrows()
+            ]
+        )
         for player_id, row in active.iterrows():
-            slot = BENCH
-            if free:
-                wanted = [s for s in SLOT_PREFERENCE.get(row["position_group"], ()) if s in free]
-                slot = wanted[0] if wanted else free[0]
-                free.remove(slot)
+            slot = placed[int(player_id)]
             assumed = row["salary"] if row["salary_source"] == ASSUMED else None
             self._lab.builder.add_player(
                 roster,

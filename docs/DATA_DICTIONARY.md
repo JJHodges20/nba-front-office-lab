@@ -58,6 +58,12 @@ measured statistics, modeled estimates and user assumptions visibly apart.
 | [`transactions`](#transactions) | current | One row per line of the league's file. | A2 |
 | [`injury_reports`](#injury_reports) | current | One row per player, or per team not yet submitted, in one report. | A2 |
 | [`current_refreshes`](#current_refreshes) | current | One row per attempt. | A2 |
+| [`research_schema`](#research_schema) | research | One row per version applied. | A6 |
+| [`research_workspaces`](#research_workspaces) | research | One row per workspace. | A6 |
+| [`research_turns`](#research_turns) | research | One row per question. | A6 |
+| [`research_findings`](#research_findings) | research | One row per bookmark. | A6 |
+| [`research_proposals`](#research_proposals) | research | One row per proposal in a workspace, named by its fingerprint. | A6 |
+| [`research_approvals`](#research_approvals) | research | One row per press. | A6 |
 
 ### teams
 
@@ -768,6 +774,135 @@ Every attempt to refresh a current source: when, what happened, from where. Neve
 | `detail` | string | no | operational |  | What the attempt found, or why it failed. |
 | `url` | string | no | operational |  | Where it fetched from. |
 | `content_hash` | string | no | operational |  | Fingerprint of what was fetched. |
+
+### research_schema
+
+Each version of the research store's tables applied to the file. Kept in data/assistant/assistant.sqlite, not the lab's database.
+
+- **Grain:** One row per version applied.
+- **Primary key:** `version`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `version` | integer | yes | operational |  | Version number. |
+| `note` | string | yes | operational |  | What the version added. |
+| `applied_at` | datetime | yes | operational |  | When it was applied to this file. |
+
+### research_workspaces
+
+Named research workspaces: what the user is working on, their notes, and the season, team, player or roster the workspace looks at. Kept in data/assistant/assistant.sqlite, not the lab's database.
+
+- **Grain:** One row per workspace.
+- **Primary key:** `workspace_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `workspace_id` | integer | yes | identifier |  | Workspace id, assigned when it is created. |
+| `name` | string | yes | assumption |  | Name the user gave it. |
+| `goal` | string | no | assumption |  | What the user is working on, in their words. |
+| `notes` | string | no | assumption |  | The user's notes, and summaries of earlier questions the assistant wrote at the user's request - prior choices and summaries, not evidence. |
+| `season` | string | no | assumption |  | Season the workspace looks at, when a question names none. |
+| `season_type` | string | no | assumption |  | Regular season or playoffs, the workspace looks at, when a question names none. One of: `regular`, `playoffs`. |
+| `team_id` | integer | no | identifier |  | Team the workspace looks at, when a question names none, by the league's id. |
+| `player_id` | integer | no | identifier |  | Player the workspace looks at, when a question names none, by the league's id. |
+| `roster_id` | integer | no | identifier |  | Team Builder roster the workspace looks at, when a question names none. |
+| `conversation` | integer | yes | operational |  | The conversation under way: earlier turns of it are what a follow-up reads. |
+| `archived` | boolean | yes | assumption |  | Whether the user put it away. |
+| `created_at` | datetime | yes | operational |  | When it was created. |
+| `updated_at` | datetime | yes | operational |  | When it, or anything in it, last changed. |
+
+### research_turns
+
+Each question asked in a workspace and the answer it got, kept as it was: the data build and model files it used are recorded, and nothing rewrites it. Kept in data/assistant/assistant.sqlite, not the lab's database.
+
+- **Grain:** One row per question.
+- **Primary key:** `turn_id`
+- **Indexes:** `workspace_id`, `conversation`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `turn_id` | integer | yes | identifier |  | Turn id. |
+| `workspace_id` | integer | yes | identifier |  | Workspace it was asked in. References `research_workspaces.workspace_id`. |
+| `conversation` | integer | yes | operational |  | Conversation within the workspace. |
+| `asked_at` | datetime | yes | operational |  | When it was asked. |
+| `question` | string | yes | assumption |  | The question as written. |
+| `mode` | string | yes | assumption |  | Quick or Deep. One of: `quick`, `deep`. |
+| `season` | string | no | assumption |  | Season the question was asked about. |
+| `season_type` | string | no | assumption |  | Regular season or playoffs, the question was asked about. One of: `regular`, `playoffs`. |
+| `team_id` | integer | no | identifier |  | Team the question was asked about, by the league's id. |
+| `player_id` | integer | no | identifier |  | Player the question was asked about, by the league's id. |
+| `roster_id` | integer | no | identifier |  | Team Builder roster the question was asked about. |
+| `asked_from` | string | yes | operational |  | The page it was asked from. |
+| `about` | string | no | operational |  | What the page was showing, in words, when asked from another page. |
+| `outcome` | string | no | operational |  | What kind of answer it got; empty when none came back. One of: `supported`, `qualified`, `insufficient`, `clarify`, `declined`. |
+| `answer_text` | string | no | operational |  | The answer as shown. |
+| `error` | string | no | operational |  | Why no answer came back. |
+| `build_id` | integer | no | operational |  | The lab's data build it read. |
+| `value_model` | string | no | operational |  | The player value model revision the build applied. |
+| `model` | string | no | operational |  | The local language model that answered. |
+| `policy` | string | no | operational |  | The version of the assistant's rules. |
+| `seconds` | float | no | operational | seconds | How long the answer took. |
+| `payload` | string | yes | operational |  | Everything the page draws, as JSON: the results, their rows and charts, the evidence, the notes, the steps. |
+
+### research_findings
+
+Answers the user bookmarked, each a copy of what it said and rested on, so that it outlasts the history it came from. Kept in data/assistant/assistant.sqlite, not the lab's database.
+
+- **Grain:** One row per bookmark.
+- **Primary key:** `finding_id`
+- **Indexes:** `workspace_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `finding_id` | integer | yes | identifier |  | Finding id. |
+| `workspace_id` | integer | yes | identifier |  | Workspace it belongs to. References `research_workspaces.workspace_id`. |
+| `turn_id` | integer | no | identifier |  | The turn it was saved from, while that turn is kept. |
+| `title` | string | yes | assumption |  | Title the user gave it. |
+| `note` | string | no | assumption |  | The user's note on it. |
+| `question` | string | yes | assumption |  | The question. |
+| `answer_text` | string | no | operational |  | The answer, as shown. |
+| `evidence` | string | no | operational |  | What the answer rested on, one source a line, with its dates. |
+| `asked_at` | datetime | yes | operational |  | When the question was asked. |
+| `build_id` | integer | no | operational |  | The data build the answer read. |
+| `created_at` | datetime | yes | operational |  | When it was bookmarked. |
+
+### research_proposals
+
+Rosters the assistant proposed in a workspace, kept until the user saves or declines each. Kept in data/assistant/assistant.sqlite, not the lab's database.
+
+- **Grain:** One row per proposal in a workspace, named by its fingerprint.
+- **Primary key:** `workspace_id`, `fingerprint`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `workspace_id` | integer | yes | identifier |  | Workspace it was proposed in. References `research_workspaces.workspace_id`. |
+| `fingerprint` | string | yes | identifier |  | The proposal's fingerprint: everything in it, hashed. |
+| `turn_id` | integer | no | identifier |  | The turn that proposed it, while kept. |
+| `label` | string | yes | operational |  | Option A, Option B... |
+| `payroll_season` | string | yes | operational |  | Season it is priced for. |
+| `status` | string | yes | assumption |  | Waiting for the user, saved as a roster, or declined. One of: `draft`, `saved`, `declined`. |
+| `roster_id` | integer | no | identifier |  | The Team Builder roster it was saved as. |
+| `payload` | string | yes | operational |  | The proposal as the page shows it, as JSON. |
+| `created_at` | datetime | yes | operational |  | When it was proposed. |
+| `decided_at` | datetime | no | operational |  | When the user saved or declined it. |
+
+### research_approvals
+
+Every press of a proposal's save or decline button and what came of it: saved, found saved already, refused because something had changed, or declined. Kept in data/assistant/assistant.sqlite, not the lab's database.
+
+- **Grain:** One row per press.
+- **Primary key:** `approval_id`
+- **Indexes:** `workspace_id`, `fingerprint`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `approval_id` | integer | yes | identifier |  | Approval id. |
+| `workspace_id` | integer | yes | identifier |  | Workspace the proposal belongs to. References `research_workspaces.workspace_id`. |
+| `fingerprint` | string | yes | identifier |  | The proposal's fingerprint. |
+| `action` | string | yes | operational |  | What came of it. One of: `saved`, `already_saved`, `refused`, `declined`. |
+| `roster_id` | integer | no | identifier |  | The roster it saved or found. |
+| `detail` | string | no | operational |  | Why it was refused, in plain sentences. |
+| `at` | datetime | yes | operational |  | When the button was pressed. |
 
 ## Planned tables
 

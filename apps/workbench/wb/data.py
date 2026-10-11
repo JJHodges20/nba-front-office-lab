@@ -45,6 +45,7 @@ from front_office.services import (
     ValueForMoney,
     ValueStatus,
     Window,
+    WorkspaceService,
     relationship,
 )
 
@@ -626,6 +627,12 @@ def rosters() -> pd.DataFrame:
 
 def roster_summary(roster_id: int) -> RosterSummary:
     return lab().builder.summary(roster_id)
+
+
+def research() -> WorkspaceService:
+    """The user's research workspaces (A6): their own work, changed from the page, so never
+    cached."""
+    return lab().workspaces
 
 
 # --- exploration ------------------------------------------------------------------------

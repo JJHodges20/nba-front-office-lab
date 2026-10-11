@@ -14,7 +14,7 @@ import streamlit as st
 
 from front_office.domain.fit_model import FitEvidence
 from front_office.services import FitReport, FitStatus
-from wb import charts, components, data, formats, state
+from wb import ask, charts, components, data, formats, state
 from wb.components import DERIVED, EMPTY_CELL, MODELED, Figure
 from wb.state import Filters
 
@@ -45,6 +45,7 @@ def render() -> None:
         "anything to the sum of the parts.",
         kinds=[MODELED, DERIVED],
     )
+    ask.button(ask.from_filters("Roster Fit", filters))
     if not status.seasons:
         components.empty(
             "No team profiles yet",

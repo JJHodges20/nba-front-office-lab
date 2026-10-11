@@ -65,6 +65,7 @@ from front_office.services.simulator import (
 from front_office.services.teams import TeamProfile, TeamService, TeamTable
 from front_office.services.value import ModelCard, ValueForMoney, ValueService, ValueStatus
 from front_office.services.window import Window
+from front_office.services.workspaces import WorkspaceError, WorkspaceService
 from front_office.storage import RosterNotFound
 
 __all__ = [
@@ -130,6 +131,8 @@ __all__ = [
     "ValueService",
     "ValueStatus",
     "Window",
+    "WorkspaceError",
+    "WorkspaceService",
     "floor",
     "metric_glossary",
     "probability_key",

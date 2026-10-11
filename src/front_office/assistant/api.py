@@ -2,13 +2,20 @@
 
 - ``status``: whether the assistant can answer, and if not, what to do; whether web search
   is set up.
-- ``start``: a question answered in the background - a :class:`Job` whose steps can be
-  read while it runs, which can be stopped, and whose answer arrives when it is done. A
-  job opens its own connection to the lab, so the pages go on reading theirs.
-- ``history``: the session's earlier turns, as the conversation the next question follows.
-- ``save_proposal``: a roster the optimizer proposed, saved for the Team Builder when the
-  user presses the button under it - never by the model.
+- ``start``: a question answered in the background, in a workspace - a :class:`Job` whose
+  steps can be read while it runs, which can be stopped, and whose turn is kept in the
+  workspace when it is done. A job opens its own connection to the lab, so the pages go on
+  reading theirs; a follow-up reads only its own workspace's conversation (A6).
+- ``history``: kept turns as the conversation the next question follows.
+- ``save_proposal`` and ``decline_proposal``: a roster the optimizer proposed, saved for the
+  Team Builder or declined when the user presses the button under it - never by the model -
+  and the press logged in the workspace.
+- ``summarize``: the conversation under way, summarized into the workspace's notes by the
+  local model, and a new conversation begun.
 - ``refresh_current``: fetch what is due of the current sources, by hand.
+
+The workspaces themselves - made, renamed, put away, exported - are the services' to keep
+(``Lab.workspaces``), and the workbench reaches them as it reaches every other service.
 
 Ollama not running, or the model not pulled, is a message on the page, never an error:
 the rest of the lab works without the assistant. ``connect`` and ``tools_for`` are the two
@@ -21,7 +28,7 @@ import threading
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from enum import StrEnum
 from pathlib import Path
 
@@ -37,6 +44,7 @@ from front_office.domain.assistant import (
     Step,
 )
 from front_office.domain.proposals import RosterProposal
+from front_office.domain.research import RESEARCH_PAGE, Focus, SavedTurn
 from front_office.domain.seasons import Season
 from front_office.pipelines.current import refresh_current as fetch_current
 from front_office.providers.ollama import (
@@ -47,12 +55,13 @@ from front_office.providers.ollama import (
     OllamaUnavailable,
 )
 from front_office.providers.web import search_key
-from front_office.services import Lab, ProposalSaved
+from front_office.services import Lab, ProposalSaved, RosterNotFound
 
 STATUS_TIMEOUT_SECONDS = 5.0
-HISTORY_TURNS = 3
-"""Earlier exchanges the next question carries: enough to follow "and in 2012-13?", few
-enough to leave the context room for results."""
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def connect(host: str, timeout: float) -> OllamaProvider:
@@ -150,54 +159,78 @@ def status(
 
 @dataclass(frozen=True, slots=True)
 class Question:
-    """A question as the page asks it: the words, the mode, and the sidebar's filters."""
+    """A question as a page asks it: the words, the mode, and what it is about when it names
+    nothing - the sidebar's filters, the workspace's focus, or what the asking page shows."""
 
     text: str
     season: str
     season_type: str = "regular"
     team_id: int | None = None
     player_id: int | None = None
+    roster_id: int | None = None
     mode: Mode = Mode.QUICK
     resolved: tuple[NameCandidate, ...] = ()
     """Readings the user has chosen: the answer to a question back."""
+    asked_from: str = RESEARCH_PAGE
+    """The page it is asked from."""
+    about: str | None = None
+    """What that page shows, in words, when it is not the AI Research page."""
+
+    @property
+    def focus(self) -> Focus:
+        return Focus(
+            season=self.season,
+            season_type=self.season_type,
+            team_id=self.team_id,
+            player_id=self.player_id,
+            roster_id=self.roster_id,
+        )
+
+    @classmethod
+    def again(cls, turn: SavedTurn) -> Question:
+        """A kept question asked again as it was asked: for an answer from the lab as it is
+        now, beside the old one."""
+        focus = turn.focus
+        return cls(
+            text=turn.question,
+            season=focus.season or "",
+            season_type=focus.season_type or "regular",
+            team_id=focus.team_id,
+            player_id=focus.player_id,
+            roster_id=focus.roster_id,
+            mode=turn.mode,
+            resolved=turn.resolved,
+            asked_from=turn.asked_from,
+            about=turn.about,
+        )
 
 
-@dataclass(frozen=True, slots=True)
-class Turn:
-    """One question and what came of it, as the page keeps them for the session."""
-
-    question: Question
-    answer: Answer | None
-    error: str | None = None
-    """Why there is no answer: the model stopped answering, the lab is not built..."""
-    steps: tuple[Step, ...] = ()
-    seconds: float = 0.0
-
-
-def history(turns: Sequence[Turn]) -> tuple[Message, ...]:
-    """The last few answered turns as the conversation the next question follows."""
+def history(turns: Sequence[SavedTurn]) -> tuple[Message, ...]:
+    """Answered turns as the conversation the next question follows: each question, and the
+    answer as it was shown."""
     messages: list[Message] = []
-    for turn in [turn for turn in turns if turn.answer is not None][-HISTORY_TURNS:]:
-        assert turn.answer is not None
-        messages.append(Message(role="user", content=turn.question.text))
+    for turn in turns:
+        if turn.answer is None:
+            continue
+        messages.append(Message(role="user", content=turn.question))
         messages.append(Message(role="assistant", content=turn.answer.text))
     return tuple(messages)
 
 
 class Job:
-    """One question answered in the background: steps readable as they come, a stop, and
-    the answer - or why there is none - when it is done."""
+    """One question answered in the background, in a workspace: its steps readable as they
+    come, a stop, and the turn - kept in the workspace, answered or not - when it is done."""
 
     def __init__(
         self,
         question: Question,
-        history: Sequence[Message] = (),
+        workspace_id: int,
         *,
         project_root: Path | None = None,
         today: date | None = None,
     ) -> None:
         self.question = question
-        self._history = tuple(history)
+        self.workspace_id = int(workspace_id)
         self._root = project_root
         self._today = today or date.today()
         self._steps: list[Step] = []
@@ -205,6 +238,11 @@ class Job:
         self._stop = threading.Event()
         self.answer: Answer | None = None
         self.error: str | None = None
+        self.saved: SavedTurn | None = None
+        """The turn as the workspace keeps it, once it is kept."""
+        self._asked_at = _utc_now()
+        self._conversation: int | None = None
+        self._stamp: tuple[int | None, str | None] = (None, None)
         self._started = time.monotonic()
         self._finished: float | None = None
         self._thread = threading.Thread(target=self._run, name="assistant-question", daemon=True)
@@ -235,9 +273,11 @@ class Job:
         self._thread.join(timeout)
         return self.done
 
-    def turn(self) -> Turn:
-        """The finished question, as the page keeps it."""
-        return Turn(self.question, self.answer, self.error, self.steps, self.seconds)
+    def turn(self) -> SavedTurn:
+        """The finished question, as its workspace keeps it."""
+        if self.saved is not None:
+            return self.saved
+        return self._unsaved(self._conversation or 0)
 
     def _record(self, step: Step) -> None:
         with self._lock:
@@ -251,6 +291,10 @@ class Job:
                 return
             with Lab.open(self._root) as lab:
                 lab.require_built()
+                workspaces = lab.workspaces
+                workspace = workspaces.get(self.workspace_id)
+                self._conversation = workspace.conversation
+                self._stamp = workspaces.stamp()
                 settings = load_assistant_settings(lab.settings.config_dir)
                 provider = connect(settings.ollama.host, settings.ollama.timeout_seconds)
                 assistant = Assistant(
@@ -258,8 +302,8 @@ class Job:
                 )
                 self.answer = assistant.ask(
                     self.question.text,
-                    context_for(lab, self.question, self._today),
-                    history=self._history,
+                    context_for(lab, self.question, self._today, notes=workspace.notes or ""),
+                    history=history(workspaces.history(self.workspace_id)),
                     on_step=self._record,
                     should_stop=self._stop.is_set,
                 )
@@ -269,21 +313,57 @@ class Job:
             self.error = f"The assistant could not answer: {error}"
         finally:
             self._finished = time.monotonic()
+            self._keep()
+
+    def _keep(self) -> None:
+        """Keep the turn in its workspace, answered or not. A failure to keep it is said on
+        the page, never raised."""
+        try:
+            with Lab.open(self._root) as lab:
+                conversation = self._conversation
+                if conversation is None:
+                    conversation = lab.workspaces.get(self.workspace_id).conversation
+                self.saved = lab.workspaces.record(self._unsaved(conversation))
+        except Exception as error:
+            note = f"The answer could not be kept in the workspace: {error}"
+            self.error = note if self.error is None else f"{self.error} {note}"
+
+    def _unsaved(self, conversation: int) -> SavedTurn:
+        build, value = self._stamp
+        return SavedTurn(
+            workspace_id=self.workspace_id,
+            conversation=max(conversation, 1),
+            asked_at=self._asked_at,
+            question=self.question.text,
+            mode=self.question.mode,
+            focus=self.question.focus,
+            asked_from=self.question.asked_from,
+            answer=self.answer,
+            error=self.error,
+            steps=self.steps,
+            seconds=self.seconds,
+            resolved=self.question.resolved,
+            about=self.question.about,
+            build_id=build,
+            value_model=value,
+        )
 
 
 def start(
     question: Question,
-    turns: Sequence[Turn] = (),
+    workspace_id: int,
     *,
     project_root: Path | None = None,
     today: date | None = None,
 ) -> Job:
-    """Answer ``question`` in the background, after the session's earlier ``turns``."""
-    return Job(question, history(turns), project_root=project_root, today=today)
+    """Answer ``question`` in the background, in ``workspace_id``: following that
+    workspace's conversation under way, and kept in it when done."""
+    return Job(question, workspace_id, project_root=project_root, today=today)
 
 
-def context_for(lab: Lab, question: Question, today: date) -> Context:
-    """What the model is told about the day and the data, with the page's filters."""
+def context_for(lab: Lab, question: Question, today: date, *, notes: str = "") -> Context:
+    """What the model is told about the day and the data, what the question is about when it
+    names nothing, and the workspace's notes - background, never evidence."""
     status = lab.status()
     league_year = Season.league_year_on(today).label
     games = lab.current.games()
@@ -310,6 +390,12 @@ def context_for(lab: Lab, question: Question, today: date) -> Context:
         if status.has_contracts and status.contract_as_of
         else "; no contract file"
     )
+    roster_name = None
+    if question.roster_id is not None:
+        try:
+            roster_name = str(lab.rosters.get(question.roster_id)["name"])
+        except RosterNotFound:
+            roster_name = None
     return Context(
         today=today,
         calendar=calendar,
@@ -318,8 +404,11 @@ def context_for(lab: Lab, question: Question, today: date) -> Context:
         season_type=question.season_type,
         team_id=question.team_id,
         player_id=question.player_id,
+        roster_id=question.roster_id,
+        roster_name=roster_name,
         resolved=question.resolved,
         mode=question.mode,
+        notes=notes,
     )
 
 
@@ -327,14 +416,99 @@ def context_for(lab: Lab, question: Question, today: date) -> Context:
 
 
 def save_proposal(
-    proposal: RosterProposal, name: str, *, project_root: Path | None = None
+    proposal: RosterProposal,
+    name: str,
+    *,
+    workspace_id: int,
+    project_root: Path | None = None,
 ) -> ProposalSaved:
     """Save a roster proposal the user approved, as a Team Builder roster, in one
-    transaction. Nothing is saved when the data, the value model, the contract file or a
-    player's salary has changed since the proposal was made; a second press finds the
-    roster the first one saved."""
+    transaction, and log the press in the workspace. Nothing is saved when the data, the
+    value model, the contract file or a player's salary has changed since the proposal was
+    made; a second press finds the roster the first one saved."""
     with Lab.open(project_root) as lab:
-        return lab.proposals.save(proposal, name)
+        return lab.workspaces.save_proposal(workspace_id, proposal, name)
+
+
+def decline_proposal(
+    fingerprint: str, *, workspace_id: int, project_root: Path | None = None
+) -> None:
+    """The user's press of *Decline* under a proposal: nothing is saved, and the workspace
+    says the proposal was declined."""
+    with Lab.open(project_root) as lab:
+        lab.workspaces.decline_proposal(workspace_id, fingerprint)
+
+
+# --- workspace notes -----------------------------------------------------------------------
+
+
+class SummaryError(ValueError):
+    """A summary cannot be written; the message says why, in plain words."""
+
+
+SUMMARY_RULES = (
+    "You write short notes for a basketball research workspace. Summarize the conversation "
+    "below in at most six bullet points, in plain words: what the user wanted to know, what "
+    "the answers found, and any choice the user made. Add no fact or figure that is not in "
+    'the answers. Write "they" for a player.'
+)
+SUMMARY_ANSWER_CHARACTERS = 900
+"""Of each answer, given to the summary: enough for its findings, few enough for a dozen."""
+
+
+def summarize(
+    workspace_id: int, *, project_root: Path | None = None, today: date | None = None
+) -> str:
+    """Summarize the conversation under way into the workspace's notes with the local model,
+    then start a new conversation, which reads the notes instead of the turns. The summary is
+    marked as the assistant's and as not evidence; the user can edit or delete it."""
+    ready = status(project_root)
+    if not ready.is_ready:
+        raise SummaryError(ready.message)
+    with Lab.open(project_root) as lab:
+        service = lab.workspaces
+        workspace = service.get(workspace_id)
+        turns = [
+            turn
+            for turn in service.turns(workspace_id, conversation=workspace.conversation)
+            if turn.answer is not None
+        ]
+        if not turns:
+            raise SummaryError("There is nothing to summarize yet: no question has been answered.")
+        transcript = "\n\n".join(
+            f"Question: {turn.question}\nAnswer: {turn.answer.text[:SUMMARY_ANSWER_CHARACTERS]}"  # type: ignore[union-attr]
+            for turn in turns
+        )
+        settings = load_assistant_settings(lab.settings.config_dir)
+        provider = connect(settings.ollama.host, settings.ollama.timeout_seconds)
+        model = ready.model or settings.default_model
+        think = False if provider.details(model).can_think else None
+        try:
+            reply = provider.chat(
+                model,
+                [
+                    {"role": "system", "content": SUMMARY_RULES},
+                    {"role": "user", "content": transcript},
+                ],
+                context_tokens=settings.deep.context_tokens,
+                think=think,
+                max_output_tokens=settings.deep.max_output_tokens,
+                temperature=settings.temperature,
+                keep_alive=settings.ollama.keep_alive,
+            )
+        except OllamaError as error:
+            raise SummaryError(f"The model stopped answering: {error}") from error
+        summary = reply.content.strip()
+        if not summary:
+            raise SummaryError("The model wrote no summary. Nothing was changed.")
+        written = (today or date.today()).isoformat()
+        heading = (
+            f"Summary of earlier questions, {written} (written by the assistant; not evidence):"
+        )
+        notes = "\n\n".join(part for part in (workspace.notes, f"{heading}\n{summary}") if part)
+        service.update(workspace_id, notes=notes)
+        service.new_conversation(workspace_id)
+    return summary
 
 
 # --- current information -------------------------------------------------------------------

@@ -74,7 +74,9 @@ Each roster: its players with salary, projection and roles; the payroll against 
 season's lines; the room under the budget; the share of a season its minutes cover; the
 roles and groups it holds; and what it swaps against the first. A roster can be saved into
 the Team Builder, where the five largest projected shares start in slots that suit their
-groups, and the Roster Fit page will describe it like any other.
+groups, and the Roster Fit page will describe it like any other. (Amended at A6, at the
+user's wish: the starters are chosen from the nine who play the most, each at a position
+they are listed at where the roster allows - `domain/lineup.py`, decision 0018.)
 
 ## Alternatives considered
 

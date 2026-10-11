@@ -13,6 +13,7 @@ from front_office.assistant.orchestrator import (
     NO_MORE_TOOLS,
     NO_SUCH_RESULT,
     VERDICT_ASKED,
+    WHO_IS_MEANT,
     Assistant,
 )
 from front_office.assistant.toolbox import Toolbox
@@ -588,3 +589,62 @@ def test_a_name_the_user_has_chosen_is_not_asked_about_again(lab: Lab) -> None:
         == "How did Jaylen Brown shoot this season?"
     )
     assert answer.question == "How did Brown shoot this season?"
+
+
+# --- A6: what a follow-up with nothing to follow means --------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("question", "word"),
+    [
+        ("How did he do last season?", "he"),
+        ("Did they make the playoffs in 2012-13?", "they"),
+        ("What is her true shooting percentage?", "her"),
+    ],
+)
+def test_a_pronoun_with_nothing_to_mean_is_asked_about(lab: Lab, question: str, word: str) -> None:
+    ollama = ScriptedOllama()
+    answer = ask(lab, ollama, question)
+    assert answer.outcome is Outcome.CLARIFY and answer.options == ()
+    assert answer.text == WHO_IS_MEANT.format(word=word)
+    assert ollama.chat_payloads == [], "the model is not asked to guess"
+
+
+@pytest.mark.parametrize(
+    ("question", "context", "history"),
+    [
+        # Something for it to mean: a team or player in focus, or an earlier turn.
+        ("How did they do last season?", CONTEXT.model_copy(update={"team_id": BOS}), ()),
+        ("How did he do last season?", CONTEXT.model_copy(update={"player_id": BROWN}), ()),
+        ("How did they do?", CONTEXT.model_copy(update={"roster_id": 4}), ()),
+        (
+            "How did he do last season?",
+            CONTEXT,
+            (
+                Message(role="user", content="How did Jalen Brunson shoot?"),
+                Message(role="assistant", content="Well."),
+            ),
+        ),
+        # The question gives it a meaning of its own.
+        ("Who won the 2025-26 championship, and whom did they beat?", CONTEXT, ()),
+        ("Do teams win more when they take more threes?", CONTEXT, ()),
+        ("How did the Celtics do when they lost Tatum?", CONTEXT, ()),
+    ],
+)
+def test_a_pronoun_with_something_to_mean_goes_to_the_model(
+    lab: Lab, question: str, context: Context, history: tuple[Message, ...]
+) -> None:
+    ollama = ScriptedOllama(chats=[chat_chunks("Something [no figures].")])
+    answer = ask(lab, ollama, question, context=context, history=history)
+    assert answer.outcome is not Outcome.CLARIFY and len(ollama.chat_payloads) == 1
+
+
+def test_a_roster_in_focus_and_the_notes_are_told_to_the_model(lab: Lab) -> None:
+    ollama = ScriptedOllama(chats=[chat_chunks("Something [no figures].")])
+    context = CONTEXT.model_copy(
+        update={"roster_id": 4, "roster_name": "Budget contender", "notes": "Prefer wings."}
+    )
+    ask(lab, ollama, "How does it look?", context=context)
+    system = ollama.chat_payloads[0]["messages"][0]["content"]
+    assert "Roster in focus: Budget contender (roster_id 4)." in system
+    assert system.rstrip().endswith("Prefer wings.") and "not evidence" in system

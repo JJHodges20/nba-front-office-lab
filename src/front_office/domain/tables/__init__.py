@@ -16,6 +16,7 @@ from front_office.domain.tables import (
     fit,
     operations,
     players,
+    research,
     rosters,
     teams,
     value,
@@ -53,8 +54,14 @@ if len(_BY_NAME) != len(ALL_TABLES):
 # data/current.sqlite, never in the lab's database (decision 0018).
 CURRENT_TABLES: tuple[TableContract, ...] = current.TABLES
 
-# Every table the data dictionary describes: the lab's database, then the current cache.
-DOCUMENTED_TABLES: tuple[TableContract, ...] = (*ALL_TABLES, *CURRENT_TABLES)
+# The user's research with the assistant - workspaces, questions and answers, findings,
+# proposals and approvals: kept in its own file, data/assistant/assistant.sqlite, which no
+# build touches (decision 0018, A6).
+RESEARCH_TABLES: tuple[TableContract, ...] = research.TABLES
+
+# Every table the data dictionary describes: the lab's database, the current cache, then
+# the research store.
+DOCUMENTED_TABLES: tuple[TableContract, ...] = (*ALL_TABLES, *CURRENT_TABLES, *RESEARCH_TABLES)
 if len({contract.name for contract in DOCUMENTED_TABLES}) != len(DOCUMENTED_TABLES):
     raise RuntimeError("two table contracts share a name")
 
@@ -94,6 +101,7 @@ __all__ = [
     "CURRENT_TABLES",
     "DOCUMENTED_TABLES",
     "PLANNED_TABLES",
+    "RESEARCH_TABLES",
     "PlannedTable",
     "table",
 ]

@@ -172,9 +172,16 @@ class Context(BaseModel):
     season_type: str = "regular"
     team_id: int | None = None
     player_id: int | None = None
+    roster_id: int | None = None
+    """A Team Builder roster the question is about when it names none: the workspace's
+    scenario, or the roster a page was showing (A6)."""
+    roster_name: str | None = None
     resolved: tuple[NameCandidate, ...] = ()
     sources: tuple[Source, ...] = ()
     mode: Mode = Mode.QUICK
+    notes: str = ""
+    """The workspace's notes - the user's own and summaries of earlier questions - given to
+    the model as background, never as evidence: the answer checker does not read them (A6)."""
 
 
 class Message(BaseModel):

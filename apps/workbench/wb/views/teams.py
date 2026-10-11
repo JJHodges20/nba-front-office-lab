@@ -7,7 +7,7 @@ import streamlit as st
 
 from front_office.domain.cap_rules import PayrollLine
 from front_office.services import TeamTable
-from wb import charts, components, data, formats, state
+from wb import ask, charts, components, data, formats, state
 from wb.components import DERIVED, EMPTY_CELL, ESTIMATE, MEASURED, Figure
 from wb.state import Filters
 
@@ -57,6 +57,7 @@ def render() -> None:
     table = data.team_table(filters.build, filters.season, filters.season_type, filters.window)
     kinds = [MEASURED, DERIVED, *([ESTIMATE] if table.estimated else [])]
     components.header("Team Explorer", filters.scope, kinds=kinds)
+    ask.button(ask.from_filters("Team Explorer", filters))
     if table.estimated:
         st.caption(
             "Over a span of games, ratings, pace and turnover rates are estimates from box "

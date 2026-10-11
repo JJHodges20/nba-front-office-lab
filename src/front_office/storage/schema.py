@@ -37,7 +37,11 @@ _SQL_TYPES = {
 
 
 def build_tables(
-    metadata: MetaData, contracts: Sequence[TableContract], *, enforce_references: bool
+    metadata: MetaData,
+    contracts: Sequence[TableContract],
+    *,
+    enforce_references: bool,
+    never_reuse_ids: bool = False,
 ) -> dict[str, Table]:
     """Add one table per contract to ``metadata``.
 
@@ -73,7 +77,11 @@ def build_tables(
                     comment=field.description,
                 )
             )
-        table = Table(contract.name, metadata, *columns, comment=contract.description)
+        # SQLite's AUTOINCREMENT: an id is never handed out twice, even after its row is
+        # deleted. The research store asks for it - a finding names the turn it came from,
+        # and a cleared history would otherwise give that id to a new turn (A6).
+        unique = {"sqlite_autoincrement": True} if never_reuse_ids and single_integer_key else {}
+        table = Table(contract.name, metadata, *columns, comment=contract.description, **unique)
         for index_columns in contract.indexes:
             Index(
                 f"ix_{contract.name}_{'_'.join(index_columns)}",

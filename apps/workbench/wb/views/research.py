@@ -1,12 +1,18 @@
-"""AI Research: ask the lab in plain words, and see what every answer rests on.
+"""AI Research: ask the lab in plain words, keep the research in workspaces, and see what
+every answer rests on.
 
 A local model answers from the lab's tools (decision 0018): the lab's data, its fitted
 models and its own documents, what has happened since the build, and pages on the web.
-Every figure in an answer was checked against the results before it is shown. Under each
-answer the page draws what it rests on: each result's rows, a chart where the tool chose
-one, and the evidence - sources, dates, the build, the model files. The conversation lasts
-as long as this browser tab. A roster the optimizer proposed is shown with what it rests on
-and a *Save approved roster* button: saving is the user's click, never the model's (A5).
+Every figure in an answer was checked against the results before it is shown, and
+``wb.answers`` draws each answer with what it rests on.
+
+The research is kept in named workspaces (A6), on this computer, apart from the lab's data
+so that no build touches it: every question asked in a workspace and the answer it got,
+answers bookmarked as findings, rosters proposed and what the user did with each, and the
+user's notes. A follow-up reads only the conversation under way in its own workspace. An
+old answer says when the data or the model has changed since and can be asked again; it is
+never rewritten. A workspace can be renamed, focused on a season, team or roster, exported,
+cleared, put away or deleted.
 
 A question runs in the background (``assistant.api.Job``): the page shows its steps as
 they come, and can stop it, keeping what was gathered by then.
@@ -14,51 +20,45 @@ they come, and can stop it, keeping what was gathered by then.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import replace
 
-import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 
 import front_office.assistant.api as api
-from front_office.domain.assistant import (
-    Answer,
-    Chart,
-    Evidence,
-    EvidenceKind,
-    Mode,
-    NameCandidate,
-    Outcome,
-    ResultStatus,
-    Step,
-    ToolResult,
-)
-from front_office.domain.metrics import MetricSpec
-from front_office.domain.proposals import RosterProposal
-from front_office.domain.tables.rosters import ROSTER_SLOTS
-from front_office.services import METRIC_CATALOGS, CurrentSource, ProposalSaved
-from wb import charts, components, data, formats, state
-from wb.components import ASSUMPTION, DERIVED, ESTIMATE, MEASURED, MODELED, REPORTED, Figure
-from wb.theme import Palette
+from front_office.domain.assistant import Mode, NameCandidate
+from front_office.domain.research import RESEARCH_PAGE, Finding, Focus, SavedTurn, Workspace
+from front_office.services import CurrentSource, WorkspaceError, WorkspaceService
+from wb import answers, components, data, formats, state
+from wb.components import ASSUMPTION, DERIVED, ESTIMATE, MEASURED, MODELED, REPORTED
+from wb.state import Filters
 
-TURNS = "ai_turns"
-JOB = "ai_job"
+JOB = state.AI_JOB
+WORKSPACE = state.AI_WORKSPACE
+PARKED = state.AI_PARKED
+UNKEPT = state.AI_UNKEPT
 MODE = "ai_mode"
 REFRESHED = "ai_refreshed"
-SAVES = "ai_saves"
-"""What pressing a proposal's save button did, by the proposal's fingerprint."""
-BENCH = ROSTER_SLOTS[-1]
+SENT = "ai_forms_sent"
+"""How many times a form that starts again empty has been sent, by form: part of its
+widgets' keys. A form that shows what is stored has the stored values in its keys instead
+(``_stamp``). Either way a form starts again as new widgets: a key only forgotten leaves the
+browser showing, and sending back, what was typed - the notes as they were before a summary,
+say (A6 browser pass)."""
+NOTICE = "ai_notice"
+"""What the last action did, said once at the top of the next run."""
+EARLIER = "ai_show_earlier"
 PROGRESS_SECONDS = 1.0
 """How often a question under way is looked in on."""
-TAB_LABEL = 38
-"""Characters of a result's title on its tab."""
+TITLE_LENGTH = 60
 
 SUBTITLE = (
     "Ask a question in your own words. An AI model running on this computer answers from the "
     "lab's data, models and documents, the latest league news, and the web. Every number it "
-    "gives is checked against those sources before you see it. The conversation lasts until "
-    "you close or reload this tab. Nothing is saved unless you press a save button."
+    "gives is checked against those sources before you see it. Your questions and answers are "
+    "kept in the workspace you choose, on this computer; nothing is saved to the Team Builder "
+    "unless you press a save button."
 )
 PROMPT = "Ask about players, teams, seasons, forecasts, recent games, injuries, trades or news"
 MODES = {Mode.QUICK.value: "Quick", Mode.DEEP.value: "Deep"}
@@ -66,6 +66,14 @@ MODE_HELP = (
     "Quick: for one fact or one comparison - up to 3 lookups and about 90 seconds. Deep: for "
     "a longer look at several sources - up to 12 lookups and 5 minutes, thinking it through "
     "first."
+)
+WORKSPACE_HELP = (
+    "A workspace keeps one piece of research: its questions and answers, findings, proposed "
+    "rosters and notes. A follow-up question reads only this workspace's conversation."
+)
+NOTES_HELP = (
+    "Your notes, and summaries the assistant wrote when you asked. The assistant reads them "
+    "as background, never as evidence: no figure in them is taken as checked."
 )
 READINESS = {
     api.AssistantState.READY: ("Ready", ":material/check_circle:", "green"),
@@ -78,55 +86,6 @@ WEB_HELP = (
     "project's .env file. Links you paste into a question are read either way."
 )
 SOURCES = {"games": "Games", "transactions": "Transactions", "injuries": "Injury report"}
-OUTCOMES = {
-    Outcome.SUPPORTED: (
-        "Supported",
-        ":material/verified:",
-        "green",
-        "Answered from the lab's results; every number was checked.",
-    ),
-    Outcome.QUALIFIED: (
-        "Partly answered",
-        ":material/info:",
-        "orange",
-        "Part of the question could not be answered, or comes with a caveat: the notes say which.",
-    ),
-    Outcome.INSUFFICIENT: (
-        "Not enough to answer",
-        ":material/help:",
-        "gray",
-        "The lab's results do not answer this. The answer says what is missing and makes "
-        "nothing up.",
-    ),
-    Outcome.CLARIFY: (
-        "Question back",
-        ":material/contact_support:",
-        "blue",
-        "A name could mean more than one player, team or season: pick the one you mean.",
-    ),
-    Outcome.DECLINED: (
-        "Declined",
-        ":material/block:",
-        "gray",
-        "Something the assistant does not do: run code or database queries, open files, save "
-        "or change anything, or refit a model.",
-    ),
-}
-STEPS = {
-    "clarify": ":material/contact_support:",
-    "model": ":material/psychology:",
-    "tool": ":material/build:",
-    "repair": ":material/healing:",
-    "check": ":material/rule:",
-}
-EVIDENCE = {
-    EvidenceKind.LAB: "The lab's data",
-    EvidenceKind.MODEL: "A fitted model",
-    EvidenceKind.CONTRACTS: "Your contract file",
-    EvidenceKind.CURRENT: "Current information",
-    EvidenceKind.WEB: "The web",
-    EvidenceKind.DOCS: "The lab's documents",
-}
 EXAMPLES = (
     "What was the Celtics' net rating in 2025-26, and where did it rank?",
     "Compare Jalen Brunson and Jaylen Brown this season.",
@@ -136,39 +95,12 @@ EXAMPLES = (
     "Search the web for reporting on the Knicks' preseason.",
     "Propose three rosters for next season under a $150M budget.",
 )
-PROPOSALS = (
-    "Example rosters the optimizer found for this question: options to compare, not a "
-    "recommendation. The lab has not checked whether the trades or signings to get them are "
-    "allowed. Nothing is saved until you press Save approved roster under one."
-)
-SAVE_HELP = (
-    "Saves this roster for the Team Builder. Before saving, the lab checks that its data, its "
-    "player value model and the salaries are the same as when the roster was proposed."
-)
-RATING_HELP = (
-    "Each player's forecast added up for the minutes they are expected to play, relative to "
-    "the league. For whole teams these forecasts have typically been off by the amount shown."
-)
-PROPOSAL_METRICS = ("projected_impact", "projected_share", "projected_wins")
-"""The value model's forecasts in a proposal's players table, labelled by their catalog."""
-PROPOSAL_COLUMNS = {
-    "player_name": st.column_config.Column("Player", width="medium", pinned=True),
-    "team": st.column_config.Column("Team", help="The team the player is under contract to."),
-    "position": st.column_config.Column("Pos"),
-    "slot": st.column_config.Column(
-        "On the roster",
-        help="Where the save puts the player: the five with the most forecast minutes start.",
-    ),
-    "salary": st.column_config.Column(
-        "Salary", help="For the season ahead, from your contract file."
-    ),
-}
-IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
-SPECIAL = re.compile(r"([\\`*_\[\]()#+!|~<>$-])")
+SIDEBAR = "Sidebar's"
 
 
 def render() -> None:
     filters = state.current()
+    _apply_parked()
     _finish()
     status = data.assistant_status(filters.build)
     components.header(
@@ -177,41 +109,106 @@ def render() -> None:
         kinds=[MEASURED, DERIVED, ESTIMATE, MODELED, ASSUMPTION, REPORTED],
     )
     _status(status)
-    turns: list[api.Turn] = st.session_state.setdefault(TURNS, [])
+    research = data.research()
     job: api.Job | None = st.session_state.get(JOB)
-    _controls(turns, busy=job is not None)
-    if not turns and job is None:
-        _welcome(status)
-    for number, turn in enumerate(turns):
-        _turn(number, turn, can_ask=status.is_ready and job is None)
+    workspace = _workspace_bar(research, filters, ready=status.is_ready, busy=job is not None)
+    notice = st.session_state.pop(NOTICE, None)
+    if notice:
+        components.tagged(("Done", ":material/check_circle:", "green"), answers.escaped(notice))
+    roster_names = _roster_names()
+    _shelf(research, workspace, roster_names)
+    turns = research.turns(workspace.workspace_id)
+    current = [turn for turn in turns if turn.conversation == workspace.conversation]
+    earlier = [turn for turn in turns if turn.conversation != workspace.conversation]
+    _controls(research, workspace, busy=job is not None, started=bool(current))
+    records = {record.fingerprint: record for record in research.proposals(workspace.workspace_id)}
+    stamp = research.stamp()
+    can_ask = status.is_ready and job is None
+    if earlier and st.toggle(
+        f"Show earlier conversations ({len(earlier)} questions)",
+        key=EARLIER,
+        help="Questions from before the conversation under way. A follow-up does not read them.",
+    ):
+        for turn in earlier:
+            _turn(turn, research, can_ask=can_ask, records=records, names=roster_names, stamp=stamp)
+        st.divider()
+    if not current and job is None:
+        _welcome(status, workspace)
+    for turn in current:
+        _turn(turn, research, can_ask=can_ask, records=records, names=roster_names, stamp=stamp)
+    for turn in st.session_state.get(UNKEPT, []):
+        if turn.workspace_id == workspace.workspace_id:
+            _turn(turn, research, can_ask=False, records=records, names=roster_names, stamp=stamp)
     if job is not None:
         _progress()
-    asked = st.chat_input(
-        PROMPT, key="ai_question", disabled=not status.is_ready or job is not None
-    )
+    asked = st.chat_input(PROMPT, key="ai_question", disabled=not can_ask)
     if asked and asked.strip():
-        question = api.Question(
-            asked.strip(),
-            season=filters.season,
-            season_type=filters.season_type,
-            team_id=filters.team_id,
-            player_id=filters.player_id,
-            mode=Mode(st.session_state.get(MODE, Mode.QUICK.value)),
-        )
-        _start(question)
+        _start(_question(asked.strip(), filters, workspace), workspace.workspace_id)
 
 
-def _start(question: api.Question) -> None:
-    st.session_state[JOB] = api.start(question, st.session_state.get(TURNS, []))
+def _question(text: str, filters: Filters, workspace: Workspace) -> api.Question:
+    """A question from this page: about the workspace's focus where it has one, and the
+    sidebar's choices for the rest."""
+    sidebar = Focus(
+        season=filters.season,
+        season_type=filters.season_type,
+        team_id=filters.team_id,
+        player_id=filters.player_id,
+    )
+    focus = workspace.focus.over(sidebar)
+    return api.Question(
+        text,
+        season=focus.season or filters.season,
+        season_type=focus.season_type or filters.season_type,
+        team_id=focus.team_id,
+        player_id=focus.player_id,
+        roster_id=focus.roster_id,
+        mode=Mode(st.session_state.get(MODE, Mode.QUICK.value)),
+    )
+
+
+def _start(question: api.Question, workspace_id: int) -> None:
+    st.session_state[JOB] = api.start(question, workspace_id)
     st.rerun()
 
 
 def _finish() -> None:
-    """A question finished in the background joins the conversation."""
+    """A question finished in the background is kept in its workspace by the job; one that
+    could not be kept is shown for the session."""
     job: api.Job | None = st.session_state.get(JOB)
     if job is not None and job.done:
-        st.session_state.setdefault(TURNS, []).append(job.turn())
+        if job.saved is None:
+            st.session_state.setdefault(UNKEPT, []).append(job.turn())
         st.session_state[JOB] = None
+
+
+def _apply_parked() -> None:
+    """What an action decided after the widgets it changes were drawn, applied before they
+    are drawn again."""
+    if PARKED in st.session_state:
+        st.session_state[WORKSPACE] = st.session_state.pop(PARKED)
+
+
+def _sent(form: str) -> int:
+    """How many times ``form`` has been sent this session (``SENT``)."""
+    return st.session_state.get(SENT, {}).get(form, 0)
+
+
+def _stamp(*stored: object) -> str:
+    """What a form shows, as a few characters for its widgets' keys (``SENT``)."""
+    return hashlib.sha256(repr(stored).encode("utf-8")).hexdigest()[:10]
+
+
+def _after(notice: str, *, show: int | None = None, sent: str | None = None) -> None:
+    """Say what was done at the top of the next run, open workspace ``show``, and start
+    form ``sent`` again empty."""
+    st.session_state[NOTICE] = notice
+    if show is not None:
+        st.session_state[PARKED] = show
+    if sent is not None:
+        counts = st.session_state.setdefault(SENT, {})
+        counts[sent] = counts.get(sent, 0) + 1
+    st.rerun()
 
 
 # --- where things stand ----------------------------------------------------------------------
@@ -234,7 +231,7 @@ def _status(status: api.AssistantStatus) -> None:
         components.empty("The assistant cannot answer yet", status.message, icon=icon)
     for refreshed in st.session_state.get(REFRESHED, ()):
         name = SOURCES.get(refreshed.source, refreshed.source)
-        st.caption(f"{name}: {refreshed.status} - {_escaped(refreshed.detail)}")
+        st.caption(f"{name}: {refreshed.status} - {answers.escaped(refreshed.detail)}")
 
 
 def _source_state(source: CurrentSource) -> str:
@@ -243,7 +240,339 @@ def _source_state(source: CurrentSource) -> str:
     return f"as of {formats.moment(source.stored_at)}"
 
 
-def _controls(turns: list[api.Turn], *, busy: bool) -> None:
+# --- the workspace ----------------------------------------------------------------------------
+
+
+def _workspace_bar(
+    research: WorkspaceService, filters: Filters, *, ready: bool, busy: bool
+) -> Workspace:
+    listed = list(research.list()) or [research.default()]
+    by_id = {workspace.workspace_id: workspace for workspace in listed}
+    if st.session_state.get(WORKSPACE) not in by_id:
+        st.session_state[WORKSPACE] = listed[0].workspace_id
+    with st.container(horizontal=True, gap="small", vertical_alignment="bottom"):
+        chosen = st.selectbox(
+            "Workspace",
+            list(by_id),
+            format_func=lambda key: by_id[key].name,
+            key=WORKSPACE,
+            help=WORKSPACE_HELP,
+            disabled=busy,
+        )
+        workspace = by_id[chosen]
+        _new_workspace(research, busy=busy)
+        _settings(research, workspace, filters, ready=ready, busy=busy)
+        _export(research, workspace)
+        _put_away(research, workspace, busy=busy)
+    st.caption(_about(workspace, filters))
+    return workspace
+
+
+def _new_workspace(research: WorkspaceService, *, busy: bool) -> None:
+    sent = _sent("new_workspace")
+    with st.popover("New workspace", icon=":material/add:", disabled=busy):
+        name = st.text_input("Name", max_chars=60, key=f"ai_new_workspace_name_{sent}")
+        goal = st.text_area(
+            "What you are working on (optional)",
+            max_chars=400,
+            key=f"ai_new_workspace_goal_{sent}",
+        )
+        if st.button("Create workspace", key="ai_new_workspace_create", type="primary"):
+            try:
+                made = research.create(name, goal=goal or None)
+            except WorkspaceError as error:
+                st.error(str(error), icon=":material/error:")
+            else:
+                _after(f"Created “{made.name}”.", show=made.workspace_id, sent="new_workspace")
+
+
+def _settings(
+    research: WorkspaceService,
+    workspace: Workspace,
+    filters: Filters,
+    *,
+    ready: bool,
+    busy: bool,
+) -> None:
+    key = workspace.workspace_id
+    focus = workspace.focus
+    shown = _stamp(
+        workspace.name,
+        workspace.goal,
+        workspace.notes,
+        focus.season,
+        focus.season_type,
+        focus.team_id,
+        focus.roster_id,
+    )
+    with st.popover("Workspace", icon=":material/tune:", disabled=busy):
+        st.caption(
+            "Its name, what you are working on, and what its questions are about when they name "
+            "nothing. Left to the sidebar, they follow the sidebar."
+        )
+        name = st.text_input(
+            "Name", value=workspace.name, max_chars=60, key=f"ai_ws_name_{key}_{shown}"
+        )
+        goal = st.text_area(
+            "What you are working on",
+            value=workspace.goal or "",
+            max_chars=400,
+            key=f"ai_ws_goal_{key}_{shown}",
+        )
+        seasons = [None, *data.status().team_seasons]
+        season = st.selectbox(
+            "Season",
+            seasons,
+            index=_position(seasons, focus.season),
+            format_func=lambda value: f"{SIDEBAR} season" if value is None else value,
+            key=f"ai_ws_season_{key}_{shown}",
+        )
+        phases = [None, *state.PHASES]
+        phase = st.selectbox(
+            "Phase",
+            phases,
+            index=_position(phases, focus.season_type),
+            format_func=lambda value: f"{SIDEBAR} phase" if value is None else state.PHASES[value],
+            key=f"ai_ws_phase_{key}_{shown}",
+        )
+        teams = data.team_labels(filters.build)
+        team_ids = [None, *sorted(teams.index, key=lambda team: teams.at[team, "full_name"])]
+        team = st.selectbox(
+            "Team",
+            team_ids,
+            index=_position(team_ids, focus.team_id),
+            format_func=lambda value: (
+                f"{SIDEBAR} team" if value is None else str(teams.at[value, "full_name"])
+            ),
+            key=f"ai_ws_team_{key}_{shown}",
+        )
+        rosters = _roster_names()
+        roster_ids = [None, *rosters]
+        roster = st.selectbox(
+            "Team Builder roster",
+            roster_ids,
+            index=_position(roster_ids, focus.roster_id),
+            format_func=lambda value: "None" if value is None else rosters[value],
+            key=f"ai_ws_roster_{key}_{shown}",
+            help="A roster the workspace's questions are about when they name none: its fit, "
+            "its chances, a scenario for it.",
+        )
+        notes = st.text_area(
+            "Notes",
+            value=workspace.notes or "",
+            height=160,
+            key=f"ai_ws_notes_{key}_{shown}",
+            help=NOTES_HELP,
+        )
+        if st.button("Save changes", key=f"ai_ws_save_{key}", type="primary"):
+            try:
+                saved = research.update(
+                    key,
+                    name=name,
+                    goal=goal or None,
+                    notes=notes or None,
+                    focus=replace(
+                        workspace.focus,
+                        season=season,
+                        season_type=phase,
+                        team_id=None if team is None else int(team),
+                        roster_id=None if roster is None else int(roster),
+                    ),
+                )
+            except (WorkspaceError, ValueError) as error:
+                st.error(str(error), icon=":material/error:")
+            else:
+                _after(f"Saved “{saved.name}”.")
+        st.divider()
+        st.caption(
+            "Summarize: the assistant writes the conversation under way into the notes, marked "
+            "as its summary, and a new conversation begins that reads the notes instead."
+        )
+        if st.button(
+            "Summarize into the notes",
+            key=f"ai_ws_summarize_{key}",
+            icon=":material/summarize:",
+            disabled=not ready,
+        ):
+            with st.spinner("Summarizing..."):
+                try:
+                    api.summarize(key)
+                except api.SummaryError as error:
+                    st.warning(str(error), icon=":material/warning:")
+                else:
+                    _after("The conversation is summarized in the notes.")
+
+
+def _export(research: WorkspaceService, workspace: Workspace) -> None:
+    slug = re.sub(r"[^0-9a-z]+", "_", workspace.name.lower()).strip("_") or "workspace"
+    with st.popover("Export", icon=":material/download:"):
+        st.caption(
+            "Everything the workspace holds: as a document to read, or as data. Each answer "
+            "says which data build and model it read."
+        )
+        st.download_button(
+            "Document (Markdown)",
+            research.export_markdown(workspace.workspace_id),
+            file_name=f"{slug}.md",
+            mime="text/markdown",
+            key=f"ai_export_md_{workspace.workspace_id}",
+            icon=":material/description:",
+        )
+        st.download_button(
+            "Data (JSON)",
+            research.export_json(workspace.workspace_id),
+            file_name=f"{slug}.json",
+            mime="application/json",
+            key=f"ai_export_json_{workspace.workspace_id}",
+            icon=":material/data_object:",
+        )
+
+
+def _put_away(research: WorkspaceService, workspace: Workspace, *, busy: bool) -> None:
+    key = workspace.workspace_id
+    with st.popover("Archive or delete", icon=":material/inventory_2:", disabled=busy):
+        if st.button("Archive this workspace", key=f"ai_ws_archive_{key}"):
+            research.update(key, archived=True)
+            _after(f"Archived “{workspace.name}”. Restore it here any time.")
+        archived = research.list(archived=True)
+        if archived:
+            st.caption("Archived workspaces")
+            for kept in archived:
+                if st.button(f"Restore “{kept.name}”", key=f"ai_ws_restore_{kept.workspace_id}"):
+                    research.update(kept.workspace_id, archived=False)
+                    _after(f"Restored “{kept.name}”.", show=kept.workspace_id)
+        st.divider()
+        clear = st.checkbox(
+            "Forget this workspace's questions and answers (notes, findings and proposed "
+            "rosters stay)",
+            # Clearing begins a new conversation, and with it an unticked box.
+            key=f"ai_ws_clear_ok_{key}_{workspace.conversation}",
+        )
+        if st.button("Clear history", key=f"ai_ws_clear_{key}", disabled=not clear):
+            gone = research.clear_history(key)
+            _after(f"Cleared {gone} question{'s' if gone != 1 else ''} from “{workspace.name}”.")
+        delete = st.checkbox(
+            "Delete this workspace and everything in it (rosters saved from it stay in the Team "
+            "Builder)",
+            key=f"ai_ws_delete_ok_{key}",
+        )
+        if st.button(
+            "Delete workspace", key=f"ai_ws_delete_{key}", type="primary", disabled=not delete
+        ):
+            research.delete(key)
+            _after(f"Deleted “{workspace.name}”.")
+
+
+def _about(workspace: Workspace, filters: Filters) -> str:
+    """What the workspace is for, and what its questions are about when they name nothing."""
+    focus = workspace.focus
+    parts = []
+    season = focus.season or filters.season
+    phase = state.PHASES.get(focus.season_type or filters.season_type, "")
+    parts.append(
+        f"{season} {phase.lower()}" + ("" if focus.season or focus.season_type else " (sidebar)")
+    )
+    if focus.team_id is not None:
+        parts.append(_team_name(filters, focus.team_id))
+    elif filters.team_id is not None:
+        parts.append(f"{_team_name(filters, filters.team_id)} (sidebar)")
+    if focus.roster_id is not None:
+        parts.append(f"roster “{_roster_names().get(focus.roster_id, 'deleted')}”")
+    said = "Questions that name nothing are about: " + " · ".join(parts) + "."
+    if workspace.goal:
+        said = f"{workspace.goal} - {said}"
+    return answers.escaped(said)
+
+
+def _team_name(filters: Filters, team_id: int) -> str:
+    teams = data.team_labels(filters.build)
+    return str(teams.at[team_id, "full_name"]) if team_id in teams.index else f"team {team_id}"
+
+
+def _roster_names() -> dict[int, str]:
+    rosters = data.rosters()
+    return {int(row["roster_id"]): str(row["name"]) for _, row in rosters.iterrows()}
+
+
+def _position(options: list, value: object) -> int:
+    """Where the stored choice is in the list; the first, the sidebar's, when it is gone."""
+    return options.index(value) if value in options else 0
+
+
+# --- what the workspace keeps -----------------------------------------------------------------
+
+
+def _shelf(research: WorkspaceService, workspace: Workspace, names: dict[int, str]) -> None:
+    findings = research.findings(workspace.workspace_id)
+    held = research.proposals(workspace.workspace_id)
+    waiting = sum(record.status == "draft" for record in held)
+    with st.expander(f"Findings ({len(findings)})", icon=":material/bookmark:"):
+        if not findings:
+            st.caption(
+                "None yet. To keep an answer worth keeping, press Save as finding under it: a "
+                "copy stays here even if the history is cleared."
+            )
+        for finding in findings:
+            _finding(research, finding)
+    label = f"Proposed rosters ({len(held)}" + (f", {waiting} waiting)" if waiting else ")")
+    with st.expander(label, icon=":material/groups:"):
+        if not held:
+            st.caption(
+                "None yet. Ask for rosters under a budget, and the options are kept here until "
+                "you save or decline each."
+            )
+        for record in held:
+            answers.proposal_card(
+                record.proposal,
+                record.proposal,
+                key=f"w{workspace.workspace_id}_{record.fingerprint}",
+                workspace_id=workspace.workspace_id,
+                record=record,
+                roster_names=names,
+            )
+
+
+def _finding(research: WorkspaceService, finding: Finding) -> None:
+    key = finding.finding_id
+    with st.container(border=True):
+        st.markdown(f"**{answers.escaped(finding.title)}**")
+        asked = f"Asked {formats.moment(finding.asked_at)}: {finding.question}"
+        if finding.build_id is not None:
+            asked += f" · data build {finding.build_id}"
+        st.caption(answers.escaped(asked))
+        if finding.note:
+            st.markdown(f"*{answers.escaped(finding.note)}*")
+        if finding.answer_text:
+            st.markdown(answers.prose(finding.answer_text))
+        if finding.evidence:
+            st.caption(answers.escaped("Rests on: " + "; ".join(finding.evidence.splitlines())))
+        with st.container(horizontal=True, gap="small"):
+            with st.popover("Edit", icon=":material/edit:"):
+                shown = _stamp(finding.title, finding.note)
+                title = st.text_input(
+                    "Title",
+                    value=finding.title,
+                    max_chars=TITLE_LENGTH,
+                    key=f"ai_f_title_{key}_{shown}",
+                )
+                note = st.text_area(
+                    "Note", value=finding.note or "", key=f"ai_f_note_{key}_{shown}"
+                )
+                if st.button("Save", key=f"ai_f_save_{key}", type="primary"):
+                    try:
+                        research.update_finding(key, title=title, note=note or None)
+                    except WorkspaceError as error:
+                        st.error(str(error), icon=":material/error:")
+                    else:
+                        _after("Finding saved.")
+            if st.button("Delete", key=f"ai_f_delete_{key}", icon=":material/delete:"):
+                research.delete_finding(key)
+                _after("Finding deleted.")
+
+
+def _controls(
+    research: WorkspaceService, workspace: Workspace, *, busy: bool, started: bool
+) -> None:
     if st.session_state.get(MODE) not in MODES:
         st.session_state[MODE] = Mode.QUICK.value
     with st.container(horizontal=True, gap="medium", vertical_alignment="bottom"):
@@ -254,10 +583,11 @@ def _controls(turns: list[api.Turn], *, busy: bool) -> None:
             "New conversation",
             key="ai_new",
             icon=":material/add_comment:",
-            disabled=busy or not turns,
-            help="Start again; the answers so far are cleared from this page.",
+            disabled=busy or not started,
+            help="Start afresh: the next question follows no earlier one. Earlier questions stay "
+            "in the workspace.",
         ):
-            st.session_state[TURNS] = []
+            research.new_conversation(workspace.workspace_id)
             st.session_state.pop(REFRESHED, None)
             st.rerun()
         if st.button(
@@ -273,74 +603,112 @@ def _controls(turns: list[api.Turn], *, busy: bool) -> None:
             st.rerun()
 
 
-def _welcome(status: api.AssistantStatus) -> None:
-    examples = "\n".join(f"- {_escaped(example)}" for example in EXAMPLES)
+def _welcome(status: api.AssistantStatus, workspace: Workspace) -> None:
+    examples = "\n".join(f"- {answers.escaped(example)}" for example in EXAMPLES)
     body = (
         "The assistant reads names, seasons and teams from your question; where you name none, "
-        "it uses the season and team chosen in the sidebar. If a name could mean more than one "
-        "player, it asks which one first.\n\nFor example:\n" + examples
+        "it uses this workspace's focus or the sidebar's season and team. If a name could mean "
+        "more than one player, it asks which one first. A follow-up question reads the "
+        "conversation under way in this workspace, and nothing else.\n\nFor example:\n" + examples
     )
     with st.container(border=True):
-        st.markdown(":material/forum: **Ask a question**")
+        st.markdown(f":material/forum: **Ask a question in “{answers.escaped(workspace.name)}”**")
         st.markdown(body)
 
 
 # --- the conversation --------------------------------------------------------------------------
 
 
-def _turn(number: int, turn: api.Turn, *, can_ask: bool) -> None:
+def _turn(
+    turn: SavedTurn,
+    research: WorkspaceService,
+    *,
+    can_ask: bool,
+    records: dict,
+    names: dict[int, str],
+    stamp: tuple[int | None, str | None],
+) -> None:
+    key = f"t{turn.turn_id}" if turn.turn_id is not None else f"u{id(turn)}"
     with st.chat_message("user", avatar=":material/person:"):
-        st.markdown(_prose(turn.question.text))
-        st.caption(_asked_about(turn.question))
+        st.markdown(answers.prose(turn.question))
+        st.caption(answers.escaped(_asked(turn)))
     with st.chat_message("assistant", avatar=":material/smart_toy:"):
         if turn.answer is None:
             components.tagged(
                 ("No answer", ":material/error:", "red"),
-                _escaped(turn.error or "Nothing came back."),
+                answers.escaped(turn.error or "Nothing came back."),
             )
-            return
-        answer = turn.answer
-        word, icon, color, meaning = OUTCOMES[answer.outcome]
-        with st.container(horizontal=True, gap="small"):
-            st.badge(word, icon=icon, color=color, help=meaning)
-            kinds = sorted(
-                {kind for result in answer.results if result.usable for kind in result.kinds}
-                & set(components.PROVENANCE)
+        else:
+
+            def choose(option: NameCandidate) -> None:
+                again = api.Question.again(turn)
+                _start(replace(again, resolved=(*again.resolved, option)), turn.workspace_id)
+
+            answers.draw(
+                turn.answer,
+                key=key,
+                steps=turn.steps,
+                seconds=turn.seconds,
+                can_ask=can_ask,
+                choose=choose,
+                workspace_id=turn.workspace_id,
+                records=records,
+                roster_names=names,
             )
-            components.provenance(kinds)
-        st.markdown(_prose(answer.text))
-        if answer.outcome is Outcome.CLARIFY:
-            _options(number, turn, can_ask=can_ask)
-        for note in answer.warnings:
-            components.tagged(("Note", ":material/info:", "gray"), _escaped(note))
-        _proposals(number, answer)
-        _results(number, answer)
-        _evidence(answer)
-        _workings(turn)
+        if turn.turn_id is not None:
+            _turn_actions(turn, research, key=key, can_ask=can_ask, stamp=stamp)
 
 
-def _asked_about(question: api.Question) -> str:
-    phase = state.PHASES.get(question.season_type, question.season_type)
-    return f"{MODES[question.mode.value]} · sidebar: {question.season} {phase.lower()}"
+def _turn_actions(
+    turn: SavedTurn,
+    research: WorkspaceService,
+    *,
+    key: str,
+    can_ask: bool,
+    stamp: tuple[int | None, str | None],
+) -> None:
+    changed = research.changed_since(turn, stamp=stamp)
+    with st.container(horizontal=True, gap="small", vertical_alignment="center"):
+        if turn.answer is not None:
+            with st.popover("Save as finding", icon=":material/bookmark_add:"):
+                sent = _sent(f"finding_{key}")
+                title = st.text_input(
+                    "Title",
+                    value=turn.question[:TITLE_LENGTH],
+                    max_chars=TITLE_LENGTH,
+                    key=f"ai_find_title_{key}_{sent}",
+                )
+                note = st.text_area("Note (optional)", key=f"ai_find_note_{key}_{sent}")
+                if st.button("Save finding", key=f"ai_find_save_{key}", type="primary"):
+                    try:
+                        research.save_finding(turn, title, note or None)
+                    except WorkspaceError as error:
+                        st.error(str(error), icon=":material/error:")
+                    else:
+                        _after(f"Saved “{title.strip()}” to the findings.", sent=f"finding_{key}")
+        if changed and st.button(
+            "Ask again with today's data",
+            key=f"ai_again_{key}",
+            icon=":material/refresh:",
+            disabled=not can_ask,
+            help="Asks the same question again; this answer stays as it was.",
+        ):
+            _start(api.Question.again(turn), turn.workspace_id)
+    if changed:
+        st.caption(answers.escaped(" ".join(changed)))
 
 
-def _options(number: int, turn: api.Turn, *, can_ask: bool) -> None:
-    assert turn.answer is not None
-    st.caption("Choose the one you mean, and the question is asked again with it.")
-    with st.container(horizontal=True, gap="small"):
-        for position, option in enumerate(turn.answer.options):
-            if st.button(
-                option.name,
-                key=f"ai_option_{number}_{position}",
-                disabled=not can_ask,
-                help=_option_help(option),
-            ):
-                _start(replace(turn.question, resolved=(*turn.question.resolved, option)))
-
-
-def _option_help(option: NameCandidate) -> str:
-    kind = {"player": "The player", "team": "The team", "season": "The season"}[option.kind]
-    return f'{kind} {option.name}, for "{option.text}".'
+def _asked(turn: SavedTurn) -> str:
+    """When and how a kept question was asked, and what it was about."""
+    focus = turn.focus
+    phase = state.PHASES.get(focus.season_type or "", focus.season_type or "")
+    parts = [MODES[turn.mode.value], f"{focus.season} {phase.lower()}".strip()]
+    if turn.asked_from != RESEARCH_PAGE:
+        parts.append(
+            f"asked from {turn.asked_from}" + (f" about {turn.about}" if turn.about else "")
+        )
+    parts.append(formats.moment(turn.asked_at))
+    return " · ".join(part for part in parts if part)
 
 
 @st.fragment(run_every=PROGRESS_SECONDS)
@@ -352,8 +720,11 @@ def _progress() -> None:
     if job.done:
         st.rerun()  # the whole page, which takes the finished answer in
     with st.chat_message("user", avatar=":material/person:"):
-        st.markdown(_prose(job.question.text))
-        st.caption(_asked_about(job.question))
+        st.markdown(answers.prose(job.question.text))
+        where = ""
+        if st.session_state.get(WORKSPACE) != job.workspace_id:
+            where = " · in another workspace"
+        st.caption(answers.escaped(f"{MODES[job.question.mode.value]}{where}"))
     with st.chat_message("assistant", avatar=":material/smart_toy:"):
         mode = MODES[job.question.mode.value]
         with st.status(f"{mode} answer under way: {job.seconds:.0f} s", expanded=True):
@@ -361,7 +732,7 @@ def _progress() -> None:
             if not steps:
                 st.caption("Reading the question...")
             for step in steps:
-                st.markdown(_step_line(step))
+                st.markdown(answers.step_line(step))
         if job.stopping:
             st.caption("Stopping at the next step; what was gathered by then is kept.")
         elif st.button(
@@ -373,402 +744,3 @@ def _progress() -> None:
         ):
             job.stop()
             st.rerun(scope="fragment")
-
-
-def _step_line(step: Step) -> str:
-    took = f" ({step.seconds:.1f} s)" if step.seconds >= 0.1 else ""
-    return f"{STEPS.get(step.kind, ':material/circle:')} {_escaped(_step_words(step))}{took}"
-
-
-def _step_words(step: Step) -> str:
-    if step.kind == "model":
-        return (
-            "The model wrote the answer"
-            if step.detail == "answered"
-            else f"The model {step.detail}"
-        )
-    if step.kind == "tool":
-        return f"Ran {step.detail}"
-    if step.kind == "repair":
-        return f"Sent back to the model: {step.detail}"
-    if step.kind == "check":
-        return f"Checked: {step.detail}"
-    return step.detail
-
-
-# --- roster proposals ---------------------------------------------------------------------------
-
-
-def _proposals(number: int, answer: Answer) -> None:
-    """The rosters the optimizer proposed, each with what it rests on and a button to save
-    it: the user's click, never the model's (A5)."""
-    found = [result for result in answer.results if result.usable and result.proposals]
-    if not found:
-        return
-    st.markdown("**Rosters to review**")
-    st.caption(PROPOSALS)
-    for result in found:
-        if len(found) > 1:  # each run labels its own options from A
-            st.caption(f"From {result.result_id}: {_escaped(result.title)}")
-        first = result.proposals[0]
-        for position, proposal in enumerate(result.proposals):
-            _proposal(proposal, first, key=f"{number}_{result.result_id}_{position}")
-
-
-def _proposal(proposal: RosterProposal, first: RosterProposal, *, key: str) -> None:
-    with st.container(border=True):
-        st.markdown(f"**{_escaped(proposal.label)}** · {proposal.payroll_season}")
-        components.figures(
-            [
-                Figure(
-                    "Payroll",
-                    formats.money_compact(proposal.payroll),
-                    f"budget {formats.money_compact(proposal.budget)}",
-                    help=f"{proposal.budget_label}: the line the payroll may not go over.",
-                ),
-                Figure(
-                    "Left to spend",
-                    formats.money_compact(proposal.room),
-                    "under the budget",
-                ),
-                Figure(
-                    "Projected net rating",
-                    f"{proposal.rating:+.1f}",
-                    None if proposal.error is None else f"give or take {proposal.error:.1f}",
-                    help=RATING_HELP,
-                ),
-            ]
-        )
-        if proposal is not first:
-            st.caption(
-                f"Compared with {_escaped(first.label)}: in {_listed(proposal.added)}; "
-                f"out {_listed(proposal.removed)}."
-            )
-        st.caption(_basis(proposal))
-        players = pd.DataFrame([player.model_dump() for player in proposal.players])
-        players["slot"] = players["slot"].map(_slot)
-        shown = players[[*PROPOSAL_COLUMNS, *PROPOSAL_METRICS]]
-        catalog = METRIC_CATALOGS["Player value"]
-        st.dataframe(
-            formats.styled(shown, catalog, {"salary": formats.money}),
-            hide_index=True,
-            placeholder=components.EMPTY_CELL,
-            height=components.table_height(len(shown)),
-            row_height=components.ROW,
-            column_config={
-                **PROPOSAL_COLUMNS,
-                **components.metric_columns(catalog, PROPOSAL_METRICS),
-            },
-            key=f"ai_proposal_table_{key}",
-        )
-        with st.popover("Save approved roster", icon=":material/save:"):
-            st.caption(SAVE_HELP)
-            name = st.text_input(
-                "Roster name",
-                value=f"AI Research {proposal.label}, {proposal.payroll_season}",
-                max_chars=80,
-                key=f"ai_proposal_name_{key}",
-            )
-            if st.button("Save approved roster", key=f"ai_proposal_save_{key}", type="primary"):
-                st.session_state.setdefault(SAVES, {})[proposal.fingerprint] = api.save_proposal(
-                    proposal, name
-                )
-        _saved(st.session_state.get(SAVES, {}).get(proposal.fingerprint))
-
-
-def _saved(saved: ProposalSaved | None) -> None:
-    if saved is None:
-        return
-    if saved.created:
-        st.success(
-            f"Saved as “{_escaped(str(saved.name))}”. The Team Builder has it.",
-            icon=":material/check_circle:",
-        )
-    elif saved.saved:
-        st.info(
-            f"Already saved as “{_escaped(str(saved.name))}”. It was not saved a second time.",
-            icon=":material/info:",
-        )
-    else:
-        st.warning(
-            "Not saved. "
-            + " ".join(_escaped(reason) for reason in saved.refused)
-            + " Ask the question again for rosters made from the lab as it is now.",
-            icon=":material/warning:",
-        )
-
-
-def _basis(proposal: RosterProposal) -> str:
-    basis = proposal.basis
-    asked = "; ".join(proposal.requirements)
-    contract = (
-        f"your contract file as of {formats.day(basis.contract_as_of)}"
-        if basis.contract_as_of is not None
-        else "your contract file"
-    )
-    model = f"the player value model ({basis.value_model})" if basis.value_model else "no model"
-    build = f", data build {basis.build_id}" if basis.build_id is not None else ""
-    return _escaped(f"Asked for: {asked}. Salaries from {contract}; forecasts from {model}{build}.")
-
-
-def _slot(slot: str) -> str:
-    return "Bench" if slot == BENCH else f"Starts at {slot}"
-
-
-def _listed(names: tuple[str, ...]) -> str:
-    if not names:
-        return "nobody"
-    escaped = [_escaped(name) for name in names]
-    if len(escaped) == 1:
-        return escaped[0]
-    return ", ".join(escaped[:-1]) + " and " + escaped[-1]
-
-
-# --- what an answer rests on --------------------------------------------------------------------
-
-
-def _results(number: int, answer: Answer) -> None:
-    shown = [result for result in answer.results if _has_rows(result)]
-    if not shown:
-        return
-    st.markdown("**Where this answer comes from**")
-    tabs = st.tabs([_tab_label(result) for result in shown])
-    for tab, result in zip(tabs, shown, strict=True):
-        with tab:
-            if len(result.title) > TAB_LABEL:  # the tab could not say it in full
-                st.caption(_escaped(result.title))
-            for position, chart in enumerate(result.charts):
-                _chart(chart, key=f"ai_chart_{number}_{result.result_id}_{position}")
-            if result.table is not None and not result.table.empty:
-                _rows(result.table, key=f"ai_table_{number}_{result.result_id}")
-                components.export(
-                    result.table,
-                    f"{result.tool}_{result.result_id}",
-                    key=f"ai_csv_{number}_{result.result_id}",
-                    label="Rows (CSV)",
-                )
-
-
-def _rows(table: pd.DataFrame, *, key: str) -> None:
-    """A result's rows as the workbench writes them: a metric under its label and in its
-    format, any other column in words, the lab's internal ids left to the CSV."""
-    shown = table[[column for column in table.columns if not str(column).endswith("_id")]]
-    shown = shown.reset_index(drop=True)
-    specs = {
-        column: spec
-        for column in shown.columns
-        if (spec := _spec(str(column))) is not None
-        and pd.api.types.is_numeric_dtype(shown[column])
-        and not pd.api.types.is_bool_dtype(shown[column])
-    }
-    headings = {
-        column: st.column_config.Column(
-            specs[column].label if column in specs else _words(str(column)),
-            help=f"{specs[column].name}. {specs[column].description}" if column in specs else None,
-        )
-        for column in shown.columns
-    }
-    plain = {
-        column: _plain
-        for column in shown.columns
-        if column not in specs
-        and pd.api.types.is_numeric_dtype(shown[column])
-        and not pd.api.types.is_bool_dtype(shown[column])
-    }
-    styled = shown.style.format(
-        {**plain, **{column: spec.format_value for column, spec in specs.items()}},
-        na_rep=components.EMPTY_CELL,
-    )
-    st.dataframe(
-        styled,
-        hide_index=True,
-        column_config=headings,
-        placeholder=components.EMPTY_CELL,
-        key=key,
-    )
-
-
-def _plain(value: object) -> str:
-    """A figure no catalog describes, without a tail of zeros: 5, 0.793, 114.9."""
-    if formats.is_missing(value):
-        return components.EMPTY_CELL
-    number = float(value)  # type: ignore[arg-type]
-    if number.is_integer():
-        return f"{number:,.0f}"
-    return f"{number:,.3f}".rstrip("0").rstrip(".")
-
-
-def _words(column: str) -> str:
-    text = column.replace("_", " ").strip()
-    return text[:1].upper() + text[1:]
-
-
-def _has_rows(result: ToolResult) -> bool:
-    if result.status not in (ResultStatus.OK, ResultStatus.EMPTY):
-        return False
-    return bool(result.charts) or (result.table is not None and not result.table.empty)
-
-
-def _tab_label(result: ToolResult) -> str:
-    title = result.title
-    short = title if len(title) <= TAB_LABEL else title[: TAB_LABEL - 1].rstrip() + "…"
-    return f"{result.result_id} · {short}"
-
-
-def _chart(chart: Chart, *, key: str) -> None:
-    spec = _spec(chart.metric)
-    tickformat = chart.tickformat or (formats.tickformat(spec) if spec is not None else "")
-    title = ("≈ " if chart.estimate else "") + chart.title
-    st.markdown(f"**{_escaped(title)}**")
-    try:
-        figure = _figure(chart, components.colors(), tickformat)
-    except ValueError as reason:  # a house rule it would break: too many series to tell apart
-        st.caption(f"Not drawn: {_escaped(str(reason))}. Every figure is in the rows below.")
-        return
-    components.chart(figure, chart.frame, key=key, filename=_filename(chart.title))
-
-
-def _figure(chart: Chart, palette: Palette, tickformat: str) -> go.Figure:
-    frame = chart.frame
-    if chart.kind == "line":
-        return charts.line(
-            frame,
-            x=chart.x,
-            y=chart.y,
-            text=chart.text,
-            palette=palette,
-            y_title=chart.y_title,
-            tickformat=tickformat,
-            reference=chart.reference,
-            reference_label=chart.reference_label,
-            categorical_x=True,
-        )
-    if chart.kind == "bars":
-        return charts.diverging_bars(
-            frame,
-            value=chart.y,
-            label=chart.x,
-            text=chart.text,
-            palette=palette,
-            value_title=chart.y_title,
-            tickformat=tickformat,
-        )
-    if chart.kind == "intervals":
-        assert chart.low is not None and chart.high is not None
-        return charts.interval_rows(
-            frame,
-            label=chart.x,
-            value=chart.y,
-            low=chart.low,
-            high=chart.high,
-            text=chart.text,
-            palette=palette,
-            value_title=chart.y_title,
-            tickformat=tickformat,
-            reference=chart.reference,
-            reference_label=chart.reference_label,
-            axis_range=chart.y_range,
-        )
-    if chart.kind == "percentiles":
-        # A tool names the axis when higher is not better - a roster's fit measures (A4).
-        titled = {"axis_title": chart.y_title} if chart.y_title else {}
-        return charts.percentile_bars(
-            frame, percentile=chart.y, label=chart.x, text=chart.text, palette=palette, **titled
-        )
-    assert chart.who is not None
-    if chart.y_range is None:
-        return charts.comparison_dots(
-            frame,
-            metric=chart.x,
-            who=chart.who,
-            percentile=chart.y,
-            text=chart.text,
-            palette=palette,
-        )
-    # Not a percentile but a share with natural ends - a chance before and after a change.
-    low, high = chart.y_range
-    margin = (high - low) * 0.02
-    return charts.comparison_dots(
-        frame,
-        metric=chart.x,
-        who=chart.who,
-        percentile=chart.y,
-        text=chart.text,
-        palette=palette,
-        axis_title=chart.y_title,
-        axis_range=(low - margin, high + margin),
-        tickvals=None,
-        tickformat=tickformat,
-        reference=chart.reference,
-    )
-
-
-def _spec(metric: str | None) -> MetricSpec | None:
-    if metric is None:
-        return None
-    return next(
-        (catalog[metric] for catalog in METRIC_CATALOGS.values() if metric in catalog), None
-    )
-
-
-def _filename(title: str) -> str:
-    return re.sub(r"[^0-9a-z]+", "_", title.lower()).strip("_")[:60] or "chart"
-
-
-def _evidence(answer: Answer) -> None:
-    items = answer.evidence
-    if not items:
-        return
-    label = f"Evidence: {len(items)} source{'s' if len(items) != 1 else ''}"
-    with st.expander(label, icon=":material/fact_check:"):
-        for item in items:
-            st.markdown(_evidence_line(item))
-
-
-def _evidence_line(item: Evidence) -> str:
-    parts = [f"**{EVIDENCE[item.kind]}**", _escaped(item.label)]
-    if item.location:
-        location = item.location
-        is_link = location.startswith(("http://", "https://")) and not re.search(
-            r"[\s<>]", location
-        )
-        parts.append(f"<{location}>" if is_link else f"`{location.replace('`', '')}`")
-    dates = []
-    if item.published_at is not None:
-        dates.append(f"published {formats.moment(item.published_at)}")
-    if item.effective_at is not None:
-        dates.append(f"dated {formats.day(item.effective_at)}")
-    if item.retrieved_at is not None:
-        dates.append(f"fetched {formats.moment(item.retrieved_at)}")
-    if dates:
-        parts.append(", ".join(dates))
-    return " · ".join(parts)
-
-
-def _workings(turn: api.Turn) -> None:
-    answer = turn.answer
-    assert answer is not None
-    with st.expander("How it was answered", icon=":material/route:"):
-        for step in turn.steps or answer.steps:
-            st.markdown(_step_line(step))
-        made = f"Model {answer.model}" if answer.model else "No model was asked"
-        st.caption(f"{made} · rules {answer.policy} · {turn.seconds:.1f} s")
-        if answer.removed:
-            st.caption(
-                "Figures taken out because no result holds them: "
-                + _escaped(", ".join(answer.removed))
-            )
-
-
-# --- text from outside the lab -------------------------------------------------------------------
-
-
-def _prose(text: str) -> str:
-    """The model's or the user's words as markdown that shows what they say: a dollar sign
-    is a dollar sign rather than the start of a formula, and an image is not fetched."""
-    return IMAGE.sub("(image left out)", text).replace("$", "\\$")
-
-
-def _escaped(text: str) -> str:
-    """Text shown exactly as written: a page's title, a source's name, a step."""
-    return SPECIAL.sub(r"\\\1", text)

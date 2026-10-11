@@ -3,6 +3,138 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone A6 - AI Research Assistant: workspaces and asking from any page (2026-10-10)
+
+The research is kept. Named workspaces, in a file of their own that no build touches, hold
+every question and its whole answer, findings, notes, and the rosters an answer proposed
+until the user saves or declines each; eight pages can ask about what they show. No league
+table, model file or setting changed: nothing was fitted or rebuilt.
+
+**Built**
+
+- **The research store** (`storage/research.py`, its contracts in
+  `domain/tables/research.py`): `data/assistant/assistant.sqlite`, with six tables -
+  workspaces, turns, findings, proposals, approvals and the version log. It is versioned: a
+  new file is made at the latest version; an older one is copied to `backups/` with
+  SQLite's own backup and brought forward in one transaction; a file from a later lab, or
+  one that is not this store, is refused and left alone. Ids are never handed out twice
+  (`build_tables(never_reuse_ids=True)`), and the store opens its connections as the lab's
+  database does (`configure_connections`, taken out of `Database`).
+- **The answer as data** (`domain/research.py`): a turn keeps its whole answer as JSON -
+  the results with their rows and charts, the evidence, the notes and the steps - so an
+  old answer is drawn exactly as it came.
+- **The service** (`services/workspaces.py`, `Lab.workspaces`): workspaces made, renamed,
+  described, focused, archived, restored, cleared and deleted; a new conversation; a turn
+  recorded with the rosters it proposed; what a follow-up reads (the last three answered
+  turns of the conversation under way, in its own workspace); what has changed since an
+  answer, in sentences - the data build, the value model, and current information or the
+  web once the lab would fetch them again; findings; proposals saved or declined, every
+  press logged; export as a document and as data.
+- **The facade** (`assistant/api.py`): a question runs in a workspace and is kept whether
+  it was answered, stopped or never answered; `Question.again`; `summarize`, which has the
+  local model write the conversation under way into the notes, marked as its summary, and
+  starts a new conversation; the proposal save and decline name their workspace. The
+  context carries the workspace's focus, a roster in focus and the notes.
+- **The policy and the orchestrator**: the notes reach the system prompt after the
+  context, under a heading that says they are background, and outside what the answer
+  checker reads; a roster in focus is named. A "he", "she" or "they" with nothing to mean
+  is asked about before the model is (`_nobody_named`). The rules are A4's, `2026-10-10.3`.
+- **The page** (`views/research.py`, with the drawing of an answer moved to
+  `wb/answers.py`): the workspace bar - the choice of workspace, *New workspace*,
+  *Workspace* (name, goal, focus, notes, *Summarize into the notes*), *Export*, *Archive or
+  delete* (clearing and deleting each need a ticked box); *Findings* and *Proposed rosters*;
+  the turns kept, earlier conversations behind a switch; under an answer *Save as finding*
+  and, when something it read has changed, *Ask again with today's data*.
+- **Ask AI about this** (`wb/ask.py`) on the player, value, team, benchmark, Team Builder,
+  roster fit, postseason and simulator pages: a dialog that says what the question is
+  about, asks it in the workspace open on AI Research without touching the sidebar, shares
+  the one running question with that page, and links to the full answer.
+- **Positions** (`domain/lineup.py`), the user's wish at the A5 review: every save - the
+  Roster Optimizer's, a proposal's, the Scenario Simulator's - starts players from the nine
+  who play the most, each at a position they are listed at where the roster allows.
+- **Tests**: the store (made, opened again, every field kept, names unique whatever the
+  case, deletes that reach everything a workspace holds, an id never reused, an older file
+  backed up and brought forward, a failed step leaving the file as it was, a later or
+  foreign file refused); the answer as data; the service (a follow-up that reads its own
+  workspace only, what changed since an answer, findings that outlast a cleared history,
+  research that outlasts a build, proposals waiting until saved or declined, a refused save
+  logged, export); the facade (a question kept when answered, stopped or without Ollama,
+  follow-ups across two workspaces, notes that are not evidence, a summary); the pronoun
+  rule both ways; the lineup; and the page and the dialog with a scripted model.
+
+**Decided** (decision 0018, "Settled while building A6"): six tables where the roadmap
+sketched nine, a turn keeping its answer whole; a workspace made the first time one is
+needed, under a free name; notes as background, never evidence; an old answer never
+rewritten, asked again beside itself; proposals kept until saved or declined, every press
+logged; a dialog body drawn as a plain function so a test can draw it.
+
+**The evaluation** - one run, 47 of 59 ([AI_EVALUATION.md](AI_EVALUATION.md)). The model
+reads A5's prompts word for word, since the cases set no roster in focus and no notes; the
+twelve that fail all failed in A5's runs, and B01, the difference from A5's last run,
+passed in three of A5's eight. The pronoun rule asked about no case it should not have. The
+run was made before the last changes below, which touch the page and the service, not what
+the model reads.
+
+**The browser pass** - the workbench over a scratch copy of the real project, with the
+real model, clicked through with Playwright in the light and the dark theme: a workspace
+made and its form empty again; a question and a follow-up; a finding saved, its form empty
+again; notes saved, a summary written into them, the notes box showing both, and a later
+save keeping them; a new conversation begun by the summary; three rosters proposed, kept in
+the workspace and one declined; the workspace downloaded as a document and as data;
+another workspace showing nothing of the first, its history cleared and the box unticked
+again; *Ask AI about this* from Team Explorer with the Celtics chosen, answered in the
+dialog, the sidebar unchanged, the answer opened in AI Research with where it was asked;
+the dialog opened again, empty; and a proposal saved from the workspace's list, its five
+starters at positions they are listed at (two guards, two G-F forwards, a center). Each
+theme passed all 21 checks in the end. It found three faults, each fixed:
+
+- **Forms kept what was typed.** The page cleared a form by forgetting its keys, and the
+  browser went on showing - and sending back - what had been typed: after *Summarize into
+  the notes* the notes box still showed the notes before the summary, and the next *Save
+  changes* would have written them back over it. A first fix, starting each widget through
+  the session state, failed in its turn: the settings form came back with an empty name, so
+  *Save changes* was refused, and its lists read "Choose an option". The forms now give
+  their widgets the stored values and end their keys with what they show or with how many
+  times they were sent, so a form starts again as new widgets. A page test now covers a
+  summary and a later save; `AppTest` could not have seen the fault, and CLAUDE.md now has
+  the rule.
+- **AI Research came up blank after *Open in AI Research*,** in each of three full passes,
+  though never in a shorter probe: the button switched pages from a fragment that reruns
+  itself each second. It is now a link to the page, and the full pass then opened the
+  answer each time.
+- **A saved proposal still counted as waiting** in the workspace's list until the next
+  click. The page now draws itself again after a save, as after a decline.
+
+Writing this entry also found one gap: *Ask again with today's data* was offered only when
+the data build or the value model had changed, so an answer that read the injury report or
+the web never offered it. It now does once a question would fetch the soonest current
+source again (`configs/assistant.yaml`), and says so.
+
+What the model wrote is unchanged from A5, and one slip showed again: "54 wins, placing
+them 7th in the Eastern Conference", where the result's 7th is the league's. A place is
+checked as a place, not for what it ranks.
+
+**The user's decisions at the A6 review (2026-10-10)**:
+
+- Starters should be chosen by projected impact and role, not by projected minutes - in
+  Option B of the browser pass Shai Gilgeous-Alexander and Victor Wembanyama came off the
+  bench for players projected to play more. The Team Builder still moves anyone. To be
+  done with A7.
+- A place in an answer should be checked for what it ranks: the whole league, or one
+  conference. To be done with A7.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Pass |
+| `pytest -n auto` (everything but live-network and live-model tests) | 3,748 passed in about 4 min. One earlier run of the workbench tests stalled in a test it never named; it was stopped, and the runs since - the workbench tests and the whole suite, each with a stack dump set for any test over a few minutes - finished without one |
+| `pytest -m ollama` (the live model) | 6 passed |
+| The end-to-end evaluation, on the A6 prompts | 47/59, one run; report generated |
+| The page in a browser | Clicked through as above, light and dark, over a copy of the real project; 21 checks each; no error box or exception; three faults found and fixed |
+| UI boundaries | The pages import `front_office.assistant.api` alone of the assistant; the boundary tests pass |
+| Data and models | No model file, setting or league table changed; the browser pass wrote only into a scratch copy; the research store is `data/assistant/assistant.sqlite`, which is not committed |
+
 ## Milestone A5 - AI Research Assistant: roster proposals and the approved save (2026-10-10)
 
 The assistant proposes rosters, and only the user saves one. No league table, model file

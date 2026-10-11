@@ -24,6 +24,17 @@ PENDING = "pending_selection"
 CLICKS = "table_clicks"
 CURRENT = "filters"
 
+# The AI assistant's session (A6): shared by the AI Research page and the Ask AI about this
+# dialog on every other page, so that one question runs at a time and both show it.
+AI_JOB = "ai_job"
+"""The question under way, an ``api.Job``, wherever it was asked."""
+AI_WORKSPACE = "ai_workspace"
+"""The workspace open on the AI Research page: the workspace box's key."""
+AI_PARKED = "ai_workspace_parked"
+"""A workspace to open at the top of the next run, before the box is drawn."""
+AI_UNKEPT = "ai_unkept"
+"""Answers that could not be kept in their workspace: shown for the session."""
+
 PHASES = {SeasonType.REGULAR.value: "Regular season", SeasonType.PLAYOFFS.value: "Playoffs"}
 FULL_SEASON = "Full season"
 DATE_RANGE = "Date range"

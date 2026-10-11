@@ -389,8 +389,14 @@ the AI Research page:  apps/workbench/wb/views/research.py -> front_office.assis
              (status; start -> a Job: a thread with its own Lab, its steps readable, a
              stop; history; refresh_current) -> each answer drawn with the workbench's
              own components and charts
-an approved proposal:  the user's click -> assistant.api.save_proposal -> ProposalService.save
-             (nothing it rests on changed, not saved before) -> one transaction
+an approved proposal:  the user's click -> assistant.api.save_proposal -> WorkspaceService
+             .save_proposal -> ProposalService.save (nothing it rests on changed, not saved
+             before) -> one transaction; the press logged in the workspace
+the user's research:  assistant.api.Job (a question in a workspace) -> WorkspaceService
+             (services.workspaces: history, notes, record) -> storage.research
+             -> data/assistant/assistant.sqlite (versioned, backed up, no build touches it)
+Ask AI about this:  a page -> wb.ask (the page's season, team, player, roster) -> api.start
+             in the open workspace; wb.answers draws an answer on either page
 scripts/benchmark_ollama.py:  each candidate model's first move -> ASSISTANT_MODELS.md
 scripts/evaluate_answers.py:  whole answers on the test databases, in a recorded world
              -> assistant.evaluation.score_answer -> docs/research/ASSISTANT_ANSWERS.md
@@ -460,6 +466,19 @@ reaches `assistant.api.save_proposal`; `ProposalService.save` finds an earlier s
 fingerprint in a roster's notes, refuses one whose build, value model, contract file or
 salaries have changed, and otherwise writes the roster and its players in one
 transaction (`RosterRepository.create_with_players`).
+
+From A6 the research is kept. `data/assistant/assistant.sqlite` is a third file beside the
+lab's database and the current cache (`storage/research.py`, contracts in
+`domain/tables/research.py`, the shapes and the answer codec in `domain/research.py`): a
+build never touches it, it carries a version log, and an older file is backed up before it
+is brought forward. `services/workspaces.py` keeps workspaces, the turns asked in them with
+their whole answers, findings, proposals waiting for a decision, and every save or decline.
+A question runs in a workspace (`api.start(question, workspace_id)`): the job reads that
+workspace's conversation under way and its notes - which reach the model's prompt but not
+the answer checker - and keeps the turn when done, answered or not. The workbench reaches
+the workspaces as it reaches any service (`data.research()`, never cached); the AI Research
+page draws them, and `wb/ask.py` asks from any other page about what that page shows. Every
+roster save places its starters with `domain/lineup.py`.
 See [AI_ASSISTANT_SPEC.md](AI_ASSISTANT_SPEC.md) and [AI_EVALUATION.md](AI_EVALUATION.md).
 
 ## Conventions

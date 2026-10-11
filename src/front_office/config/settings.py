@@ -128,6 +128,12 @@ class Settings(_Section):
         return self.data_dir / "current.sqlite"
 
     @property
+    def research_path(self) -> Path:
+        """The user's research with the assistant: workspaces, questions and answers,
+        findings and proposals (decision 0018, A6). No build touches it."""
+        return self.data_dir / "assistant" / "assistant.sqlite"
+
+    @property
     def history_start(self) -> Season:
         return Season.parse(self.seasons.history_start)
 

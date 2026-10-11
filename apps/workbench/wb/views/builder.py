@@ -13,7 +13,7 @@ from front_office.domain.cap_rules import PayrollLine
 from front_office.domain.metrics import MetricCatalog
 from front_office.domain.tables.rosters import ROSTER_SLOTS
 from front_office.services import RosterError, RosterNotFound, RosterSummary
-from wb import charts, components, data, formats, state
+from wb import ask, charts, components, data, formats, state
 from wb.components import ASSUMPTION, DERIVED, EMPTY_CELL, MEASURED, Figure
 from wb.state import Filters
 
@@ -55,6 +55,11 @@ def render() -> None:
         st.session_state.pop(SELECTED, None)
         st.rerun()
     roster = summary.roster
+    ask.button(
+        ask.from_filters(
+            "Team Builder", filters, roster_id=roster_id, roster_name=str(roster["name"])
+        )
+    )
     st.caption(
         f"Players are described by their {roster['stats_season']} regular season and priced "
         f"against the {roster['payroll_season']} cap. Both are your choice: change them under "

@@ -118,6 +118,25 @@ OFFER = re.compile(
 """Offering to look something up instead of doing it. Before anything is called, in a reply
 that declines nothing, it is held to like a promise (A5: M01 described the optimizer from
 memory and offered to look it up in the lab's documents)."""
+SOMEONE = re.compile(r"\b(?:he|him|his|himself|she|her|hers|herself)\b", re.IGNORECASE)
+SOME_THEY = re.compile(r"\b(?:they|them|their|theirs|themselves)\b", re.IGNORECASE)
+MANY = re.compile(
+    r"\b(?:teams|players|rosters|champions|clubs|franchises|contenders|guards|forwards|"
+    r"centers|wings|bigs|starters|stars|both|everyone|people|anyone|those|these)\b",
+    re.IGNORECASE,
+)
+"""Plural words a "they" may stand for in the question itself - "do teams win more when
+they..." - so that it asks about nobody in particular."""
+ASKS_WHO = re.compile(r"\b(?:who|whom|whose|which)\b", re.IGNORECASE)
+"""A question that asks who has a subject of its own for a pronoun to mean: "Who won the
+2025-26 championship, and whom did they beat?" (H03)."""
+WHO_IS_MEANT = (
+    'Who do you mean by "{word}"? Name the player or the team in your question, or choose '
+    "one in the sidebar."
+)
+"""Asked of a follow-up with nothing to follow (A6): a "he" or "they" in a workspace's first
+question, with no name in it and no team, player or roster in focus. Guessing would read one
+workspace's subject into another's."""
 GO_AHEAD = "Go ahead: call the tool now, then answer from its result."
 NO_SUCH_RESULT = (
     "That cites a result no tool has returned in this answer. Call the tool that gives it, "
@@ -180,6 +199,18 @@ class Assistant:
                 text,
                 Outcome.CLARIFY,
                 options=unclear.names(),
+                steps=tuple(steps),
+                policy=POLICY_VERSION,
+                seconds=self._clock() - started,
+            )
+        word = _nobody_named(question, mentions, context, history)
+        if word is not None:
+            text = WHO_IS_MEANT.format(word=word)
+            record(Step("clarify", text))
+            return Answer(
+                question,
+                text,
+                Outcome.CLARIFY,
                 steps=tuple(steps),
                 policy=POLICY_VERSION,
                 seconds=self._clock() - started,
@@ -400,6 +431,32 @@ def for_model(result: ToolResult) -> str:
     if sources:
         lines.append(f"Source: {sources}")
     return "\n".join(lines)
+
+
+def _nobody_named(
+    question: str,
+    mentions: Sequence[Mention],
+    context: Context,
+    history: Sequence[Message],
+) -> str | None:
+    """The pronoun a question leans on with nothing for it to mean, if any: no player or
+    team named in it, none chosen, no earlier turn to follow."""
+    if history or context.resolved:
+        return None
+    if (
+        context.team_id is not None
+        or context.player_id is not None
+        or context.roster_id is not None
+    ):
+        return None
+    if any(mention.candidates[0].kind in ("player", "team") for mention in mentions):
+        return None
+    if ASKS_WHO.search(question):
+        return None
+    found = SOMEONE.search(question)
+    if found is None and not MANY.search(question):
+        found = SOME_THEY.search(question)
+    return None if found is None else found.group(0)
 
 
 def _settled(mentions: Sequence[Mention], resolved: Sequence[NameCandidate]) -> tuple[Mention, ...]:

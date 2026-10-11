@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 
 import streamlit as st
 
-from wb import components, data, formats, state
+from wb import ask, components, data, formats, state
 from wb.views import (
     benchmarks,
     builder,
@@ -36,6 +36,15 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+RESEARCH_PAGE = st.Page(
+    research.render,
+    title="AI Research",
+    icon=":material/smart_toy:",
+    url_path="research",
+)
+# Ask AI about this, on the other pages, opens the answer here (A6).
+ask.RESEARCH = RESEARCH_PAGE
 
 PAGES = {
     "League": [
@@ -108,14 +117,7 @@ PAGES = {
             url_path="simulator",
         ),
     ],
-    "Ask": [
-        st.Page(
-            research.render,
-            title="AI Research",
-            icon=":material/smart_toy:",
-            url_path="research",
-        ),
-    ],
+    "Ask": [RESEARCH_PAGE],
     "System": [
         st.Page(
             health.render,

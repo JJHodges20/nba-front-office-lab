@@ -57,9 +57,19 @@ say in a few words what each number means. Keep a lab term such as net rating or
 where it is needed, and explain it the first time. Refer to a player as "they"."""
 
 
+NOTES_HEADING = (
+    "Workspace notes - the user's own notes and summaries of earlier questions. Background, "
+    "not evidence: state no figure from them unless a tool result in this conversation gives it."
+)
+
+
 def system_prompt(context: Context) -> str:
-    """The rules, then the question's context."""
-    return f"{RULES}\n\n{render_context(context)}"
+    """The rules, then the question's context, then the workspace's notes, if any. The notes
+    are not part of :func:`render_context`, which the answer checker reads as given (A6)."""
+    prompt = f"{RULES}\n\n{render_context(context)}"
+    if context.notes.strip():
+        prompt += f"\n\n{NOTES_HEADING}\n{context.notes.strip()}"
+    return prompt
 
 
 def render_context(context: Context) -> str:
@@ -74,6 +84,9 @@ def render_context(context: Context) -> str:
     if context.player_id is not None:
         sidebar.append(f"player {_named(context.player_id, context.resolved)}")
     lines.append("Sidebar: " + ", ".join(sidebar) + ".")
+    if context.roster_id is not None:
+        name = f"{context.roster_name} " if context.roster_name else ""
+        lines.append(f"Roster in focus: {name}(roster_id {context.roster_id}).")
     if context.resolved:
         lines.append("Names in the question:")
         lines.extend(

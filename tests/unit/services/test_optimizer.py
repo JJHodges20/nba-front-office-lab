@@ -16,6 +16,7 @@ import pytest
 
 from front_office.config import load_settings
 from front_office.domain.cap_rules import PayrollLine
+from front_office.domain.lineup import ROTATION
 from front_office.domain.optimizer import BudgetMode, OptimizerRequest
 from front_office.domain.tables.rosters import STARTING_SLOTS
 from front_office.modeling.optimizer import SALARY_TIE_BREAK
@@ -280,12 +281,12 @@ class TestSaving:
         assert set(members.index) == set(plan.players.index)
         starters = members[members["slot"].isin(STARTING_SLOTS)]
         assert len(starters) == 5 and starters["slot"].is_unique
-        top = plan.players.index[:5]
-        assert set(starters.index) == set(top)
-        pool = scratch.optimizer.pool()
-        for player, row in starters.iterrows():
-            if pool.at[player, "in_bigs"] and not pool.at[player, "in_guards"]:
-                assert row["slot"] in ("C", "PF")
+        # Placed as domain.lineup places them: starters from the rotation, each at a position
+        # they are listed at where the roster allows (the user's wish at the A5 review).
+        assert (
+            dict(scratch.optimizer.slots(plan.players.index.tolist())) == members["slot"].to_dict()
+        )
+        assert set(starters.index) <= set(plan.players.index[:ROTATION])
         summary = scratch.builder.summary(roster)
         assert summary.payroll_total == plan.solution.payroll
         assert summary.priced == len(members) and summary.assumed == 0 and summary.unpriced == 0

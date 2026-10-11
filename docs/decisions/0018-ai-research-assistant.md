@@ -358,3 +358,72 @@ the chart, and nothing fetched on opening the page - on 2026-10-10.
     correct figure from the tool result is $80,000 ... Here's the corrected version", as
     A2 had seen; every note now ends by asking for the answer as if for the first time,
     without mentioning the note or a correction.
+
+## Settled while building A6 (2026-10-10)
+
+- **The research store is a file of its own**, `data/assistant/assistant.sqlite`
+  (`storage/research.py`, its contracts in `domain/tables/research.py`), as this decision
+  set out: no build touches it, and a test keeps a workspace through `fol build`. It is
+  versioned. `research_schema` records each version applied; a new file is made at the
+  latest; an older one is first copied to `backups/` with SQLite's own backup and then
+  brought forward in one transaction, so a failed step leaves it as it was; a file made by
+  a later lab, or one that is not this store, is refused and left alone. An id is never
+  handed out twice, because a finding names the turn it came from and a cleared history
+  would otherwise give that id to a new turn.
+- **Six tables where the roadmap sketched nine**: workspaces, turns, findings, proposals,
+  approvals and the version log. A turn keeps its whole answer as JSON - the results, their
+  rows and charts, the evidence, the notes and the steps - so the page draws an old answer
+  exactly as it was; separate tables of tool runs and evidence would only be read to put
+  the turn together again. A conversation is a number on the workspace and on its turns.
+  The model benchmarks stay files in `data/assistant/benchmarks/`, as at A1.
+- **A workspace is made the first time one is needed**, named "My research" or the first
+  free variant: the control sweep archived the only workspace, and a new one of the same
+  name clashed with it.
+- **A follow-up reads its own workspace and nothing else**: the last three answered turns
+  of the conversation under way. *New conversation* starts afresh and keeps the history;
+  *Clear history* forgets the questions and answers and keeps the notes, findings and
+  proposals; *Delete* removes the workspace and all it holds, but never a roster saved from
+  it. Tests send questions in two workspaces and read what the model was given.
+- **Notes are background, never evidence.** A workspace's notes go into the system prompt
+  after the context, under a heading that says what they are; the answer checker does not
+  read them, so a figure taken from the notes alone is cut. At the user's request the
+  local model summarizes the conversation under way into the notes, marked as its summary,
+  and a new conversation begins that reads the notes instead.
+- **A workspace has a focus**: the season, phase, team and Team Builder roster its
+  questions are about when they name nothing, over the sidebar's. A roster in focus reaches
+  the model as "Roster in focus: name (roster_id N)".
+- **A pronoun with nothing to mean is asked about, not guessed.** "He", "she" or "they" in
+  a question that names no player or team, with none in focus and no earlier turn to follow,
+  gets "Who do you mean by...?" without the model. A question that asks who or which has a
+  subject of its own ("Who won the 2025-26 championship, and whom did they beat?" - H03
+  would otherwise have been asked), and "they" beside a plural ("do teams win more when
+  they...") means the plural. No frozen case is caught.
+- **An old answer is never rewritten.** A turn records the data build and the value model
+  revision it read; when either has changed the page says so in a sentence and offers *Ask
+  again with today's data*, which asks the same question as a new turn beside the old one.
+  Current information and the web change without a build, so an answer that read them
+  says when, and offers the same, once a question would fetch the soonest of the current
+  sources again (`configs/assistant.yaml`) - without knowing which source it read, which
+  the evidence does not record.
+- **Proposals have a place to be saved** - the user's condition at the A5 review. Every
+  roster an answer proposes is kept in its workspace, waiting until the user saves or
+  declines it, under the answer or in the workspace's list; a declined one can still be
+  saved. Every press is logged: saved, found saved already, refused with the reason, or
+  declined.
+- **Ask AI about this** sits on the player, value, team, benchmark, Team Builder, roster
+  fit, postseason and simulator pages. The dialog says what the question will be about -
+  the page's player, team, season and roster - and asks it in the workspace open on the AI
+  Research page. The page's choice travels with the question alone; the sidebar never
+  changes. The answer comes back in the dialog in short, and in full in the workspace, a
+  click away. One question runs at a time, and the dialog and the page show the same one.
+  The dialog's body is a plain function, so a test can draw it inline: in a browser a
+  dialog reruns alone, which the test runner cannot follow.
+- **Saved players keep their positions** - the user's wish at the A5 review.
+  `domain/lineup.py` chooses the starters from the nine who play the most, each at a
+  position they are listed at where the roster allows, then the most minutes; every save
+  uses it - the Roster Optimizer's, a proposal's and the Scenario Simulator's. A roster's
+  five guards no longer start with one at center: a center starts there, and a guard with
+  more minutes comes off the bench.
+- **At the A6 review** (2026-10-10) the user decided that starters are chosen by projected
+  impact and role rather than minutes, and that a place in an answer is checked for what it
+  ranks - the league or a conference. Both are A7's.

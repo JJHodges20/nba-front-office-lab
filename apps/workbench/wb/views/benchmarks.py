@@ -13,7 +13,7 @@ import streamlit as st
 
 from front_office.domain.metrics import MetricCatalog
 from front_office.services import MEASURES, EraView, floor
-from wb import charts, components, data, formats, state
+from wb import ask, charts, components, data, formats, state
 from wb.components import DERIVED, EMPTY_CELL, MEASURED, Figure
 
 ERA, FROM, TO, STAGE = "bench_era", "bench_from", "bench_to", "bench_stage"
@@ -41,6 +41,7 @@ def render() -> None:
         "What the teams that reached each stage of the postseason looked like, across seasons.",
         kinds=[MEASURED, DERIVED],
     )
+    ask.button(ask.from_filters("Winning Benchmarks", state.current()))
     seasons = data.benchmark_seasons(build)
     if not seasons:
         components.empty(

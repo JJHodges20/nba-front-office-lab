@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from front_office.config import load_settings
+from front_office.domain.lineup import LineupPlayer, starting_slots
 from front_office.domain.optimizer import BudgetMode, OptimizerRequest
 from front_office.domain.proposals import FINGERPRINT_NOTE, RosterProposal
 from front_office.domain.tables.rosters import STARTING_SLOTS
@@ -92,9 +93,15 @@ class TestFromReport:
             starting = [slot for slot in slots if slot in STARTING_SLOTS]
             assert sorted(starting) == sorted(STARTING_SLOTS)
             assert slots.count("BENCH") == len(slots) - 5
-            # The five with the largest projected share start.
-            by_share = sorted(proposal.players, key=lambda p: -p.projected_share)
-            assert {p.slot for p in by_share[:5]} == set(STARTING_SLOTS)
+            # Placed by domain.lineup: starters from the rotation, each kept at a listed
+            # position where the roster allows (the user's wish at the A5 review).
+            expected = starting_slots(
+                [
+                    LineupPlayer(p.player_id, p.position or "", p.projected_share)
+                    for p in proposal.players
+                ]
+            )
+            assert {p.player_id: p.slot for p in proposal.players} == expected
 
     def test_the_basis_is_what_the_lab_holds_now(
         self, shared: Lab, proposals: tuple[RosterProposal, ...]

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import shutil
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -13,6 +13,7 @@ from front_office.assistant.toolbox import LAB_HANDLERS, Toolbox
 from front_office.config import Settings, load_settings
 from front_office.config.assistant import assistant_settings_path
 from front_office.domain.assistant import Answer, Mode, Outcome
+from front_office.domain.research import Focus, SavedTurn
 from front_office.providers.ollama import OllamaProvider
 from front_office.services import Lab
 from tests.ollama_fakes import ScriptedOllama, chat_chunks, tool_call
@@ -80,24 +81,40 @@ def scripted(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
     return use
 
 
-def test_a_question_is_answered_in_the_background(scripted, built_readonly: Settings) -> None:
+def workspace(home: Settings, name: str = "Questions") -> int:
+    with Lab(home) as lab:
+        return lab.workspaces.create(name).workspace_id
+
+
+def asked(home: Settings, question: api.Question, workspace_id: int) -> api.Job:
+    job = api.start(question, workspace_id, project_root=home.project_root, today=date(2026, 10, 9))
+    assert job.wait(30)
+    return job
+
+
+def test_a_question_is_answered_in_the_background_and_kept(scripted, built_lab: Settings) -> None:
     scripted(
         ScriptedOllama(chats=[chat_chunks(tool_calls=[CELTICS]), chat_chunks("It was +8.3 [r1].")])
     )
-    job = api.start(QUESTION, project_root=built_readonly.project_root, today=date(2026, 10, 9))
-    assert job.wait(30)
-    turn = job.turn()
+    place = workspace(built_lab)
+    turn = asked(built_lab, QUESTION, place).turn()
     assert turn.error is None and turn.answer is not None
     assert turn.answer.outcome is Outcome.SUPPORTED and turn.answer.text == "It was +8.3 [r1]."
     assert [step.kind for step in turn.steps] == ["model", "tool", "model"]
-    assert turn.seconds > 0
+    assert turn.seconds > 0 and turn.turn_id is not None
+    with Lab(built_lab) as lab:
+        (kept,) = lab.workspaces.turns(place)
+        stamp = lab.workspaces.stamp()
+    assert kept.answer is not None and kept.answer.text == "It was +8.3 [r1]."
+    assert (kept.build_id, kept.value_model) == stamp
+    assert kept.focus.season == "2025-26" and kept.asked_from == "AI Research"
 
 
 def test_a_stopped_question_says_so_and_keeps_what_it_gathered(
-    scripted, built_readonly: Settings
+    scripted, built_lab: Settings
 ) -> None:
     scripted(ScriptedOllama(chats=[chat_chunks(tool_calls=[CELTICS])]))
-    job = api.Job(QUESTION, project_root=built_readonly.project_root)
+    job = api.Job(QUESTION, workspace(built_lab), project_root=built_lab.project_root)
     job.stop()  # taken at the next step, whether or not the model has been asked yet
     assert job.wait(30) and job.stopping
     turn = job.turn()
@@ -106,26 +123,145 @@ def test_a_stopped_question_says_so_and_keeps_what_it_gathered(
     assert turn.answer.warnings == ("Stopped by the user.",)
 
 
-def test_ollama_down_is_said_not_raised(scripted, built_readonly: Settings) -> None:
+def test_ollama_down_is_said_not_raised_and_kept(scripted, built_lab: Settings) -> None:
     scripted(ScriptedOllama(down=True))
-    job = api.start(QUESTION, project_root=built_readonly.project_root)
-    assert job.wait(30)
-    turn = job.turn()
+    place = workspace(built_lab)
+    turn = asked(built_lab, QUESTION, place).turn()
     assert turn.answer is None and "Ollama is not running" in (turn.error or "")
+    with Lab(built_lab) as lab:
+        (kept,) = lab.workspaces.turns(place)
+    assert kept.answer is None and "Ollama is not running" in (kept.error or "")
 
 
-def test_the_next_question_carries_the_last_three_answered_turns() -> None:
-    answered = [
-        api.Turn(QUESTION, Answer(f"q{n}", f"answer {n}", Outcome.SUPPORTED)) for n in range(5)
+def test_a_follow_up_carries_its_own_workspace_and_nothing_else(
+    scripted, built_lab: Settings
+) -> None:
+    """A6: no cross-workspace leaks. A follow-up reads its own workspace's conversation."""
+    knicks_question = api.Question("How did the Knicks do in 2025-26?", season="2025-26")
+    model = scripted(
+        ScriptedOllama(
+            chats=[
+                chat_chunks("Celtics answer, without figures [no tool]."),
+                chat_chunks("Knicks answer, without figures [no tool]."),
+                chat_chunks("A follow-up answer."),
+            ]
+        )
+    )
+    celtics, knicks = workspace(built_lab, "Celtics"), workspace(built_lab, "Knicks")
+    asked(built_lab, QUESTION, celtics)
+    asked(built_lab, knicks_question, knicks)
+    asked(built_lab, api.Question("And in 2012-13?", season="2025-26"), knicks)
+    follow_up = model.chat_payloads[-1]["messages"]
+    said = [message["content"] for message in follow_up if message["role"] != "system"]
+    assert said[:2] == [
+        "How did the Knicks do in 2025-26?",
+        "Knicks answer, without figures [no tool].",
     ]
-    failed = api.Turn(QUESTION, None, "Ollama is not running")
-    messages = api.history([*answered, failed])
-    assert [m.role for m in messages] == ["user", "assistant"] * 3
-    assert [m.content for m in messages if m.role == "assistant"] == [
-        "answer 2",
-        "answer 3",
-        "answer 4",
+    assert not any("Celtics" in text for text in said), "nothing of the other workspace"
+
+
+def test_the_notes_are_background_not_evidence(scripted, built_lab: Settings) -> None:
+    """A6: a workspace's notes reach the model, but a figure from them is not one it may
+    state: the checker does not read them."""
+    model = scripted(
+        ScriptedOllama(
+            chats=[
+                chat_chunks("The note says 99.9, so it was +99.9."),
+                chat_chunks("The note says 99.9, so it was +99.9."),
+            ]
+        )
+    )
+    place = workspace(built_lab)
+    with Lab(built_lab) as lab:
+        lab.workspaces.update(place, notes="Their net rating was +99.9 last time I looked.")
+    turn = asked(built_lab, QUESTION, place).turn()
+    system = model.chat_payloads[0]["messages"][0]["content"]
+    assert "Workspace notes" in system and "+99.9 last time" in system
+    assert turn.answer is not None and "99.9" in turn.answer.removed
+
+
+def test_kept_turns_become_the_conversation_a_follow_up_reads() -> None:
+    def kept(n: int, answer: Answer | None) -> SavedTurn:
+        return SavedTurn(
+            workspace_id=1,
+            conversation=1,
+            asked_at=datetime(2026, 10, 10, 13, n),
+            question=f"q{n}",
+            mode=Mode.QUICK,
+            focus=Focus(season="2025-26"),
+            asked_from="AI Research",
+            answer=answer,
+            error=None if answer else "Ollama is not running",
+        )
+
+    turns = [kept(n, Answer(f"q{n}", f"answer {n}", Outcome.SUPPORTED)) for n in range(2)]
+    messages = api.history([*turns, kept(2, None)])
+    assert [(m.role, m.content) for m in messages] == [
+        ("user", "q0"),
+        ("assistant", "answer 0"),
+        ("user", "q1"),
+        ("assistant", "answer 1"),
     ]
+
+
+def test_a_kept_question_can_be_asked_again_as_it_was() -> None:
+    turn = SavedTurn(
+        workspace_id=1,
+        conversation=1,
+        asked_at=datetime(2026, 10, 10),
+        question="Their defense?",
+        mode=Mode.DEEP,
+        focus=Focus(season="2012-13", season_type="playoffs", team_id=BOS, roster_id=4),
+        asked_from="Team Explorer",
+        answer=None,
+        about="Boston Celtics, 2012-13 playoffs",
+    )
+    again = api.Question.again(turn)
+    assert (again.text, again.mode, again.season, again.season_type) == (
+        "Their defense?",
+        Mode.DEEP,
+        "2012-13",
+        "playoffs",
+    )
+    assert (again.team_id, again.roster_id, again.asked_from, again.about) == (
+        BOS,
+        4,
+        "Team Explorer",
+        "Boston Celtics, 2012-13 playoffs",
+    )
+
+
+def test_a_conversation_is_summarized_into_the_notes(scripted, built_lab: Settings) -> None:
+    scripted(
+        ScriptedOllama(
+            chats=[
+                chat_chunks("They were good [no tool]."),
+                chat_chunks(
+                    "- The user asked how the Celtics did; the answer said they were good."
+                ),
+            ]
+        )
+    )
+    place = workspace(built_lab)
+    with Lab(built_lab) as lab:
+        lab.workspaces.update(place, notes="My own note.")
+    asked(built_lab, QUESTION, place)
+    summary = api.summarize(place, project_root=built_lab.project_root, today=date(2026, 10, 10))
+    assert summary.startswith("- The user asked how the Celtics did")
+    with Lab(built_lab) as lab:
+        kept = lab.workspaces.get(place)
+        follows = lab.workspaces.history(place)
+    assert kept.notes is not None and kept.notes.startswith("My own note.\n\nSummary of earlier")
+    assert "(written by the assistant; not evidence)" in kept.notes
+    assert kept.conversation == 2 and follows == (), "the next question follows the notes"
+    with pytest.raises(api.SummaryError, match="nothing to summarize"):
+        api.summarize(place, project_root=built_lab.project_root)
+
+
+def test_a_summary_needs_the_model(scripted, built_lab: Settings) -> None:
+    scripted(ScriptedOllama(down=True))
+    with pytest.raises(api.SummaryError, match="Ollama is not running"):
+        api.summarize(workspace(built_lab), project_root=built_lab.project_root)
 
 
 def test_the_context_says_where_the_season_and_the_data_stand(built_readonly: Settings) -> None:
@@ -164,16 +300,37 @@ def test_a_refresh_by_hand_reports_each_source(project: Path, monkeypatch: pytes
 
 
 def test_an_approved_proposal_is_saved_once(priced_template: Path, tmp_path: Path) -> None:
-    """A5: the page's button reaches the save through the facade; a second press finds it."""
+    """A5: the page's button reaches the save through the facade; a second press finds it.
+    A6: each press is logged in the workspace, and a decline is too."""
     home = tmp_path / "home"
     shutil.copytree(priced_template, home)
-    asked = t.OptimizeRoster(budget_mode="custom", budget_millions=150)
+    request = t.OptimizeRoster(budget_mode="custom", budget_millions=150)
     with Lab(load_settings(home)) as lab:
-        proposal = LAB_HANDLERS["optimize_roster"](lab, asked).proposals[0]
-    saved = api.save_proposal(proposal, "Approved", project_root=home)
+        first, second, *_ = LAB_HANDLERS["optimize_roster"](lab, request).proposals
+        place = lab.workspaces.create("Proposals").workspace_id
+    saved = api.save_proposal(first, "Approved", workspace_id=place, project_root=home)
     assert saved.created and saved.name == "Approved"
-    again = api.save_proposal(proposal, "Approved again", project_root=home)
+    again = api.save_proposal(first, "Approved again", workspace_id=place, project_root=home)
     assert not again.created and again.roster_id == saved.roster_id
+    api.decline_proposal(second.fingerprint, workspace_id=place, project_root=home)
     with Lab(load_settings(home)) as lab:
         members = lab.rosters.players(saved.roster_id)
-    assert set(members["player_id"]) == set(proposal.player_ids)
+        log = [entry.action for entry in lab.workspaces.approvals(place)]
+    assert set(members["player_id"]) == set(first.player_ids)
+    assert log == ["saved", "already_saved", "declined"]
+
+
+def test_a_season_named_in_a_follow_up_is_the_one_meant(scripted, built_lab: Settings) -> None:
+    """A6: a follow-up naming a season is about that season, whatever the workspace or the
+    sidebar look at; the season they look at is still said, as the sidebar's."""
+    model = scripted(
+        ScriptedOllama(chats=[chat_chunks("First [no tool]."), chat_chunks("Then [no tool].")])
+    )
+    place = workspace(built_lab)
+    with Lab(built_lab) as lab:
+        lab.workspaces.update(place, focus=Focus(season="2025-26", team_id=BOS))
+    asked(built_lab, QUESTION, place)
+    asked(built_lab, api.Question("And in 2012-13?", season="2025-26", team_id=BOS), place)
+    system = model.chat_payloads[-1]["messages"][0]["content"]
+    assert '"2012-13": season 2012-13' in system
+    assert "Sidebar: season 2025-26" in system

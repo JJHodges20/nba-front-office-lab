@@ -207,6 +207,23 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   file or a salary has changed, and writes the roster and its players in one transaction
   (`RosterRepository.create_with_players`, which `OptimizerService.save` uses too). R01
   and R03 run on the `priced` test database (`priced_template`), the user's decision at A5.
+- **The user's research is a third file**, `data/assistant/assistant.sqlite`
+  (`storage/research.py`, contracts in `domain/tables/research.py`): never in the lab's
+  database, never touched by a build. It is versioned: a change to a research contract needs
+  a new `Migration` in `storage/research.py` (and a test that brings an older file forward);
+  a new file is made at the latest version, an older one is backed up to `backups/` first,
+  and ids are never reused. A turn keeps its whole answer as JSON (`domain/research.py`'s
+  codec), so an old answer draws exactly as it was and is never rewritten - asking again
+  makes a new turn.
+- **A question runs in a workspace** (`api.start(question, workspace_id)`). A follow-up reads
+  the last three answered turns of its own workspace's conversation under way and nothing
+  else. The workspace's notes reach the model's prompt but never the answer checker: they
+  are background, not evidence. A "he" or "they" with nothing to mean is asked about before
+  the model runs (`orchestrator._nobody_named`). Every proposed roster waits in its workspace
+  until the user saves or declines it, and every press is logged.
+- **Saved rosters place their starters with `domain/lineup.py`**: from the nine who play the
+  most, each at a position they are listed at where the roster allows - the user's wish at
+  the A5 review, for every save.
 - **A handler formats; the services compute.** A tool's handler (`assistant/*_tools.py`)
   calls service methods and writes what they return as the workbench shows it, with the
   evidence: the build, the contract file's date, a source's address and times. It never
@@ -280,6 +297,17 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   selected, and it then overrules every later choice in the sidebar.
 - **Never assign to a widget's session key after the widget is drawn.** Park the value
   and apply it at the top of the next run (`state.choose`, `builder.CREATED`).
+- **A form that starts again gets new widgets.** Give its widgets their stored values with
+  `value=` and end their keys with what they show (`research._stamp`) or with how many
+  times the form was sent (`research.SENT`). Popping a key is not enough: the browser keeps
+  showing what was typed and sends it back on the next click - at A6 a workspace's old
+  notes were written back over its summary that way. Starting widgets through
+  `st.session_state.setdefault` failed too: the settings form came back with an empty
+  name, and a list showed "Choose an option" for a stored `None`. `AppTest` sees none of
+  this; the browser pass does.
+- **Never call `st.switch_page` from a fragment that reruns itself** (`run_every`): a run
+  of it arriving after the switch left the new page blank. Link to the page with
+  `st.page_link` instead (the dialog's *Open in AI Research*).
 - **Plain words on screen.** The user wants simple, easy language wherever possible: short
   sentences, everyday words, a statistic explained in a few words where it appears. This
   holds for page text, notes, table headings, chart titles and the assistant's answers
@@ -296,6 +324,14 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   (a dollar sign is not a formula, an image is not fetched) and outside text through
   `_escaped`. No page test reaches Ollama or the network: `tests/ui/conftest.py` keeps the
   assistant offline unless a test scripts a model (`tests/ui/test_research_page.py`).
+  An answer is drawn by `wb/answers.py` wherever it appears; its widget keys come from the
+  kept turn's id. Opening the page makes a workspace if there is none, and asking keeps
+  turns: a test that asks, or counts workspaces, works on a private copy of a project.
+- **Ask AI about this** (`wb/ask.py`) goes under a page's header:
+  `ask.button(ask.from_filters(page, filters, roster_id=...))`. It never changes the
+  sidebar, asks in the workspace open on the AI Research page, and shares that page's one
+  running question (`state.AI_JOB`). Its `body` is a plain function so a test can draw it
+  inline: in a browser a dialog reruns alone, which `AppTest` cannot follow.
 - **Page tests** (`tests/ui/test_pages.py`) draw a page with `AppTest` and compare what
   it shows with what the service returns. `tests/ui/test_sweep.py` tries every control
   on every page; a new page must be added to its `STARTS`. `AppTest` cannot click a

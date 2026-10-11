@@ -7,6 +7,7 @@ a repository. May import: domain.
 from front_office.storage.database import Database, StorageError
 from front_office.storage.documents import DocumentHit, search_sections
 from front_office.storage.operations import OperationsLog
+from front_office.storage.research import ResearchNotFound, ResearchStore
 from front_office.storage.rosters import RosterNotFound, RosterRepository
 from front_office.storage.warehouse import Warehouse
 
@@ -14,6 +15,8 @@ __all__ = [
     "Database",
     "DocumentHit",
     "OperationsLog",
+    "ResearchNotFound",
+    "ResearchStore",
     "RosterNotFound",
     "RosterRepository",
     "StorageError",

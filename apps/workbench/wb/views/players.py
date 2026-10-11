@@ -7,7 +7,7 @@ import streamlit as st
 
 from front_office.services import DEFAULT_QUALIFICATION, PlayerTable, Qualification
 from front_office.services.players import SPAN_QUALIFICATION
-from wb import charts, components, data, formats, state
+from wb import ask, charts, components, data, formats, state
 from wb.components import DERIVED, EMPTY_CELL, MEASURED, MODELED, Figure
 from wb.state import Filters
 
@@ -64,6 +64,7 @@ SUBJECT = "players_subject"
 def render() -> None:
     filters = state.current()
     components.header("Player Explorer", filters.scope, kinds=_kinds(filters))
+    ask.button(ask.from_filters("Player Explorer", filters))
     if not filters.has_players:
         components.empty(
             f"No player statistics for {filters.season}",

@@ -32,6 +32,30 @@ class StorageError(RuntimeError):
     """The database cannot be used as asked."""
 
 
+def configure_connections(engine: Engine) -> None:
+    """Every connection of ``engine``: foreign keys enforced, write-ahead logging, and
+    transactions that take in DDL - a failed rebuild or migration is undone whole."""
+
+    @event.listens_for(engine, "connect")
+    def _on_connect(connection, _record) -> None:  # type: ignore[no-untyped-def]
+        # Left to itself the sqlite3 module starts a transaction only before a data
+        # change, so DROP and CREATE would run outside one and a failed rebuild could
+        # not be undone. SQLAlchemy's documented remedy has two halves: take
+        # transaction control away from the driver here, and issue BEGIN ourselves
+        # in the "begin" hook below. The second half is what makes DDL transactional.
+        connection.isolation_level = None
+        cursor = connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        # Write-ahead logging lets the workbench keep reading during a rebuild.
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.close()
+
+    @event.listens_for(engine, "begin")
+    def _on_begin(connection) -> None:  # type: ignore[no-untyped-def]
+        connection.exec_driver_sql("BEGIN")
+
+
 class Database:
     """One SQLite file holding every table of the lab.
 
@@ -47,7 +71,7 @@ class Database:
         self.engine: Engine = create_engine(
             f"sqlite:///{self.path.as_posix()}", connect_args={"timeout": LOCK_TIMEOUT_SECONDS}
         )
-        self._configure(self.engine)
+        configure_connections(self.engine)
 
         self.kept_metadata = MetaData()
         self.kept = build_tables(self.kept_metadata, KEPT_TABLES, enforce_references=True)
@@ -61,27 +85,6 @@ class Database:
         self.rebuilt = build_tables(self.rebuilt_metadata, REBUILT_TABLES, enforce_references=False)
         with self.begin() as connection:
             self.kept_metadata.create_all(connection)
-
-    @staticmethod
-    def _configure(engine: Engine) -> None:
-        @event.listens_for(engine, "connect")
-        def _on_connect(connection, _record) -> None:  # type: ignore[no-untyped-def]
-            # Left to itself the sqlite3 module starts a transaction only before a data
-            # change, so DROP and CREATE would run outside one and a failed rebuild could
-            # not be undone. SQLAlchemy's documented remedy has two halves: take
-            # transaction control away from the driver here, and issue BEGIN ourselves
-            # in the "begin" hook below. The second half is what makes DDL transactional.
-            connection.isolation_level = None
-            cursor = connection.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            # Write-ahead logging lets the workbench keep reading during a rebuild.
-            cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA synchronous=NORMAL")
-            cursor.close()
-
-        @event.listens_for(engine, "begin")
-        def _on_begin(connection) -> None:  # type: ignore[no-untyped-def]
-            connection.exec_driver_sql("BEGIN")
 
     @contextmanager
     def begin(self) -> Iterator[Connection]:
