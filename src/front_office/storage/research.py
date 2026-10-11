@@ -3,7 +3,7 @@
 
 A file of its own, which no build touches: workspaces, the questions asked in them and the
 answers they got, bookmarked findings, proposed rosters and every press of a save or
-decline button. Tables are made from the contracts in ``domain/tables/research.py``, and
+decline button, and the experiment proposals the user keeps (version 2, A8). Tables are made from the contracts in ``domain/tables/research.py``, and
 deleting a workspace deletes what it holds through their foreign keys.
 
 The file is versioned. A new file is made at the latest version. An older one is first
@@ -27,12 +27,14 @@ from sqlalchemy import Connection, Engine, MetaData, create_engine, delete, func
 from sqlalchemy import insert as sql_insert
 from sqlalchemy import update as sql_update
 
+from front_office.domain.experiments import TESTED_MODELS
 from front_office.domain.seasons import Season
 from front_office.domain.tables import RESEARCH_TABLES
 from front_office.domain.tables.research import (
     APPROVAL_ACTIONS,
     PROPOSAL_STATUSES,
     RESEARCH_APPROVALS,
+    RESEARCH_EXPERIMENTS,
     RESEARCH_FINDINGS,
     RESEARCH_PROPOSALS,
     RESEARCH_SCHEMA,
@@ -72,8 +74,19 @@ def _first(connection: Connection) -> None:
     raise StorageError("version 1 is where a store begins; nothing comes before it")
 
 
+def _experiments(connection: Connection) -> None:
+    """Version 2 (A8): the experiment proposals a user keeps. The table is made from its
+    contract, as a new file makes it; a later change to the table needs a version of its
+    own, and a test checks that a file brought forward matches a new one."""
+    tables = build_tables(
+        MetaData(), RESEARCH_TABLES, enforce_references=True, never_reuse_ids=True
+    )
+    tables[RESEARCH_EXPERIMENTS.name].create(connection)
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, "Workspaces, questions and answers, findings, proposals, approvals.", _first),
+    Migration(2, "Experiment proposals kept in a workspace.", _experiments),
 )
 
 
@@ -480,7 +493,74 @@ class ResearchStore:
             rows = connection.execute(statement).mappings().all()
         return frame_from_rows(rows, RESEARCH_APPROVALS)
 
+    # --- experiment proposals (A8) -----------------------------------------------------------
+
+    def keep_experiment(self, experiment: Mapping[str, Any]) -> tuple[int, bool]:
+        """Keep an experiment proposal in its workspace. One the workspace holds already, by
+        its fingerprint, is not kept twice. Returns its id, and whether it was new."""
+        table = self.tables[RESEARCH_EXPERIMENTS.name]
+        values = dict(experiment)
+        if values.get("model") not in TESTED_MODELS:
+            raise StorageError(
+                f"an experiment proposal is for one of {list(TESTED_MODELS)}, not "
+                f"{values.get('model')!r}"
+            )
+        values["note"] = _text(values.get("note"))
+        workspace_id = int(values["workspace_id"])
+        with self.engine.begin() as connection:
+            self._require(connection, workspace_id)
+            known = connection.execute(
+                select(table.c.experiment_id).where(
+                    table.c.workspace_id == workspace_id,
+                    table.c.fingerprint == values["fingerprint"],
+                )
+            ).first()
+            if known is not None:
+                return int(known[0]), False
+            result = connection.execute(sql_insert(table).values(**values, created_at=self._now()))
+            self._touch(connection, workspace_id)
+            return int(result.inserted_primary_key[0]), True
+
+    def experiments(self, workspace_id: int) -> pd.DataFrame:
+        """A workspace's kept experiment proposals, the newest first."""
+        table = self.tables[RESEARCH_EXPERIMENTS.name]
+        statement = (
+            select(table)
+            .where(table.c.workspace_id == workspace_id)
+            .order_by(table.c.created_at.desc(), table.c.experiment_id.desc())
+        )
+        with self.engine.connect() as connection:
+            rows = connection.execute(statement).mappings().all()
+        return frame_from_rows(rows, RESEARCH_EXPERIMENTS)
+
+    def annotate_experiment(self, experiment_id: int, note: str | None) -> None:
+        table = self.tables[RESEARCH_EXPERIMENTS.name]
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                sql_update(table)
+                .where(table.c.experiment_id == experiment_id)
+                .values(note=_text(note))
+            )
+        if not result.rowcount:
+            raise ResearchNotFound(f"no experiment proposal with id {experiment_id}")
+
+    def delete_experiment(self, experiment_id: int) -> None:
+        table = self.tables[RESEARCH_EXPERIMENTS.name]
+        with self.engine.begin() as connection:
+            result = connection.execute(delete(table).where(table.c.experiment_id == experiment_id))
+        if not result.rowcount:
+            raise ResearchNotFound(f"no experiment proposal with id {experiment_id}")
+
     # --- checks ----------------------------------------------------------------------------
+
+    def _touch(self, connection: Connection, workspace_id: int) -> None:
+        """Mark the workspace changed, so it lists among the most recent."""
+        table = self.tables[RESEARCH_WORKSPACES.name]
+        connection.execute(
+            sql_update(table)
+            .where(table.c.workspace_id == workspace_id)
+            .values(updated_at=self._now())
+        )
 
     def _require(self, connection: Connection, workspace_id: int) -> dict[str, Any]:
         table = self.tables[RESEARCH_WORKSPACES.name]

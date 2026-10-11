@@ -512,3 +512,62 @@ the chart, and nothing fetched on opening the page - on 2026-10-10.
 - **A reader sees what an answer names.** Answer tables write times plainly, in UTC (a
   kept answer's too, which its JSON holds as text), show a source's id - an answer names an
   article "s2" - and leave the lab's internal keys, as its ids, to the CSV.
+
+## Settled while building A8 (2026-10-11)
+
+- **The user's three choices.** A kept experiment proposal has its own list in each
+  workspace, beside findings (`research_experiments`, version 2 of the research store); the
+  assistant drafts one only when asked for an experiment or an idea to improve a model; and
+  only the four models the lab tests out of sample may be its subject - player value, the
+  postseason model, the simulator and the roster fit test. Archetypes are rules a person
+  sets, with no test to judge a change, and are left out.
+- **Two parts, kept apart.** The idea is the assistant's, in words: what it noticed, the
+  hypothesis, the change to test and how the change could fail. It may hold no figure -
+  `propose_experiment` refuses one, and the model is sent back to write it in words - so
+  that no figure can be made up, echoed in a result and then cited as the lab's. The plan
+  is the lab's (`ExperimentService.plan`): what a change must beat or keep, read from the
+  model's fitted file; how it is tested and what was tried before, quoted whole from its
+  decision by heading; and the rules a person wrote in `configs/experiments.yaml` - the
+  split, the measure, the uncertainty test, when a change is kept, the leakage to rule out
+  and the steps of the milestone that would build it. A test checks that every heading the
+  rules name is still in its decision.
+- **The figures are the file's, not the documents'.** The simulator's decision gives its
+  intervals' coverage as 53%, 83% and 97%; its file, refitted since, says 51%, 81% and 96%.
+  A proposal reads the file.
+- **Leakage is written as it is.** The value model's main test takes each season's minutes
+  as played, by design, so its rule is "nothing from the season predicted but what the test
+  says it takes as given", and a change for forecasts must also be judged with the minutes
+  projected. The simulator's noise and residual wins are measured over recent seasons the
+  wins test also scores; its checklist says a change leaning on them should be checked on
+  seasons they were not measured on, rather than claiming they never overlap.
+- **Nothing applies a proposal.** The tool is of the `draft` class: what it drafts
+  travels with the answer and is kept only by the user's press of *Keep in the workspace*,
+  which writes one row to the research store and nothing else. No path leads from a
+  proposal to a model file, a setting or the lab's data; the tests check the model files
+  byte for byte around drafting and keeping, and the evaluation checks them around every
+  question.
+- **The tool list's size.** With `propose_experiment` the tools' schemas reach 14,925
+  characters, past the 14,000 a test held them to; a question's whole prompt measured 3,557
+  tokens of the model's 8,192, 180 of them the new tool's, so the limit is now 15,000. The
+  tool's argument model has no docstring: it would be sent with every request.
+- **A "they" for things stands for them.** The A6 check that asks about a pronoun with
+  nothing to mean asked "Who do you mean by 'they'?" of "...whether the simulator's win
+  intervals are wider than they need to be". A plural the lab talks about - intervals,
+  projections, ratings, chances, models - now gives a "they" its meaning, as teams and
+  players did, but only before it: "How did they do against their projections?" is still
+  asked about.
+- **A season is a season however its dash is written.** "2006–07" with an en dash had been
+  read as the year and a figure "07", and cut as made up; the checker now reads a season
+  with any dash as a label, as it reads "2006-07".
+- **A refusal is a refusal however it is put.** With proposals to offer instead, the model
+  refused "Refit the value model ... and save it" (I02) as "The lab does not refit models
+  ... Would you like me to propose an experiment?", and a chemistry bonus (F02) as "The
+  optimizer does not currently include" one; both were read as nothing to answer from.
+  With nothing called, what the lab, its optimizer or a model does not refit, offer,
+  support, allow or include is now a refusal - data it does not include is still missing.
+  The model offers the proposal; it does not draft one unasked.
+- **A refused figure is quoted.** Told only to write its idea in words, a model sent the
+  same "3.01" back six times (I01), and in the browser pass another gave up and told the
+  user its proposal was "rejected due to a value error". The refusal now quotes what the
+  idea holds and asks for the same idea again in words, and no refusal carries Pydantic's
+  "Value error" for a model to pass on.

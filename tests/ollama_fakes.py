@@ -19,7 +19,7 @@ TOOLS_MODEL = {
 }
 
 
-def tool_call(name: str, **arguments: Any) -> dict[str, Any]:
+def tool_call(name: str, /, **arguments: Any) -> dict[str, Any]:
     return {"function": {"name": name, "arguments": arguments}}
 
 

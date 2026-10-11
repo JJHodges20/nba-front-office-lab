@@ -56,6 +56,9 @@ class TestReading:
             ("+8.3 points per 100 possessions", [8.3]),
             ("48 wins per 82 games, every 100 possessions", [48.0]),
             ("100 possessions and 82 games", [100.0, 82.0]),
+            # A8, live: a season written with a dash, as typesetters write it, lost "07".
+            ("from 2006–07 to 2025—26, and 2012‑13", []),
+            ("a record of 56–26", [56.0, 26.0]),
         ],
     )
     def test_what_counts_as_a_figure(self, text: str, read: list[float]) -> None:

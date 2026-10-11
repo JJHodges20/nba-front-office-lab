@@ -186,8 +186,8 @@ def _answer() -> None:
         st.markdown(answers.prose(done.answer.text))
         answers.notes(done.answer)
         st.caption(
-            "The rows, charts and sources behind it - and any rosters to review - are with it "
-            "in AI Research."
+            "The rows, charts and sources behind it - and any rosters or experiments to review - "
+            "are with it in AI Research."
         )
     if RESEARCH is not None:
         # A link, not a button that switches pages: this fragment runs again every second,

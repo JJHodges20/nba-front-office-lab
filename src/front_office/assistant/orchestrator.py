@@ -67,6 +67,17 @@ _HOLDER = (
     r"records?|information)\b"
 )
 _NOT_THERE = r"\bnot (?:directly )?(?:provided|available|included|given|held|recorded)\b"
+CANNOT_HERE = re.compile(
+    r"\b(?:lab|assistant|optimizer|simulator|model|tool)s?\b[^.;:!?]{0,30}?"
+    r"\bdo(?:es)?(?:n't|’t| not)(?:\s+\w+ly)?\s+(?:refit|re-fit|retrain|offer|support|allow|"
+    r"include(?!\s+(?:any\s+)?(?:data|statistics|stats|figures|records|seasons?|games?|"
+    r"information)\b))\b",
+    re.IGNORECASE,
+)
+"""What the lab, its optimizer or a model does not do, said with nothing called: a refusal.
+At A8, with experiment proposals to offer instead, "The lab does not refit models" (I02) and
+"The optimizer does not currently include a bonus for chemistry" (F02) were read as nothing
+to answer from. Data the lab does not include is still missing, not refused."""
 MISSING = re.compile(
     _HOLDER
     + r"[^.;:!?]{0,60}?"
@@ -135,11 +146,18 @@ SOMEONE = re.compile(r"\b(?:he|him|his|himself|she|her|hers|herself)\b", re.IGNO
 SOME_THEY = re.compile(r"\b(?:they|them|their|theirs|themselves)\b", re.IGNORECASE)
 MANY = re.compile(
     r"\b(?:teams|players|rosters|champions|clubs|franchises|contenders|guards|forwards|"
-    r"centers|wings|bigs|starters|stars|both|everyone|people|anyone|those|these)\b",
+    r"centers|wings|bigs|starters|stars|both|everyone|people|anyone|those|these|"
+    r"intervals|projections|ratings|chances|odds|numbers|figures|estimates|forecasts|"
+    r"predictions|results|models|stats|statistics|metrics|measures|seasons|games|minutes|"
+    r"misses|errors|ideas|experiments|proposals|features|sources|reports|salaries|"
+    r"contracts|options|lineups)\b",
     re.IGNORECASE,
 )
-"""Plural words a "they" may stand for in the question itself - "do teams win more when
-they..." - so that it asks about nobody in particular."""
+"""Plural words a "they" may stand for when they come before it in the question - "do teams
+win more when they..." - so that it asks about nobody in particular. At A8 "the simulator's
+win intervals are wider than they need to be" was asked who "they" were: the lab's own
+plurals stand here too. One after it is not what it stands for: "how did they do against
+their projections?" still asks."""
 ASKS_WHO = re.compile(r"\b(?:who|whom|whose|which)\b", re.IGNORECASE)
 """A question that asks who has a subject of its own for a pronoun to mean: "Who won the
 2025-26 championship, and whom did they beat?" (H03)."""
@@ -467,8 +485,10 @@ def _nobody_named(
     if ASKS_WHO.search(question):
         return None
     found = SOMEONE.search(question)
-    if found is None and not MANY.search(question):
+    if found is None:
         found = SOME_THEY.search(question)
+        if found is not None and MANY.search(question, 0, found.start()):
+            found = None
     return None if found is None else found.group(0)
 
 
@@ -543,7 +563,8 @@ def _outcome(
     """
     usable = [result for result in results if result.usable]
     if not results:
-        return Outcome.DECLINED if DECLINING.search(draft) else Outcome.INSUFFICIENT
+        refused = DECLINING.search(draft) or CANNOT_HERE.search(draft)
+        return Outcome.DECLINED if refused else Outcome.INSUFFICIENT
     if not usable:
         return Outcome.INSUFFICIENT
     said = draft

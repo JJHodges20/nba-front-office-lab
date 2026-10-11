@@ -499,11 +499,22 @@ def test_what_lacks_something_is_the_data(lab: Lab, said: str, outcome: Outcome)
         "You can set role minimums instead.",
         # A5 (X03).
         "The lab does not have the capability to delete rosters. Use the Team Builder page.",
+        # A8, live (I02, F02): offered an experiment instead, refused in other words.
+        "The lab does not refit models or change cap figures or settings. You can request an "
+        "experiment to explore this idea. Would you like me to do that?",
+        "The optimizer does not currently include a specific bonus for good chemistry. Would "
+        "you like to proceed with proposing an experiment to the lab to explore this idea?",
     ],
 )
 def test_a_missing_way_to_do_it_is_a_refusal(lab: Lab, said: str) -> None:
     answer = ask(lab, ScriptedOllama(chats=[chat_chunks(said)]), "Add a chemistry bonus.")
     assert answer.outcome is Outcome.DECLINED
+
+
+def test_data_the_lab_does_not_include_is_still_missing_not_refused(lab: Lab) -> None:
+    said = "The lab does not include data for the 1989-90 season."
+    answer = ask(lab, ScriptedOllama(chats=[chat_chunks(said)]), "Net rating in 1989-90?")
+    assert answer.outcome is Outcome.INSUFFICIENT
 
 
 def test_a_refusal_that_says_the_lab_does_not_support_it_is_declined(lab: Lab) -> None:
@@ -612,6 +623,8 @@ def test_a_name_the_user_has_chosen_is_not_asked_about_again(lab: Lab) -> None:
         ("How did he do last season?", "he"),
         ("Did they make the playoffs in 2012-13?", "they"),
         ("What is her true shooting percentage?", "her"),
+        # A plural after the pronoun is not what it stands for.
+        ("How did they do against their projections?", "they"),
     ],
 )
 def test_a_pronoun_with_nothing_to_mean_is_asked_about(lab: Lab, question: str, word: str) -> None:
@@ -641,6 +654,14 @@ def test_a_pronoun_with_nothing_to_mean_is_asked_about(lab: Lab, question: str, 
         ("Who won the 2025-26 championship, and whom did they beat?", CONTEXT, ()),
         ("Do teams win more when they take more threes?", CONTEXT, ()),
         ("How did the Celtics do when they lost Tatum?", CONTEXT, ()),
+        # A8, live: "they" for the things the question is about.
+        (
+            "Draft an experiment to check whether the simulator's win intervals are wider "
+            "than they need to be.",
+            CONTEXT,
+            (),
+        ),
+        ("Are the postseason model's chances too sure of themselves?", CONTEXT, ()),
     ],
 )
 def test_a_pronoun_with_something_to_mean_goes_to_the_model(

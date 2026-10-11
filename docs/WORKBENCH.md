@@ -278,6 +278,15 @@ played are answered from that season's figures.
   changed since your contract file, and the answer lists the moves since its date beside
   what the file holds, and how to update the file. A report never changes the lab's data,
   a roster or the contract file.
+- *Experiments*: ask for an experiment that might improve one of the lab's tested models -
+  player value, the postseason model, the simulator or the roster fit test - and the answer
+  drafts a proposal under *Experiments to review*. The idea is the assistant's, in words,
+  and untested; beside it is the lab's test, from the model's file and its decision: what a
+  change must beat, how seasons are split, what is measured, the leakage to rule out, what
+  was tried before, and the steps of the milestone that would build it. *Keep in the
+  workspace* puts it in the workspace's *Experiment proposals*, where it can carry your
+  note; *Download* gives it as a document. Nothing is applied: no model, setting or data
+  changes, whatever you keep. The assistant drafts one only when asked.
 - *Quick or Deep*: Quick for one fact or one comparison, Deep for a longer look - more
   tool calls, more time, the model thinking first. A question under way shows its steps
   as they come, and *Stop* ends it at the next step, keeping what was gathered.

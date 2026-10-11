@@ -46,8 +46,9 @@ from front_office.domain.assistant import (
     Step,
 )
 from front_office.domain.contract_review import ContractPreview
+from front_office.domain.experiments import ExperimentProposal
 from front_office.domain.proposals import RosterProposal
-from front_office.domain.research import RESEARCH_PAGE, Focus, SavedTurn
+from front_office.domain.research import RESEARCH_PAGE, ExperimentRecord, Focus, SavedTurn
 from front_office.domain.seasons import Season
 from front_office.domain.tables.current import SOURCES
 from front_office.pipelines.contract_review import ContractReviewError as _Unreadable
@@ -443,6 +444,20 @@ def decline_proposal(
     says the proposal was declined."""
     with Lab.open(project_root) as lab:
         lab.workspaces.decline_proposal(workspace_id, fingerprint)
+
+
+def keep_experiment(
+    proposal: ExperimentProposal,
+    *,
+    workspace_id: int,
+    turn_id: int | None = None,
+    project_root: Path | None = None,
+) -> ExperimentRecord:
+    """The user's press of *Keep in the workspace* under an experiment proposal (A8): kept
+    for review in the workspace's list, once however often it is pressed. Nothing else
+    changes - no model, no setting, no data."""
+    with Lab.open(project_root) as lab:
+        return lab.workspaces.keep_experiment(workspace_id, proposal, turn_id=turn_id)
 
 
 # --- workspace notes -----------------------------------------------------------------------

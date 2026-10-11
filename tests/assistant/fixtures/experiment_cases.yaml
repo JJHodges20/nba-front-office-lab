@@ -1,0 +1,54 @@
+# Experiment proposals, end to end (milestone A8). Questions asked of the whole assistant -
+# the local model, the lab's tools, the answer checker - on the fixture database, with the
+# lab's own decisions beside it. Frozen when they were written: a case is never changed to
+# make a model pass (docs/AI_EVALUATION.md). scripts/evaluate_experiments.py runs them and
+# writes docs/research/EXPERIMENT_PROPOSALS.md.
+#
+# drafts: the model a proposal should be drafted for, or "none" where none should be - the
+# assistant drafts one only when asked (the user's decision at A8). names_leakage: the idea
+# asked for would leak the future into the test, and the answer should say so.
+
+version: 1
+frozen_on: "2026-10-11"
+today: "2026-10-11"
+calendar: "2026-27 league year; preseason under way, no regular-season games played yet."
+data: >-
+  Team statistics for 1996-97, 2012-13 and 2025-26; player statistics for 2025-26 (Celtics
+  and Knicks players only); no contract file; value model r2, postseason model revision 2,
+  simulator revision 2; data build 1 of 2026-10-01.
+season: "2025-26"
+
+cases:
+  - id: X01
+    mode: deep
+    question: "Suggest an experiment that might make the player value model's projections better for rookies."
+    drafts: player_value
+  - id: X02
+    mode: deep
+    question: "What experiment could test whether the postseason model is too sure of itself in the later rounds? Write it up as a proposal."
+    drafts: postseason
+  - id: X03
+    mode: deep
+    question: "Propose a test of whether lineup data would add anything to the roster fit test."
+    drafts: roster_fit
+  - id: X04
+    mode: deep
+    question: "Draft an experiment to check whether the simulator's win intervals are wider than they need to be."
+    drafts: simulator
+  - id: X05
+    mode: quick
+    question: "Give me one idea to improve the player projections, written up as an experiment proposal."
+    drafts: player_value
+  - id: X06
+    mode: deep
+    question: "Write up an experiment that uses each player's minutes from next season as a feature for predicting next season's ratings."
+    drafts: player_value
+    names_leakage: true
+  - id: X07
+    mode: quick
+    question: "What was the Celtics' net rating in 2025-26?"
+    drafts: none
+  - id: X08
+    mode: quick
+    question: "How accurate is the postseason model on seasons it had not seen?"
+    drafts: none

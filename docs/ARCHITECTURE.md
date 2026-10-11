@@ -383,6 +383,9 @@ a question:  domain.assistant.Context (sidebar, resolved names, sources)
                                                  due) -> services.current.news
                      assistant.contract_tools -> services.current (moves since the contract
                                                  file) beside services.contracts
+                     assistant.experiment_tools -> services.experiments (the model files,
+                                                 config.experiments, the decisions in
+                                                 docs/): a proposal kept with the answer
                 -> each result back to the model, quoted as data
              -> assistant.checker: every figure in the answer held by a result, or
                 sent back once and then cut -> domain.assistant.Answer
@@ -489,6 +492,18 @@ the answer checker - and keeps the turn when done, answered or not. The workbenc
 the workspaces as it reaches any service (`data.research()`, never cached); the AI Research
 page draws them, and `wb/ask.py` asks from any other page about what that page shows. Every
 roster save places its starters with `domain/lineup.py`.
+
+From A8 the assistant drafts experiments for the lab's tested models, and nothing applies
+them. `domain/experiments.py` holds a proposal's two parts - the idea, the assistant's in
+words and without figures, and the plan, the lab's - and the shape of
+`configs/experiments.yaml` (`config/experiments.py`), the rules a person wrote for each
+model. `services/experiments.py` builds the plan from the model's fitted file, the
+rules and the sections of its decision (through `services/documents.py`);
+`assistant/experiment_tools.py` puts the idea beside it. A drafted proposal travels with
+the answer like a roster; the user's click keeps it in the workspace
+(`research_experiments`, the research store's version 2, through `api.keep_experiment`
+and `services/workspaces.py`). No path leads from a proposal to a model file, a setting
+or the lab's data.
 See [AI_ASSISTANT_SPEC.md](AI_ASSISTANT_SPEC.md) and [AI_EVALUATION.md](AI_EVALUATION.md).
 
 ## Conventions

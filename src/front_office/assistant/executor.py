@@ -108,6 +108,7 @@ class Executor:
             limits=found.limits,
             charts=found.charts,
             proposals=found.proposals,
+            experiments=found.experiments,
         )
 
     def _refused(

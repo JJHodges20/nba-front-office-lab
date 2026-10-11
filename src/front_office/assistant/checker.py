@@ -40,7 +40,7 @@ MONTH = (
     r"Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?"
 )
 NOT_FIGURES = re.compile(
-    r"(?<!\d)(?:19|20)\d{2}-\d{2}(?:-\d{2})?(?!\d)"  # 2025-26, 2026-10-09
+    r"(?<!\d)(?:19|20)\d{2}[-–—‑]\d{2}(?:-\d{2})?(?!\d)"  # 2025-26, 2025–26, 2026-10-09
     rf"|\b{MONTH}\s+\d{{1,2}}(?:st|nd|rd|th)?(?:,?\s+(?:19|20)\d{{2}})?\b"  # October 1, 2026
     rf"|\b\d{{1,2}}(?:st|nd|rd|th)?\s+{MONTH}(?:,?\s+(?:19|20)\d{{2}})?\b"  # 1 October 2026
     r"|(?<![\d$.,])(?:19[4-9]\d|20\d{2})(?![\d%]|[.,]\d|\s?(?:million|billion|thousand|[MBK])\b)"  # 2026

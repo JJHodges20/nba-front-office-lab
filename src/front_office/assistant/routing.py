@@ -182,8 +182,11 @@ def first_move(
 
 
 def _reasons(error: ValidationError) -> str:
+    """What was wrong with each argument, in words: a rule's own message without Pydantic's
+    "Value error, " before it, which a model at A8 passed on to the user as the reason."""
     parts = []
     for problem in error.errors(include_url=False):
         where = ".".join(str(part) for part in problem.get("loc", ())) or "arguments"
-        parts.append(f"{where}: {problem.get('msg', 'invalid')}")
+        message = str(problem.get("msg", "invalid")).removeprefix("Value error, ")
+        parts.append(f"{where}: {message}")
     return "; ".join(parts)

@@ -28,7 +28,14 @@ import streamlit as st
 
 import front_office.assistant.api as api
 from front_office.domain.assistant import Mode, NameCandidate
-from front_office.domain.research import RESEARCH_PAGE, Finding, Focus, SavedTurn, Workspace
+from front_office.domain.research import (
+    RESEARCH_PAGE,
+    ExperimentRecord,
+    Finding,
+    Focus,
+    SavedTurn,
+    Workspace,
+)
 from front_office.services import CurrentSource, WorkspaceError, WorkspaceService
 from wb import answers, components, data, formats, state
 from wb.components import ASSUMPTION, DERIVED, ESTIMATE, MEASURED, MODELED, REPORTED
@@ -69,7 +76,8 @@ MODE_HELP = (
 )
 WORKSPACE_HELP = (
     "A workspace keeps one piece of research: its questions and answers, findings, proposed "
-    "rosters and notes. A follow-up question reads only this workspace's conversation."
+    "rosters, experiment proposals and notes. A follow-up question reads only this "
+    "workspace's conversation."
 )
 NOTES_HELP = (
     "Your notes, and summaries the assistant wrote when you asked. The assistant reads them "
@@ -99,6 +107,7 @@ EXAMPLES = (
     "Have the Knicks made any moves since the start of October?",
     "Search the web for reporting on the Knicks' preseason.",
     "Propose three rosters for next season under a $150M budget.",
+    "Suggest an experiment that might make the player projections better.",
 )
 SIDEBAR = "Sidebar's"
 
@@ -127,6 +136,7 @@ def render() -> None:
     earlier = [turn for turn in turns if turn.conversation != workspace.conversation]
     _controls(research, workspace, busy=job is not None, started=bool(current))
     records = {record.fingerprint: record for record in research.proposals(workspace.workspace_id)}
+    kept = {record.fingerprint: record for record in research.experiments(workspace.workspace_id)}
     stamp = research.stamp()
     can_ask = status.is_ready and job is None
     if earlier and st.toggle(
@@ -135,15 +145,15 @@ def render() -> None:
         help="Questions from before the conversation under way. A follow-up does not read them.",
     ):
         for turn in earlier:
-            _turn(turn, research, can_ask=can_ask, records=records, names=roster_names, stamp=stamp)
+            _turn(turn, research, can_ask=can_ask, records=records, kept=kept, names=roster_names, stamp=stamp)  # fmt: skip
         st.divider()
     if not current and job is None:
         _welcome(status, workspace)
     for turn in current:
-        _turn(turn, research, can_ask=can_ask, records=records, names=roster_names, stamp=stamp)
+        _turn(turn, research, can_ask=can_ask, records=records, kept=kept, names=roster_names, stamp=stamp)  # fmt: skip
     for turn in st.session_state.get(UNKEPT, []):
         if turn.workspace_id == workspace.workspace_id:
-            _turn(turn, research, can_ask=False, records=records, names=roster_names, stamp=stamp)
+            _turn(turn, research, can_ask=False, records=records, kept=kept, names=roster_names, stamp=stamp)  # fmt: skip
     if job is not None:
         _progress()
     asked = st.chat_input(PROMPT, key="ai_question", disabled=not can_ask)
@@ -535,6 +545,16 @@ def _shelf(research: WorkspaceService, workspace: Workspace, names: dict[int, st
                 record=record,
                 roster_names=names,
             )
+    kept = research.experiments(workspace.workspace_id)
+    with st.expander(f"Experiment proposals ({len(kept)})", icon=":material/science:"):
+        if not kept:
+            st.caption(
+                "None yet. Ask for an experiment that might improve one of the lab's models, "
+                "and press Keep in the workspace under a proposal you want to come back to. "
+                "Keeping one changes no model."
+            )
+        for experiment in kept:
+            _experiment(research, experiment)
 
 
 def _finding(research: WorkspaceService, finding: Finding) -> None:
@@ -573,6 +593,23 @@ def _finding(research: WorkspaceService, finding: Finding) -> None:
             if st.button("Delete", key=f"ai_f_delete_{key}", icon=":material/delete:"):
                 research.delete_finding(key)
                 _after("Finding deleted.")
+
+
+def _experiment(research: WorkspaceService, record: ExperimentRecord) -> None:
+    key = record.experiment_id
+    answers.experiment_card(record.proposal, key=f"kept_{key}", record=record)
+    if record.note:
+        st.markdown(f"*{answers.escaped(record.note)}*")
+    with st.container(horizontal=True, gap="small"):
+        with st.popover("Note", icon=":material/edit:"):
+            shown = _stamp(record.note)
+            note = st.text_area("Note", value=record.note or "", key=f"ai_x_note_{key}_{shown}")
+            if st.button("Save", key=f"ai_x_save_{key}", type="primary"):
+                research.annotate_experiment(key, note or None)
+                _after("Note saved.")
+        if st.button("Delete", key=f"ai_x_delete_{key}", icon=":material/delete:"):
+            research.delete_experiment(key)
+            _after("Experiment proposal deleted.")
 
 
 def _controls(
@@ -630,6 +667,7 @@ def _turn(
     *,
     can_ask: bool,
     records: dict,
+    kept: dict,
     names: dict[int, str],
     stamp: tuple[int | None, str | None],
 ) -> None:
@@ -659,6 +697,8 @@ def _turn(
                 workspace_id=turn.workspace_id,
                 records=records,
                 roster_names=names,
+                turn_id=turn.turn_id,
+                kept=kept,
             )
         if turn.turn_id is not None:
             _turn_actions(turn, research, key=key, can_ask=can_ask, stamp=stamp)

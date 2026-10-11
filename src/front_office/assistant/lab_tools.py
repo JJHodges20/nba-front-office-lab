@@ -19,6 +19,7 @@ import pandas as pd
 from front_office.assistant import tools as t
 from front_office.domain.assistant import Chart, Evidence, EvidenceKind, ResultStatus
 from front_office.domain.eras import Era
+from front_office.domain.experiments import ExperimentProposal
 from front_office.domain.metrics import MetricCatalog
 from front_office.domain.proposals import RosterProposal
 from front_office.domain.schema import Provenance
@@ -117,6 +118,7 @@ class Found:
     limits: tuple[str, ...] = ()
     charts: tuple[Chart, ...] = ()
     proposals: tuple[RosterProposal, ...] = ()
+    experiments: tuple[ExperimentProposal, ...] = ()
 
 
 Handler = Callable[[Lab, Any], Found]

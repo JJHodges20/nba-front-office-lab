@@ -8,6 +8,7 @@ from front_office.config.archetypes import archetypes_path, load_archetypes
 from front_office.config.assistant import assistant_settings_path, load_assistant_settings
 from front_office.config.documents import documents_path, load_sections
 from front_office.config.eras import eras_path, load_eras
+from front_office.config.experiments import experiment_rules_path, load_experiment_rules
 from front_office.config.models import (
     fit_evidence_path,
     fit_spec_path,
@@ -52,6 +53,7 @@ __all__ = [
     "configured_seasons",
     "documents_path",
     "eras_path",
+    "experiment_rules_path",
     "find_project_root",
     "load_all_season_rules",
     "load_archetypes",
@@ -73,6 +75,7 @@ __all__ = [
     "simulator_model_path",
     "simulator_spec_path",
     "load_eras",
+    "load_experiment_rules",
     "load_season_rules",
     "load_settings",
     "load_value_model",

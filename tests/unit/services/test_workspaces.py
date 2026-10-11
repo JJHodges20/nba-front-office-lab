@@ -24,6 +24,7 @@ from front_office.domain.assistant import (
     ResultStatus,
     ToolResult,
 )
+from front_office.domain.experiments import ExperimentIdea
 from front_office.domain.optimizer import BudgetMode
 from front_office.domain.proposals import RosterProposal
 from front_office.domain.research import Focus, SavedTurn
@@ -287,6 +288,54 @@ class TestProposals:
         service.delete(workspace.workspace_id)
         assert workspace.workspace_id not in [w.workspace_id for w in service.list(archived=None)]
         assert priced_home.rosters.get(saved.roster_id)["name"] == "Outlives it"  # type: ignore[arg-type]
+
+
+IDEA = ExperimentIdea(
+    title="Rookies by draft place",
+    observation="The value model knows little of a rookie, and its projections miss them most.",
+    hypothesis="Where a rookie was drafted says how good they are before they play.",
+    change="Start a rookie's estimate from the level of players drafted at the same place.",
+    failure_modes=("Too few rookies each season to tell a difference from nothing.",),
+)
+
+
+def model_files(lab: Lab) -> dict[str, bytes]:
+    folder = lab.settings.config_dir / "models"
+    return {path.name: path.read_bytes() for path in folder.iterdir()}
+
+
+class TestExperiments:
+    """A8: experiment proposals the user keeps, for review only."""
+
+    def test_kept_once_noted_and_deleted_and_nothing_else_changes(self, home: Lab) -> None:
+        service = home.workspaces
+        workspace = service.create("Ideas")
+        before = model_files(home)
+        proposal = home.experiments.draft("player_value", IDEA)
+        kept = service.keep_experiment(workspace.workspace_id, proposal, turn_id=None)
+        again = service.keep_experiment(workspace.workspace_id, proposal, note="pressed twice")
+        assert again.experiment_id == kept.experiment_id and again.note is None
+        assert kept.proposal == proposal and kept.fingerprint == proposal.fingerprint
+        service.annotate_experiment(kept.experiment_id, "After the season.")
+        (listed,) = service.experiments(workspace.workspace_id)
+        assert listed.note == "After the season."
+        assert model_files(home) == before, "keeping a proposal changes no model"
+        service.delete_experiment(kept.experiment_id)
+        assert service.experiments(workspace.workspace_id) == ()
+
+    def test_they_are_exported_with_the_workspace(self, home: Lab) -> None:
+        service = home.workspaces
+        workspace = service.create("Exported ideas")
+        proposal = home.experiments.draft("roster_fit", IDEA)
+        service.keep_experiment(workspace.workspace_id, proposal, note="Ask for lineups.")
+        document = json.loads(service.export_json(workspace.workspace_id))
+        (exported,) = document["experiments"]
+        assert exported["model"] == "roster_fit" and exported["note"] == "Ask for lineups."
+        assert exported["proposal"]["idea"]["title"] == "Rookies by draft place"
+        markdown = service.export_markdown(workspace.workspace_id)
+        assert "## Experiment proposals" in markdown
+        assert "### Experiment proposal: Rookies by draft place" in markdown
+        assert "#### The test - the lab's" in markdown and "Note: Ask for lineups." in markdown
 
 
 class TestExport:

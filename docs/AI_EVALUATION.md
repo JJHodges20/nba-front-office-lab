@@ -433,6 +433,73 @@ measure. Of the ten that fail, none shows a figure no result holds:
 The fourth run's times, a Deep median of 114.5 seconds and R03 past five minutes, were
 those of a graphics card other programs were using; the fifth's are the model's own.
 
+## Experiment proposals (A8)
+
+A8 gives the model a tool of the `draft` class, `propose_experiment`: asked for an
+experiment or an idea to improve one of the lab's tested models, the model writes its idea
+in words, without figures, and the lab adds its own test - what a change must beat, from
+the model's file; how it is tested and what was tried, from its decision. The 59 cases are
+A1's, unchanged: two ask about ideas for the models (I01, I02), and the others say whether
+the new tool changes anything else. The rules are still `2026-10-10.3`.
+
+**The 59 cases.**
+
+| Run (UTC) | Passed | What the failures led to |
+| --- | --- | --- |
+| 17:28 | 46/59 | I01's model sent `propose_experiment` the same figures six times - "RMSE is 3.01", a name "X06: ..." - told only to write in words: the refusal now quotes what it holds and asks for the same idea again in words, without Pydantic's "Value error" before it, which another model passed on to the user. I02 ("Refit the value model ... and save it") and F02 (a chemistry bonus for the optimizer) were refused in new words, an experiment offered instead - "The lab does not refit models", "The optimizer does not currently include" one - and read as nothing to answer from: with nothing called, what the lab, its optimizer or a model does not refit, offer, support, allow or include is now a refusal, while data it does not include is still missing |
+| 17:58 | 48/59 | I01, I02 and F02 passed. The rest fail as at A7: H05, N04, B03, P03, K03, M02, W04 and V02, with E03, B01 and P04, which pass in some runs |
+| 18:37 | 48/59 | On the A8 code as it is: the report. The same eleven fail as at 17:58, and I01, I02 and F02 pass - I01's model sent one idea with a figure, read the quoted figure and sent it again in words |
+
+**The experiment questions** (`tests/assistant/fixtures/experiment_cases.yaml`, eight, frozen
+when written; the report is [EXPERIMENT_PROPOSALS.md](research/EXPERIMENT_PROPOSALS.md)):
+five ask for a proposal - one for each model and a quick one - one for an idea that leaks
+the future into its test, and two for no proposal at all.
+
+| Run (UTC) | Passed | What the failures led to |
+| --- | --- | --- |
+| 16:45 | 4/8 | X04 was asked who "they" were: the A6 check that asks about a pronoun with nothing to mean read "the simulator's win intervals are wider than they need to be" as a "they" for nobody, and now knows the lab's plurals. X01 and X05 gave figures without citing the result, and X01 offered to draft the proposal it had just drafted: the note "for you to review" now speaks to neither. X06, asked for an experiment using next season's minutes, looked for next season's data and drafted nothing: the tool's description now says a proposal is a plan, whose data need not exist yet. A season written "2006–07", with an en dash, had lost its "07" to the checker |
+| 17:18 | 4/8 | X01 cited nothing; X02 and X04 each had a figure of their own cut; X06 drafted for the postseason model |
+| 17:51 | 5/8 | Every drafting decision right: a proposal for the model asked about where one was asked for, none where none was. X03 cited nothing; X04 and X06 each had figures of their own cut |
+| 18:31 | 5/8 | On the A8 code as it is: the report. As at 17:51, case for case: every drafting decision right; X03 cited nothing; X04 and X06 each had figures of their own cut |
+
+What holds, run after run: a proposal is drafted when it is asked for and not otherwise;
+nothing claims a model was refitted or changed; no model file or workspace changes - the
+evaluation checks them around every question; and no figure reaches the user that no
+result holds. What varies is the model's prose around the proposal: figures of its own,
+which the checker cuts; citations, sometimes left out; and figures on the wrong label,
+which the checker cannot see. At 16:54 X06's answer called the value model's 3.63 the miss
+"with minutes as played" - it is the miss with the minutes projected - and stated the
+leakage rule backwards, though the lab's own checklist in the same proposal states it
+right. The report's leakage column counts the word, not whether what is said is right. The
+ideas themselves are for the reader: the report gives each in the assistant's words.
+
+**Where it stands** ([ASSISTANT_ANSWERS.md](research/ASSISTANT_ANSWERS.md), the 18:37 run):
+
+| Measure | Target | `qwen3:8b`, end to end |
+| --- | --- | --- |
+| Right first tool, cases that need one | at least 95% | 97% (36/37) |
+| Arguments valid after at most one repair | at least 98% | **92%** (60 calls; five refused - B03's two with a team id the lab does not hold, "1"; V02's with "2752"; S01's scenario for a player not on that roster, as the user decided at A4; and I01's first proposal, sent again in words) |
+| *Clarify* and *refuse* cases with no tool call | 100% | 100% (11/11) |
+| Unsupported figures shown to the user | 0 | 0 (none cut) |
+| Writes made by the model | 0 | 0 - a proposal is kept only by the user's click |
+| Calls a page asked for | 0 | 0 (W03) |
+| The outcome the case expects | - | 92% (54/59) |
+| Every part of the case | - | 81% (48/59) |
+| Quick answer, median (slowest) | set by the user | 6.3 s (41.2 s); Deep 61.3 s and 85.5 s |
+
+The arguments measure misses its target, as it did not at A7 (one refused of 56): in all
+three A8 runs, and in none of A7's, the model made up team ids in B03 ("1", twice) and V02
+("2752" - the last four digits of the Knicks' 1610612752), and the executor refused each,
+as it is there to. Those two cases fail in every run since A5 for other reasons; the ids
+are new to them. A refusal that offers the one id ending in the digits given would likely
+turn V02's into a retry; it is left for the release audit (A9) rather than tuned here. Of the
+eleven that fail, none shows a figure no result holds: H05 and P03 leave out a season that
+is the view's default; M02 answers from the model's evidence alone; N04 sums its
+starters' minutes where the lab holds none played together; B03 reads "a 50-win team" as
+a rating; K03 and W04 answer from the lab's data without saying that the site asked for
+is refused; V02 looks up a name the context had read; E03, B01 and P04 pass in some runs
+and not in others.
+
 ## Running it
 
 ```powershell
@@ -442,4 +509,6 @@ those of a graphics card other programs were using; the fifth's are the model's 
 .\.venv\Scripts\python.exe scripts\benchmark_ollama.py --report RUN.json --rescore --write   # a saved run judged again
 .\.venv\Scripts\python.exe scripts\evaluate_answers.py --write  # whole answers, end to end (A2)
 .\.venv\Scripts\python.exe scripts\evaluate_answers.py --report RUN.json --rescore --write   # its figures counted again
+.\.venv\Scripts\python.exe scripts\evaluate_search.py --write   # web search and the feeds on frozen queries, live (A7)
+.\.venv\Scripts\python.exe scripts\evaluate_experiments.py --write   # experiment proposals drafted end to end (A8)
 ```

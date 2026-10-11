@@ -4,9 +4,10 @@ Reads and writes ``data/assistant/assistant.sqlite`` through ``storage.research`
 database is only read, for what an answer rests on now. A workspace is made the first time
 one is needed. A turn is recorded as it came back, with the data build and the value model
 it read, and the rosters it proposed wait in the workspace until the user saves or declines
-each - the save goes through ``ProposalService``, and every press is logged. A follow-up
-reads only the conversation under way in its own workspace: that is how one workspace's
-team or scenario never leaks into another's.
+each - the save goes through ``ProposalService``, and every press is logged. An
+experiment proposal is kept only at the user's press, and keeping it changes nothing else
+(A8). A follow-up reads only the conversation under way in its own workspace: that is how
+one workspace's team or scenario never leaks into another's.
 """
 
 from __future__ import annotations
@@ -24,9 +25,11 @@ import pandas as pd
 from front_office.config.assistant import load_assistant_settings
 from front_office.config.settings import ConfigError
 from front_office.domain.assistant import EvidenceKind, Mode, ResultStatus
+from front_office.domain.experiments import ExperimentProposal
 from front_office.domain.proposals import RosterProposal
 from front_office.domain.research import (
     Approval,
+    ExperimentRecord,
     Finding,
     Focus,
     ProposalRecord,
@@ -44,7 +47,8 @@ DEFAULT_NAME = "My research"
 HISTORY_TURNS = 3
 """Earlier answered turns a follow-up carries: enough to follow "and in 2012-13?", few
 enough to leave the context room for results."""
-EXPORT_VERSION = 1
+EXPORT_VERSION = 2
+"""2 (A8): the experiment proposals a workspace keeps, under ``experiments``."""
 NEWS = (EvidenceKind.CURRENT, EvidenceKind.WEB)
 """What changes by the hour, not by the build: current information and the web."""
 
@@ -300,6 +304,49 @@ class WorkspaceService:
         with self._store() as store:
             store.record_approval(int(workspace_id), fingerprint, "declined")
 
+    # --- experiment proposals (A8) ----------------------------------------------------------
+
+    def keep_experiment(
+        self,
+        workspace_id: int,
+        proposal: ExperimentProposal,
+        *,
+        turn_id: int | None = None,
+        note: str | None = None,
+    ) -> ExperimentRecord:
+        """The user's press of *Keep in the workspace*: the proposal as drafted, kept for
+        review. Kept twice, it is kept once. Nothing in the lab applies it: a change to a
+        model is a milestone of its own."""
+        with self._store() as store:
+            experiment_id, _ = store.keep_experiment(
+                {
+                    "workspace_id": int(workspace_id),
+                    "turn_id": turn_id,
+                    "fingerprint": proposal.fingerprint,
+                    "model": proposal.model,
+                    "title": proposal.title,
+                    "note": note,
+                    "payload": proposal.model_dump_json(),
+                }
+            )
+            frame = store.experiments(int(workspace_id))
+        row = frame[frame["experiment_id"] == experiment_id].iloc[0].to_dict()
+        return _experiment(row)
+
+    def experiments(self, workspace_id: int) -> tuple[ExperimentRecord, ...]:
+        """The experiment proposals kept in the workspace, the newest first."""
+        with self._store() as store:
+            frame = store.experiments(int(workspace_id))
+        return tuple(_experiment(row) for row in frame.to_dict("records"))
+
+    def annotate_experiment(self, experiment_id: int, note: str | None) -> None:
+        with self._store() as store:
+            store.annotate_experiment(int(experiment_id), note)
+
+    def delete_experiment(self, experiment_id: int) -> None:
+        with self._store() as store:
+            store.delete_experiment(int(experiment_id))
+
     def approvals(self, workspace_id: int) -> tuple[Approval, ...]:
         with self._store() as store:
             frame = store.approvals(int(workspace_id))
@@ -318,13 +365,14 @@ class WorkspaceService:
 
     def export_json(self, workspace_id: int) -> str:
         """Everything the workspace holds, as JSON: the workspace, its turns with their
-        answers, findings, proposals and approvals."""
+        answers, findings, proposals and approvals, and the experiment proposals kept."""
         workspace = self.get(workspace_id)
         with self._store() as store:
             turns = store.turns(int(workspace_id))
             findings = store.findings(int(workspace_id))
             proposals = store.proposals(int(workspace_id))
             approvals = store.approvals(int(workspace_id))
+            experiments = store.experiments(int(workspace_id))
         document = {
             "format": "NBA Front Office Lab research workspace",
             "version": EXPORT_VERSION,
@@ -348,16 +396,22 @@ class WorkspaceService:
                 for row in proposals.to_dict("records")
             ],
             "approvals": [_plain_row(row) for row in approvals.to_dict("records")],
+            "experiments": [
+                {**_plain_row(row, drop=("payload",)), "proposal": json.loads(row["payload"])}
+                for row in experiments.to_dict("records")
+            ],
         }
         return json.dumps(document, indent=2, ensure_ascii=False, default=str)
 
     def export_markdown(self, workspace_id: int) -> str:
         """The workspace as a document to read: notes, each question and answer with what it
-        rested on, findings, proposals and what was done with them."""
+        rested on, findings, proposals and what was done with them, and the experiment
+        proposals kept."""
         workspace = self.get(workspace_id)
         turns = self.turns(workspace_id)
         findings = self.findings(workspace_id)
         proposals = self.proposals(workspace_id)
+        experiments = self.experiments(workspace_id)
         lines = [f"# {workspace.name}", ""]
         if workspace.goal:
             lines += [f"*{workspace.goal}*", ""]
@@ -426,6 +480,14 @@ class WorkspaceService:
                 ),
                 "",
             ]
+        lines += ["## Experiment proposals", ""]
+        if not experiments:
+            lines += ["None kept.", ""]
+        for record in experiments:
+            lines += [record.proposal.document(level=3).rstrip(), ""]
+            lines += [f"*Kept {record.created_at:%Y-%m-%d %H:%M} UTC.*", ""]
+            if record.note:
+                lines += [f"Note: {record.note}", ""]
         return "\n".join(lines).rstrip() + "\n"
 
 
@@ -494,6 +556,17 @@ def _proposal(row: dict[str, Any]) -> ProposalRecord:
         turn_id=_maybe_int(row.get("turn_id")),
         created_at=row["created_at"],
         decided_at=None if _missing(decided) else decided,
+    )
+
+
+def _experiment(row: dict[str, Any]) -> ExperimentRecord:
+    return ExperimentRecord(
+        experiment_id=int(row["experiment_id"]),
+        workspace_id=int(row["workspace_id"]),
+        proposal=ExperimentProposal.model_validate_json(row["payload"]),
+        note=_maybe_text(row.get("note")),
+        turn_id=_maybe_int(row.get("turn_id")),
+        created_at=row["created_at"],
     )
 
 

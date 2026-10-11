@@ -1,0 +1,186 @@
+# How the lab tests a change to each of its tested models, for the assistant's experiment
+# proposals (decision 0018, A8). These are rules a person writes, not findings: the
+# figures a proposal must beat come from the fitted model files, and what was tried
+# before is quoted from each model's decision, by heading.
+#
+# A proposal is never applied. Keeping one in a workspace changes no model, no setting
+# and no data; a change to a model is a milestone of its own.
+
+version: 1
+
+models:
+  player_value:
+    label: Player value model
+    decision: docs/decisions/0010-player-value.md
+    tested: ["How it is tested", "Amended in milestone 14"]
+    tried: ["Tried and left out"]
+    split: >-
+      Expanding window: each season is predicted with weights fitted only to the seasons
+      before it, and the misses of every season are pooled.
+    metric: >-
+      How far each team's predicted net rating misses the one it had: the root mean
+      square error, in points per 100 possessions. Once with each season's minutes as
+      played - the test of the ratings alone, and the one simpler methods are compared on -
+      and once with the minutes projected, the error a forecast carries.
+    uncertainty: >-
+      The difference from the model without the change, with a 95% interval from
+      resampling whole seasons. A difference whose interval holds zero cannot be told from
+      nothing.
+    acceptance: >-
+      The change stays only if the model with it misses by clearly less than the model
+      without it: the interval of the difference clear of zero. Either way, what was tried
+      and what it gave go into the decision's "Tried and left out".
+    leakage:
+      - >-
+        Nothing measured in the season being predicted may enter its prediction, except
+        what the test says it takes as given: the minutes as played, in the test of the
+        ratings alone.
+      - >-
+        A change meant to make forecasts better must also be judged with the minutes
+        projected: the test with the minutes as played knows what no forecast does.
+      - >-
+        A season's playoff games come after its regular season. Only earlier seasons'
+        playoffs may inform a prediction.
+      - >-
+        A setting chosen by looking at the test seasons is fitted to the test. Choose it on
+        earlier seasons, or report every choice that was tried.
+      - >-
+        A player's age, draft place or height must be what was known before the season,
+        not a record made later.
+    steps:
+      - >-
+        Build the change - a feature in the value model's code, or a setting in
+        configs/models/player_value.yaml - with a test.
+      - >-
+        Fit it again and run its test: fol value fit --write. Compare the model with the
+        change against the model without it.
+      - >-
+        Keep it only if the interval of the difference is clear of zero. Either way, record
+        what was tried and what it gave in docs/decisions/0010-player-value.md.
+      - >-
+        If it is kept, refit in order: fol build, fol playoffs fit --write, fol simulate
+        fit --write, fol fit test --write, then the research documents.
+
+  postseason:
+    label: Postseason model
+    decision: docs/decisions/0014-postseason-model.md
+    tested: ["How it was tested"]
+    tried: ["What else was tried"]
+    split: >-
+      Expanding window: each season is scored with parameters fitted only to the seasons
+      before it - the series model on every series, the bracket carried through each
+      season's actual matchups, and the season model on every team-season.
+    metric: >-
+      Log loss, the average surprise at what happened, and the Brier score, at each stage.
+      The season model is scored twice: on the rating each team had, and as a forecast
+      reads it, from the rating predicted before the season. Both readings are reported,
+      never only the better one.
+    uncertainty: >-
+      The change in log loss with a 95% interval from resampling whole seasons; and
+      calibration - the calibration slope, where 1 means the chances mean what they say,
+      and reliability tables of predicted against observed, with Wilson intervals.
+    acceptance: >-
+      The change stays only if its change in log loss is clear of zero and its inputs are
+      still what the lab can know before what it predicts. Either way, it goes into the
+      decision's "What else was tried".
+    leakage:
+      - >-
+        Every input must be known before what it predicts: before a playoff game for the
+        series model, before the season for the season model read as a forecast.
+      - >-
+        A team's record, its seeding and the strength of its conference are not known for a
+        roster before its season. Winning percentage and the conference's field
+        out-predict on seasons already played, and were left out on purpose for that
+        reason.
+      - >-
+        A recalibration fitted on the same seasons it is judged on is a correction to the
+        test, not a finding.
+      - Parameters are never fitted on a season after the one being scored.
+    steps:
+      - >-
+        Build the change - an input or the model, in configs/models/postseason.yaml and
+        the postseason model's code - with a test.
+      - >-
+        Fit it again and score it: fol playoffs fit --write. Compare the model with the
+        change against the model without it, at every stage and in both readings.
+      - >-
+        Keep it only if the change in log loss is clear of zero and the inputs stay
+        knowable before what they predict. Either way, record it in
+        docs/decisions/0014-postseason-model.md.
+      - "If it is kept: fol simulate fit --write, then the research documents."
+
+  simulator:
+    label: Season simulator
+    decision: docs/decisions/0015-simulator.md
+    tested: ["The wins are tested the way everything else is"]
+    tried: ["The field is deliberately not in it"]
+    split: >-
+      Every team-season the value model predicted out of sample: seasons are drawn from
+      its predicted rating, with the value model's tested miss, and set against the wins
+      that happened.
+    metric: >-
+      How far the median drawn season misses the wins that happened, in wins per 82
+      games, against giving every team an even record.
+    uncertainty: >-
+      Coverage: how often the 50%, 80% and 95% intervals held the wins that happened. An
+      interval should hold them about as often as it claims.
+    acceptance: >-
+      The change stays only if the intervals still hold the wins about as often as they
+      claim and the miss is no worse. A test fails if the shipped intervals drift from
+      their claim.
+    leakage:
+      - >-
+        A season's noise and the residual wins are measured on recent seasons that the
+        wins test also scores. A change that leans on them should be checked on seasons
+        they were not measured on.
+      - >-
+        A roster's spread comes from the value model's miss with the minutes projected,
+        never from adding up its players' spreads.
+      - The games players miss in the season being drawn are not known before it.
+    steps:
+      - >-
+        Build the change - a parameter or the draw, in configs/models/simulator.yaml and
+        the simulator's code - with a test.
+      - "Measure it again and run the wins test: fol simulate fit --write."
+      - >-
+        Keep it only if the intervals still hold the wins about as often as they claim.
+        Either way, record it in docs/decisions/0015-simulator.md.
+      - "If it is kept: fol simulate report --write."
+
+  roster_fit:
+    label: Roster fit test
+    decision: docs/decisions/0012-roster-fit.md
+    tested: ["Whether fit adds anything is tested the way the value model was"]
+    tried: ["What the evidence says, and what follows from it", "Alternatives considered"]
+    split: >-
+      The value model's out-of-sample misses, one season at a time, with a correction
+      learned only from earlier seasons.
+    metric: >-
+      How far the value model's predictions miss with the correction, against without it:
+      the root mean square error, in points of net rating.
+    uncertainty: >-
+      The change in error with a 95% interval from resampling whole seasons, for each
+      measure alone and for all of them together, with each area left out in turn.
+    acceptance: >-
+      A correction is added to a roster's sum of the parts only if the measures together
+      leave the predictions missing by clearly less. There is no fit score with chosen
+      weights: a measure earns its place through this test alone.
+    leakage:
+      - >-
+        Fit measures must come from the players' previous-season profiles. A measure read
+        off the season predicted is partly its outcome.
+      - >-
+        Choosing a few measures after looking at the results is what the test exists to
+        prevent.
+      - >-
+        The misses tested must be the value model's out-of-sample ones, from the model the
+        evidence names.
+    steps:
+      - >-
+        Build the change - a measure in domain/fit.py, or the test in
+        configs/models/roster_fit.yaml - with a test.
+      - "Gather the evidence again: fol fit test --write."
+      - >-
+        Add a correction only if the evidence says it is usable. Either way, record what
+        was tried in docs/decisions/0012-roster-fit.md.
+      - "Then: fol fit report --write."

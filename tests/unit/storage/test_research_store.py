@@ -14,6 +14,7 @@ from sqlalchemy import text
 from front_office.domain.schema import validate_frame
 from front_office.domain.tables.research import (
     RESEARCH_APPROVALS,
+    RESEARCH_EXPERIMENTS,
     RESEARCH_FINDINGS,
     RESEARCH_PROPOSALS,
     RESEARCH_TURNS,
@@ -281,7 +282,88 @@ class TestFindingsAndApprovals:
             store.record_approval(workspace_id, "c", "approved")
 
 
+def experiment(fingerprint: str, workspace_id: int, *, model: str = "player_value") -> dict:
+    return {
+        "workspace_id": workspace_id,
+        "turn_id": None,
+        "fingerprint": fingerprint,
+        "model": model,
+        "title": "Rookies by draft place",
+        "note": None,
+        "payload": "{}",
+    }
+
+
+class TestExperiments:
+    """A8: the experiment proposals a user keeps, beside findings."""
+
+    def test_kept_listed_annotated_and_deleted(self, store: ResearchStore) -> None:
+        workspace_id = store.create_workspace("Ideas")
+        first, new = store.keep_experiment(experiment("a", workspace_id))
+        second, _ = store.keep_experiment(experiment("b", workspace_id, model="postseason"))
+        assert new
+        kept = store.experiments(workspace_id)
+        assert validate_frame(kept, RESEARCH_EXPERIMENTS) == []
+        assert kept["fingerprint"].tolist() == ["b", "a"], "the newest first"
+        store.annotate_experiment(first, "  try it after the season  ")
+        notes = store.experiments(workspace_id).set_index("experiment_id")["note"]
+        assert notes[first] == "try it after the season" and pd.isna(notes[second])
+        store.delete_experiment(second)
+        assert store.experiments(workspace_id)["fingerprint"].tolist() == ["a"]
+        with pytest.raises(ResearchNotFound):
+            store.delete_experiment(second)
+        with pytest.raises(ResearchNotFound):
+            store.annotate_experiment(second, "gone")
+
+    def test_one_kept_twice_is_kept_once(self, store: ResearchStore) -> None:
+        workspace_id = store.create_workspace("Twice")
+        first, new = store.keep_experiment(experiment("a", workspace_id))
+        again, new_again = store.keep_experiment(experiment("a", workspace_id))
+        assert (first, new) == (again, True) and not new_again
+        assert len(store.experiments(workspace_id)) == 1
+
+    def test_only_a_tested_model_is_kept(self, store: ResearchStore) -> None:
+        workspace_id = store.create_workspace("Rules")
+        with pytest.raises(StorageError, match="an experiment proposal is for one of"):
+            store.keep_experiment(experiment("a", workspace_id, model="archetypes"))
+
+    def test_they_go_with_their_workspace_and_outlast_its_history(
+        self, store: ResearchStore
+    ) -> None:
+        kept = store.create_workspace("Kept")
+        gone = store.create_workspace("Gone")
+        store.add_turn(turn(kept, "Suggest an experiment"))
+        store.keep_experiment(experiment("a", kept))
+        store.keep_experiment(experiment("b", gone))
+        store.clear_turns(kept)
+        store.delete_workspace(gone)
+        assert store.experiments(kept)["fingerprint"].tolist() == ["a"]
+        assert store.experiments(gone).empty
+
+
 class TestVersions:
+    def test_a_file_from_before_a8_gains_experiment_proposals(self, path: Path) -> None:
+        """Version 2 (A8): a file made at version 1 is copied aside and brought forward, and
+        then holds the table exactly as a new file does."""
+        with ResearchStore(path) as first:
+            kept = first.create_workspace("From A7")
+        made_at_a7 = sqlite3.connect(path)
+        try:
+            made_at_a7.execute("DROP TABLE research_experiments")
+            made_at_a7.execute("DELETE FROM research_schema WHERE version = 2")
+            made_at_a7.commit()
+        finally:
+            made_at_a7.close()
+        with ResearchStore(path) as upgraded:
+            assert upgraded.version() == 2 and upgraded.backup is not None
+            assert upgraded.workspace(kept)["name"] == "From A7"
+            upgraded.keep_experiment(experiment("a", kept))
+            assert len(upgraded.experiments(kept)) == 1
+        fresh = path.parent / "fresh.sqlite"
+        with ResearchStore(fresh):
+            pass
+        assert _schema(path, "research_experiments") == _schema(fresh, "research_experiments")
+
     def later(self, *, fails: bool = False) -> tuple[Migration, ...]:
         def add_index(connection) -> None:  # type: ignore[no-untyped-def]
             connection.execute(text("CREATE INDEX ix_turns_question ON research_turns (question)"))
@@ -332,3 +414,17 @@ class TestVersions:
             other.close()
         with pytest.raises(StorageError, match="not the lab's research store"):
             ResearchStore(path)
+
+
+def _schema(path: Path, table: str) -> tuple:
+    """A table as SQLite made it: its statement and its indexes."""
+    connection = sqlite3.connect(path)
+    try:
+        return tuple(
+            connection.execute(
+                "SELECT type, name, sql FROM sqlite_master WHERE tbl_name = ? ORDER BY name",
+                (table,),
+            ).fetchall()
+        )
+    finally:
+        connection.close()

@@ -57,7 +57,7 @@ class TestTheRegistry:
         assert not fields & {"sql", "query_sql", "code", "command", "path", "file", "url"}
 
     def test_every_tool_says_when_it_is_built(self) -> None:
-        assert {spec.milestone for spec in REGISTRY} <= {"A2", "A4", "A5", "A7"}
+        assert {spec.milestone for spec in REGISTRY} <= {"A2", "A4", "A5", "A7", "A8"}
 
     def test_enumerations_are_the_labs_own(self) -> None:
         schema = {spec.name: tool_schema(spec)["function"]["parameters"] for spec in REGISTRY}
@@ -99,8 +99,10 @@ class TestTheSchemas:
         assert "title" in tool_schema(spec)["function"]["parameters"]["properties"]
 
     def test_the_whole_registry_is_a_few_thousand_tokens(self) -> None:
-        """What every request carries: kept small enough to leave room in the context."""
-        assert len(json.dumps(tool_schemas())) < 14_000
+        """What every request carries: kept small enough to leave room in the context. At A8,
+        with propose_experiment, 14,925 characters: a question's whole prompt measured 3,557
+        tokens of the 8,192 the model is given, 180 of them the new tool's."""
+        assert len(json.dumps(tool_schemas())) < 15_000
 
 
 class TestValidation:

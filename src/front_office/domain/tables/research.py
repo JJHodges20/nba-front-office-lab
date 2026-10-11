@@ -3,7 +3,8 @@
 Kept in ``data/assistant/assistant.sqlite``, apart from the lab's database and the current
 cache: a build never touches it, and nothing in it is league data. A workspace holds the
 questions the user asked and the answers they got, the findings they bookmarked, the
-rosters the assistant proposed and what the user did with each. It is all the user's own
+rosters the assistant proposed and what the user did with each, and the experiment
+proposals they kept (A8). It is all the user's own
 work: deleting a workspace deletes what it holds and nothing else - a roster saved from a
 proposal lives on in the Team Builder.
 
@@ -13,6 +14,7 @@ copies the file aside before it moves it to a newer one.
 
 from __future__ import annotations
 
+from front_office.domain.experiments import TESTED_MODELS
 from front_office.domain.schema import DType, Field, Provenance, TableContract
 
 _ID = Provenance.IDENTIFIER
@@ -355,6 +357,74 @@ RESEARCH_APPROVALS = TableContract(
     introduced_in="A6",
 )
 
+RESEARCH_EXPERIMENTS = TableContract(
+    name="research_experiments",
+    domain="research",
+    description=(
+        "Experiment proposals the user kept in a workspace: the assistant's idea and the "
+        "lab's test for one of its models, as drafted. Kept for review only - nothing in the "
+        f"lab applies one. {_KEPT}"
+    ),
+    grain="One row per proposal kept in a workspace.",
+    fields=(
+        Field(
+            "experiment_id",
+            DType.INTEGER,
+            "Proposal id, assigned when it is kept.",
+            nullable=False,
+            provenance=_ID,
+        ),
+        Field(
+            "workspace_id",
+            DType.INTEGER,
+            "Workspace it was kept in.",
+            nullable=False,
+            provenance=_ID,
+            references=WORKSPACE,
+        ),
+        Field(
+            "turn_id",
+            DType.INTEGER,
+            "The turn that drafted it, while that turn is kept.",
+            provenance=_ID,
+        ),
+        Field(
+            "fingerprint",
+            DType.STRING,
+            "The proposal's fingerprint: everything in it, hashed. Kept twice, it is kept once.",
+            nullable=False,
+            provenance=_ID,
+        ),
+        Field(
+            "model",
+            DType.STRING,
+            "The model it would change.",
+            nullable=False,
+            provenance=_OPS,
+            allowed=TESTED_MODELS,
+        ),
+        Field(
+            "title",
+            DType.STRING,
+            "Its title, as the assistant wrote it.",
+            nullable=False,
+            provenance=_OPS,
+        ),
+        Field("note", DType.STRING, "The user's note on it.", provenance=_USER),
+        Field(
+            "payload",
+            DType.STRING,
+            "The proposal as the page shows it, as JSON.",
+            nullable=False,
+            provenance=_OPS,
+        ),
+        _moment("created_at", "When it was kept."),
+    ),
+    primary_key=("experiment_id",),
+    indexes=(("workspace_id",),),
+    introduced_in="A8",
+)
+
 TABLES: tuple[TableContract, ...] = (
     RESEARCH_SCHEMA,
     RESEARCH_WORKSPACES,
@@ -362,4 +432,5 @@ TABLES: tuple[TableContract, ...] = (
     RESEARCH_FINDINGS,
     RESEARCH_PROPOSALS,
     RESEARCH_APPROVALS,
+    RESEARCH_EXPERIMENTS,
 )

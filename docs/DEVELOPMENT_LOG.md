@@ -3,6 +3,152 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone A8 - AI Research Assistant: experiment proposals for the models, never applied (2026-10-11)
+
+Asked for an experiment, or an idea to improve one of the lab's models, the assistant drafts
+a proposal: its idea in words, beside the lab's own test for that model. The user may keep
+it in the workspace or download it; nothing applies it. No league table, model file,
+setting or contract figure changed: nothing was fitted, rebuilt or imported.
+
+**The user's decisions as A8 began** (2026-10-11): a kept proposal has its own list in each
+workspace; the assistant drafts one only when asked; and only the four models the lab tests
+out of sample may be its subject - player value, the postseason model, the simulator and
+the roster fit test.
+
+**Built**
+
+- **The proposal** (`domain/experiments.py`): two parts, kept apart. The idea is the
+  assistant's - what it noticed, the hypothesis, the change to test, how it could fail -
+  and holds no figure: a figure in it is refused, and the model is sent back to write it in
+  words, so that none can be made up, echoed in a result and cited as the lab's. The plan is
+  the lab's: what a change must beat or keep, how seasons are split, what is measured, how
+  sure the test is, when a change is kept, the leakage to rule out, what was tried before
+  and the steps of the milestone that would build it. A proposal has a fingerprint, and
+  reads as a Markdown document.
+- **The rules** (`configs/experiments.yaml`, `config/experiments.py`): for each tested
+  model, written as the lab works - the value model's main test takes each season's minutes
+  as played by design, and its leakage rule says so; the simulator's noise is measured over
+  seasons its wins test also scores, and its checklist says a change leaning on it should be
+  checked on others. Each names the headings of its decision that say how the model is
+  tested and what was tried; a test fails if a heading goes.
+- **The lab's part** (`services/experiments.py`, `Lab.experiments`): the figures a change
+  must beat, read from the model's fitted file - the value model's misses with the minutes
+  as played and projected, the postseason model's log loss and calibration at each stage and
+  both readings, the simulator's wins test and its intervals' coverage, the fit test's error
+  with and without a correction - and the decision's sections quoted whole. The figures are
+  the file's, never a document's: the simulator's decision gives its coverage as 53%, 83%
+  and 97%; its refitted file says 51%, 81% and 96%.
+- **The tool** (`assistant/experiment_tools.py`): `propose_experiment`, of the `draft`
+  class - what it drafts travels with the answer, and only the user's click keeps it. Its
+  description says when (only when asked) and that a proposal is a plan, so its data need
+  not exist yet; its result gives the model the lab's figures to cite.
+- **Kept in the workspace** (`research_experiments`, the research store's version 2): an
+  A7 file is backed up and brought forward on first opening, and a test checks the table
+  it gains matches a new file's. `WorkspaceService.keep_experiment` keeps a proposal once
+  however often it is pressed, with the user's note; the workspace's exports carry them.
+- **On the page** (`wb/answers.py`, `wb/views/research.py`): *Experiments to review*
+  under the answer - the idea tagged as the assistant's and untested, the lab's test tagged
+  Modeled, with what a change must beat, how it would be tested, and what was tried before
+  - with *Keep in the workspace* (`api.keep_experiment`) and *Download*; and the
+  workspace's *Experiment proposals*, each with a note and a delete.
+- **The evaluation of drafting** (`assistant/experiment_evaluation.py`,
+  `scripts/evaluate_experiments.py`, `tests/assistant/fixtures/experiment_cases.yaml`,
+  `docs/research/EXPERIMENT_PROPOSALS.md`, generated): eight frozen questions, end to end -
+  five asking for a proposal, one for each model and a quick one, one asking for an idea
+  that leaks the future, two asking for none - scored on drafting when and only when
+  asked, for the right model; no figure cut; no claim to have refitted or changed a model;
+  no model file or workspace changed; a citation; and leakage mentioned where it applies.
+- **Tests**: the idea without figures, its fingerprint and its document; the rules and every
+  heading they name; each model's plan from its file, an unfitted model, no documents; the
+  store's new table, a proposal kept once, notes, deletion, a workspace's deletion, an A7
+  file brought forward; the workspace's keep and exports; the tool, a figure sent back, a
+  model the lab does not test refused, the result carried and kept with the answer; the
+  page's draft, keep, note and delete with the model files unchanged; the scoring.
+
+**Found on the way, and fixed** - by the first runs of the experiment questions and of the
+59 cases:
+
+- **A "they" for things was asked about.** "...whether the simulator's win intervals are
+  wider than they need to be" got "Who do you mean by 'they'?": the A6 check that asks about
+  a pronoun with nothing to mean knew only plurals such as teams and players. It now knows
+  the lab's own - intervals, projections, ratings, chances, models and the like - and counts
+  one only before the pronoun, so "How did they do against their projections?" is still
+  asked about. No frozen case's question is read differently.
+- **A season written with a dash lost its second year.** "2006–07", an en dash as
+  typesetters write it, was read as the year 2006 and a figure "07" no result held, and the
+  sentence was cut. The checker reads a season with any dash as a season.
+- **The tool's words.** A model read the note "for you to review" as its own task and
+  offered to draft the proposal it had just drafted; the note now speaks to neither, and
+  the result tells the model the proposal is shown whole under the answer. Asked for an
+  experiment using next season's minutes, a model looked for next season's data and drafted
+  nothing; the description now says a proposal is a plan, whose data need not exist yet.
+- **Refusals in other words.** In the first run of the 59 cases, with proposals to offer
+  instead, the model refused I02 ("Refit the value model ... and save it") as "The lab does
+  not refit models ... Would you like me to propose an experiment?" and F02's chemistry
+  bonus as "The optimizer does not currently include" one - each read as nothing to answer
+  from. With nothing called, what the lab, its optimizer or a model does not refit, offer,
+  support, allow or include is now a refusal; data it does not include is still missing.
+- **A figure refused six times.** In the same run I01's model sent the same "3.01" back to
+  `propose_experiment` six times, told only to write in words; the refusal now quotes what
+  it holds.
+- **The tools' size.** With the new tool the schemas reach 14,925 characters, past the
+  14,000 a test held them to. A question's whole prompt measured 3,557 tokens of the
+  model's 8,192, 180 of them the new tool's; the limit is 15,000.
+- One full test run stalled near its end - a worker past the five-minute watchdog, its
+  stack not captured - as one did once at A6; run again in full it passed. It is left for
+  the release audit (A9).
+
+**The evaluation** ([AI_EVALUATION.md](AI_EVALUATION.md)). The 59 cases, three runs on the
+A8 code: 46, 48 and 48 of 59, the last the report. The first found the refusals in new
+words and the figure sent back six times, above; after them I01, I02 and F02 - the cases
+A8 bears on - passed, and each of the eleven that fail failed in A7's runs too. Every case
+that needs a tool opened with the right one but E03 (36 of 37), and no figure that no
+result holds reached the user. One measure misses its target: of 60 calls, five were
+refused - B03's and V02's with team ids the model made up, in all three A8 runs and in
+none of A7's (V02's "2752" is the end of the Knicks' id); S01's, as decided at A4; and
+I01's first proposal, sent again in words - 92% against 98%. The ids are left for the
+release audit.
+
+The eight experiment questions, four runs: 4, 4, 5 and 5 of 8, the last the report
+([EXPERIMENT_PROPOSALS.md](research/EXPERIMENT_PROPOSALS.md)). In the last two every
+drafting decision was right - a proposal for the model asked about where one was asked
+for, none where none was - nothing claimed a model was refitted or changed, and nothing
+changed. What fails is the model's prose around the proposal: X03 cited nothing; X04 and
+X06 each wrote figures of their own, which the checker cut. Figures on the wrong label go
+through, as the checker cannot see them: at one run X06's answer called the miss with the
+minutes projected the miss "with minutes as played" and stated the leakage rule
+backwards, beside the lab's checklist stating it right. The ideas themselves are the
+reader's to judge; the report lists each in the assistant's words.
+
+**The browser pass** - the workbench over a scratch copy of the real project, with the real
+model, in the light and the dark theme. The copy's research file was A7's, version 1: on
+first opening it was backed up (`backups/assistant-v1-...`) and brought to version 2, its
+workspaces and answers intact. On AI Research three experiments were asked for - the value
+model's projections for rookies, the postseason model's confidence in the later rounds, the
+simulator's win intervals - and each proposal showed under its answer: the idea tagged as
+the assistant's and untested, the lab's test tagged Modeled, with what a change must beat,
+how it would be tested and what was tried before. Each was kept, counted in the workspace's
+*Experiment proposals*, shown there as kept, given a note, and downloaded as a document
+with its two parts apart. The same proposal drafted again showed as kept, with nothing to
+keep twice. It found one fault, now fixed: asked about the simulator's intervals, the model
+put a figure in its idea, the tool refused it, and the answer told the user the proposal
+had been "rejected due to a value error". The refusal now asks for the same idea again in
+words, without Pydantic's "Value error" for the model to pass on; asked again, the question
+drafted its proposal.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| `pytest -n auto` (everything but live-network and live-model tests) | 3,895 passed (4 min 53 s), after the last change |
+| `pytest -m ollama` (the live model) | 6 passed |
+| The end-to-end evaluation, on the A8 code | 48/59 in the last of three runs; I01, I02 and F02 pass; every figure shown held by a result; arguments 92% against a 98% target (made-up team ids, refused); report generated |
+| The experiment-proposal evaluation | 5/8 in the last of four runs: drafted when and only when asked, for the right model, 8/8; no refit claimed and nothing changed, 8/8; two answers with figures of their own cut, one uncited; report generated |
+| The pages in a browser | AI Research's experiment proposals - drafted, kept, listed, noted, downloaded - light and dark, over a copy of the real project whose research file was brought from version 1 to 2; one fault found and fixed |
+| Sources and boundaries | No paid provider and no new source; the assistant reaches no new layer; the boundary tests pass |
+| Data and models | No model file, setting, league table or contract figure changed; tests check the model files byte for byte around drafting and keeping, and the evaluation around every question; the browser pass wrote only into a scratch copy |
+
 ## Milestone A7 - AI Research Assistant: wider sources and the contract-update review (2026-10-10)
 
 News comes from feeds the source register allows, every item dated; search quality is

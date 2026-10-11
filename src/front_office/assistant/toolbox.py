@@ -14,6 +14,7 @@ from datetime import datetime
 from front_office.assistant.contract_tools import contract_handlers
 from front_office.assistant.current_tools import Refresh, current_handlers
 from front_office.assistant.document_tools import DOCUMENT_HANDLERS
+from front_office.assistant.experiment_tools import EXPERIMENT_HANDLERS
 from front_office.assistant.lab_tools import HANDLERS, Handler
 from front_office.assistant.model_tools import MODEL_HANDLERS
 from front_office.assistant.proposal_tools import PROPOSAL_HANDLERS
@@ -30,6 +31,7 @@ LAB_HANDLERS: Mapping[str, Handler] = {
     **MODEL_HANDLERS,
     **DOCUMENT_HANDLERS,
     **PROPOSAL_HANDLERS,
+    **EXPERIMENT_HANDLERS,
 }
 """Every handler that needs nothing but the lab: its data, its models, its documents and
 the roster optimizer."""

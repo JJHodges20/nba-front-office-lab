@@ -18,8 +18,16 @@ from datetime import date
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
+from front_office.domain.experiments import FAILURE_MODES, ModelKey, in_words
 from front_office.domain.optimizer import BudgetMode
 from front_office.domain.scenario import (
     FULL_SEASON_GAMES,
@@ -43,7 +51,8 @@ class Permission(StrEnum):
     NET = "net"
     """Reaches current data or the web; may fill a cache."""
     DRAFT = "draft"
-    """Stores a proposal for the user to review; applies nothing."""
+    """Drafts something for the user to review: it travels with the answer, and only the
+    user's click keeps it. It stores nothing and changes nothing (A8)."""
 
 
 Season = Annotated[str, StringConstraints(pattern=r"^\d{4}-\d{2}$")]
@@ -300,6 +309,23 @@ class ResearchDocs(ToolArgs):
     query: str = Field(min_length=3, max_length=200)
 
 
+InWords = Annotated[str, AfterValidator(in_words)]
+
+
+# The model's idea for an experiment, in words: every figure in a proposal is the lab's,
+# added from the model's file, so none can be made up and cited back (A8). No docstring:
+# it would be sent with every request.
+class ProposeExperiment(ToolArgs):
+    model: ModelKey
+    name: InWords = Field(min_length=3, max_length=80)
+    observation: InWords = Field(min_length=10, max_length=600)
+    hypothesis: InWords = Field(min_length=10, max_length=400, description="Testable.")
+    change: InWords = Field(min_length=5, max_length=400, description="Feature or model change.")
+    failure_modes: list[InWords] = Field(
+        min_length=1, max_length=FAILURE_MODES, description="How it could fail."
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ToolSpec:
     name: str
@@ -311,7 +337,7 @@ class ToolSpec:
     """The milestone that builds what the tool calls."""
 
 
-R, C, N = Permission.READ, Permission.COMPUTE, Permission.NET
+R, C, N, D = Permission.READ, Permission.COMPUTE, Permission.NET, Permission.DRAFT
 
 REGISTRY: tuple[ToolSpec, ...] = (
     ToolSpec("resolve_entities", "Find a player's or team's id from a name.", ResolveEntities, R, "A2"),
@@ -336,6 +362,7 @@ REGISTRY: tuple[ToolSpec, ...] = (
     ToolSpec("web_search", "Search the web for reporting; returns sources with ids.", WebSearch, N, "A2"),
     ToolSpec("read_source", "Read one source by its id: a search result, a feed item or a link the user pasted.", ReadSource, N, "A2"),
     ToolSpec("research_docs", "Search the lab's own documentation and research: how a figure is computed, how a tool or model works and was tested, why something was decided.", ResearchDocs, R, "A4"),
+    ToolSpec("propose_experiment", "Only when the user asks for an experiment, or an idea to improve one of the lab's models: writes it up as a proposal for the user to review - a plan, so its data need not exist yet. Give your idea in words, without figures; the lab adds the model's test, what a change must beat and what was tried before. Nothing is fitted or changed.", ProposeExperiment, D, "A8"),
 )  # fmt: skip
 
 BY_NAME: Mapping[str, ToolSpec] = {spec.name: spec for spec in REGISTRY}

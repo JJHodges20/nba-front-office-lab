@@ -478,6 +478,74 @@ def test_proposed_rosters_are_saved_only_by_the_users_click(model, page, priced_
         assert len(lab.rosters.list()) == 1, "a decline saves nothing"
 
 
+EXPERIMENT = tool_call(
+    "propose_experiment",
+    model="player_value",
+    name="Rookies by draft place",
+    observation="The value model knows little of a rookie, and its projections miss them most.",
+    hypothesis="Where a rookie was drafted says how good they are before they play.",
+    change="Start a rookie's estimate from the level of players drafted at the same place.",
+    failure_modes=["Too few rookies each season to tell a difference from nothing."],
+)
+
+
+def model_files(home: Path) -> dict[str, bytes]:
+    folder = home / "configs" / "models"
+    return {path.name: path.read_bytes() for path in folder.iterdir()}
+
+
+def test_an_experiment_is_drafted_and_kept_only_by_the_users_click(model, page, home: Path) -> None:
+    """A8: the assistant's idea and the lab's test, kept apart; kept by the button, once;
+    noted and deleted in the workspace; and no model file touched by any of it."""
+    before = model_files(home)
+    model(
+        ScriptedOllama(
+            chats=[
+                chat_chunks(tool_calls=[EXPERIMENT]),
+                chat_chunks("Here is an experiment to review [r1]."),
+            ]
+        )
+    )
+    app = ask(page(home, "research"), "Suggest an experiment to improve the projections.")
+    (turn,) = kept(home)
+    said = texts(app)
+    assert "Experiments to review" in said and "Keeping one changes no model" in said
+    assert "Rookies by draft place" in said and "Not tested" in said
+    assert "The lab's test, from the Player value model, revision" in said
+    assert any(block.label == "Experiment proposals (0)" for block in app.status)
+
+    key = f"t{turn.turn_id}_r1_0"
+    app.button(key=f"ai_experiment_keep_{key}").click().run()
+    assert not app.exception, [error.value for error in app.exception]
+    assert any(block.label == "Experiment proposals (1)" for block in app.status)
+    with Lab(load_settings(home)) as lab:
+        (record,) = lab.workspaces.experiments(turn.workspace_id)
+    assert record.turn_id == turn.turn_id and record.proposal.idea.title == "Rookies by draft place"
+    assert not any(button.key == f"ai_experiment_keep_{key}" for button in app.button), (
+        "kept once: the button goes"
+    )
+
+    app.text_area(key=f"ai_x_note_{record.experiment_id}_{answers_stamp(None)}").set_value(
+        "Try it once the season ends."
+    )
+    app.button(key=f"ai_x_save_{record.experiment_id}").click().run()
+    with Lab(load_settings(home)) as lab:
+        assert (
+            lab.workspaces.experiments(turn.workspace_id)[0].note == "Try it once the season ends."
+        )
+    app.button(key=f"ai_x_delete_{record.experiment_id}").click().run()
+    with Lab(load_settings(home)) as lab:
+        assert lab.workspaces.experiments(turn.workspace_id) == ()
+    assert model_files(home) == before, "no model file was touched"
+
+
+def answers_stamp(*stored: object) -> str:
+    """The note form's key ends with what it shows (A6): see ``research._stamp``."""
+    from wb.views import research
+
+    return research._stamp(*stored)
+
+
 # --- text from outside the lab -------------------------------------------------------------------
 
 

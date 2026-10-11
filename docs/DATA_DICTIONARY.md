@@ -65,6 +65,7 @@ measured statistics, modeled estimates and user assumptions visibly apart.
 | [`research_findings`](#research_findings) | research | One row per bookmark. | A6 |
 | [`research_proposals`](#research_proposals) | research | One row per proposal in a workspace, named by its fingerprint. | A6 |
 | [`research_approvals`](#research_approvals) | research | One row per press. | A6 |
+| [`research_experiments`](#research_experiments) | research | One row per proposal kept in a workspace. | A8 |
 
 ### teams
 
@@ -927,6 +928,26 @@ Every press of a proposal's save or decline button and what came of it: saved, f
 | `roster_id` | integer | no | identifier |  | The roster it saved or found. |
 | `detail` | string | no | operational |  | Why it was refused, in plain sentences. |
 | `at` | datetime | yes | operational |  | When the button was pressed. |
+
+### research_experiments
+
+Experiment proposals the user kept in a workspace: the assistant's idea and the lab's test for one of its models, as drafted. Kept for review only - nothing in the lab applies one. Kept in data/assistant/assistant.sqlite, not the lab's database.
+
+- **Grain:** One row per proposal kept in a workspace.
+- **Primary key:** `experiment_id`
+- **Indexes:** `workspace_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `experiment_id` | integer | yes | identifier |  | Proposal id, assigned when it is kept. |
+| `workspace_id` | integer | yes | identifier |  | Workspace it was kept in. References `research_workspaces.workspace_id`. |
+| `turn_id` | integer | no | identifier |  | The turn that drafted it, while that turn is kept. |
+| `fingerprint` | string | yes | identifier |  | The proposal's fingerprint: everything in it, hashed. Kept twice, it is kept once. |
+| `model` | string | yes | operational |  | The model it would change. One of: `player_value`, `postseason`, `simulator`, `roster_fit`. |
+| `title` | string | yes | operational |  | Its title, as the assistant wrote it. |
+| `note` | string | no | assumption |  | The user's note on it. |
+| `payload` | string | yes | operational |  | The proposal as the page shows it, as JSON. |
+| `created_at` | datetime | yes | operational |  | When it was kept. |
 
 ## Planned tables
 

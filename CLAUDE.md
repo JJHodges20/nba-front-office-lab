@@ -46,6 +46,7 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\python.exe scripts\benchmark_ollama.py --write   # benchmark the candidate models (docs/research/ASSISTANT_MODELS.md)
 .\.venv\Scripts\python.exe scripts\evaluate_answers.py --write   # the assistant's whole answers, end to end (docs/research/ASSISTANT_ANSWERS.md)
 .\.venv\Scripts\python.exe scripts\evaluate_search.py --write    # web search and the news feeds on frozen queries, live (docs/research/SEARCH_QUALITY.md)
+.\.venv\Scripts\python.exe scripts\evaluate_experiments.py --write   # experiment proposals drafted end to end on frozen questions (docs/research/EXPERIMENT_PROPOSALS.md)
 .\.venv\Scripts\fol.exe current refresh            # fetch what is due: this season's games, transactions, the injury report, the news feeds
 .\.venv\Scripts\fol.exe current status             # when each current source was last fetched, and what is held
 .\.venv\Scripts\python.exe scripts\make_fixtures.py   # rebuild tests/fixtures/raw from data/raw
@@ -102,11 +103,12 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   `docs/research/BENCHMARKS.md`, `docs/research/PLAYER_VALUE.md`,
   `docs/research/ROSTER_FIT.md`, `docs/research/POSTSEASON.md`,
   `docs/research/SIMULATOR.md`, `docs/research/ASSISTANT_MODELS.md`,
-  `docs/research/ASSISTANT_ANSWERS.md` and `docs/research/SEARCH_QUALITY.md` come from
+  `docs/research/ASSISTANT_ANSWERS.md`, `docs/research/SEARCH_QUALITY.md` and
+  `docs/research/EXPERIMENT_PROPOSALS.md` come from
   `fol dictionary|metrics|benchmarks --write`, `fol value report --write`,
   `fol fit report --write`, `fol playoffs report --write`, `fol simulate report --write`,
-  `scripts/benchmark_ollama.py --write`, `scripts/evaluate_answers.py --write` and
-  `scripts/evaluate_search.py --write`. The
+  `scripts/benchmark_ollama.py --write`, `scripts/evaluate_answers.py --write`,
+  `scripts/evaluate_search.py --write` and `scripts/evaluate_experiments.py --write`. The
   first two are checked by tests; the research
   documents depend on the database, so regenerate them at a milestone gate after the
   data, a model, the evidence or the research code changes.
@@ -211,6 +213,17 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   file or a salary has changed, and writes the roster and its players in one transaction
   (`RosterRepository.create_with_players`, which `OptimizerService.save` uses too). R01
   and R03 run on the `priced` test database (`priced_template`), the user's decision at A5.
+- **An experiment proposal is never applied** (A8). `propose_experiment` drafts one only
+  when the user asks, for one of the four tested models (`domain.experiments.TESTED_MODELS`;
+  archetypes are rules, left out by the user's decision). The idea is the model's, in
+  words: its fields refuse any figure, so none can be echoed in a result and cited back. The
+  plan is the lab's (`services/experiments.py`): what a change must beat from the model's
+  fitted file, never a document's figure; how it is tested and what was tried, quoted from
+  its decision by heading (a test fails if a heading goes); and the rules in
+  `configs/experiments.yaml`, written as the lab works - change one only with its decision.
+  A proposal travels with the answer; the user's click keeps it in the workspace
+  (`research_experiments`), and nothing leads from it to a model file, a setting or the
+  lab's data. A change to a model is still a milestone of its own, fitted on request.
 - **The user's research is a third file**, `data/assistant/assistant.sqlite`
   (`storage/research.py`, contracts in `domain/tables/research.py`): never in the lab's
   database, never touched by a build. It is versioned: a change to a research contract needs

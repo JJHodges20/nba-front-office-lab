@@ -32,9 +32,10 @@ from front_office.domain.assistant import (
     Step,
     ToolResult,
 )
+from front_office.domain.experiments import ExperimentPlan, ExperimentProposal
 from front_office.domain.metrics import MetricSpec
 from front_office.domain.proposals import RosterProposal
-from front_office.domain.research import ProposalRecord
+from front_office.domain.research import ExperimentRecord, ProposalRecord
 from front_office.domain.tables.rosters import ROSTER_SLOTS
 from front_office.services import METRIC_CATALOGS, ProposalSaved
 from wb import charts, components, formats
@@ -111,6 +112,18 @@ RATING_HELP = (
     "Each player's forecast added up for the minutes they are expected to play, relative to "
     "the league. For whole teams these forecasts have typically been off by the amount shown."
 )
+EXPERIMENTS = (
+    "Drafted because you asked: experiments for one of the lab's models, to review. The idea "
+    "is the assistant's and has not been tested; the test beside it is the lab's, from the "
+    "model's file and its decision. Keeping one changes no model, setting or data."
+)
+KEEP_HELP = (
+    "Keeps this proposal in the workspace's list of experiment proposals, to come back to. "
+    "No model, setting or data changes."
+)
+IDEA_TAG = ("The assistant's idea", ":material/lightbulb:", "orange")
+TEST_TAG = components.PROVENANCE[components.MODELED][:3]
+"""The lab's test is the model's own record: tagged as every modeled figure is."""
 PROPOSAL_METRICS = ("projected_impact", "projected_share", "projected_wins")
 """The value model's forecasts in a proposal's players table, labelled by their catalog."""
 PROPOSAL_COLUMNS = {
@@ -143,9 +156,11 @@ def draw(
     workspace_id: int | None = None,
     records: Mapping[str, ProposalRecord] | None = None,
     roster_names: Mapping[int, str] | None = None,
+    turn_id: int | None = None,
+    kept: Mapping[str, ExperimentRecord] | None = None,
 ) -> None:
     """The whole answer: its kind, its text, the readings to choose from, its notes, the
-    rosters it proposed, what it rests on, and how it was answered."""
+    rosters and experiments it proposed, what it rests on, and how it was answered."""
     outcome(answer)
     st.markdown(prose(answer.text))
     if answer.outcome is Outcome.CLARIFY and answer.options and choose is not None:
@@ -159,6 +174,7 @@ def draw(
             records=records or {},
             roster_names=roster_names or {},
         )
+    experiments(answer, key=key, workspace_id=workspace_id, turn_id=turn_id, kept=kept or {})
     results(answer, key=key)
     evidence(answer)
     workings(answer, steps=steps, seconds=seconds)
@@ -373,6 +389,134 @@ def _saved(saved: ProposalSaved) -> None:
             + " Ask the question again for rosters made from the lab as it is now.",
             icon=":material/warning:",
         )
+
+
+# --- experiment proposals (A8) -------------------------------------------------------------------
+
+
+def experiments(
+    answer: Answer,
+    *,
+    key: str,
+    workspace_id: int | None,
+    turn_id: int | None,
+    kept: Mapping[str, ExperimentRecord],
+) -> None:
+    """The experiments the assistant drafted because the user asked, each with the lab's
+    test beside the idea, a button to keep it in the workspace and a document to download.
+    Keeping one changes nothing else (A8)."""
+    found = [result for result in answer.results if result.usable and result.experiments]
+    if not found:
+        return
+    st.markdown("**Experiments to review**")
+    st.caption(EXPERIMENTS)
+    for result in found:
+        for position, proposal in enumerate(result.experiments):
+            experiment_card(
+                proposal,
+                key=f"{key}_{result.result_id}_{position}",
+                workspace_id=workspace_id,
+                turn_id=turn_id,
+                record=kept.get(proposal.fingerprint),
+            )
+
+
+def experiment_card(
+    proposal: ExperimentProposal,
+    *,
+    key: str,
+    workspace_id: int | None = None,
+    turn_id: int | None = None,
+    record: ExperimentRecord | None = None,
+) -> None:
+    """One experiment proposal: the assistant's idea, then the lab's test, kept apart."""
+    idea, plan = proposal.idea, proposal.plan
+    with st.container(border=True):
+        heading = f":material/science: **{escaped(idea.title)}** · {escaped(plan.label)}"
+        if record is not None:
+            heading += " · kept"
+        st.markdown(heading)
+        components.tagged(IDEA_TAG, "Not tested: what the assistant supposes, in its words.")
+        st.markdown(
+            f"**What was noticed.** {escaped(idea.observation)}\n\n"
+            f"**The hypothesis.** {escaped(idea.hypothesis)}\n\n"
+            f"**The change to test.** {escaped(idea.change)}\n\n"
+            "**How it could fail.**\n\n"
+            + "\n".join(f"- {escaped(item)}" for item in idea.failure_modes)
+        )
+        components.tagged(TEST_TAG, escaped(_tested(plan)))
+        if plan.missing:
+            st.caption(escaped(plan.missing))
+        if plan.baseline:
+            beat = pd.DataFrame(
+                {
+                    "What a change must beat or keep": [measure.label for measure in plan.baseline],
+                    "Now": [
+                        measure.text + (f" ({measure.interval})" if measure.interval else "")
+                        for measure in plan.baseline
+                    ],
+                }
+            )
+            st.dataframe(
+                beat,
+                hide_index=True,
+                height=components.table_height(len(beat)),
+                row_height=components.ROW,
+                key=f"ai_experiment_table_{key}",
+            )
+        with st.expander("How a change would be tested", icon=":material/rule:"):
+            st.markdown(
+                f"**How seasons are split.** {escaped(plan.split)}\n\n"
+                f"**What is measured.** {escaped(plan.metric)}\n\n"
+                f"**How sure.** {escaped(plan.uncertainty)}\n\n"
+                f"**When it would be kept.** {escaped(plan.acceptance)}\n\n"
+                "**Leakage to rule out.**\n\n"
+                + "\n".join(f"- {escaped(item)}" for item in plan.leakage)
+                + "\n\n**Steps for the milestone that would build it.**\n\n"
+                + "\n".join(
+                    f"{number}. {escaped(step)}" for number, step in enumerate(plan.steps, 1)
+                )
+            )
+        if plan.tried:
+            with st.expander("What was tried before", icon=":material/history:"):
+                for section in plan.tried:
+                    st.caption(escaped(f"{section.path}: {section.heading}"))
+                    st.markdown(prose(section.text))
+        with st.container(horizontal=True, vertical_alignment="center"):
+            if workspace_id is not None and record is None:
+                if st.button(
+                    "Keep in the workspace",
+                    key=f"ai_experiment_keep_{key}",
+                    icon=":material/bookmark_add:",
+                    type="primary",
+                    help=KEEP_HELP,
+                ):
+                    api.keep_experiment(proposal, workspace_id=workspace_id, turn_id=turn_id)
+                    st.rerun()
+            st.download_button(
+                "Download",
+                data=proposal.document(),
+                file_name=f"experiment-{_filename(idea.title)}.md",
+                mime="text/markdown",
+                key=f"ai_experiment_download_{key}",
+                icon=":material/download:",
+                help="The proposal as a document (Markdown), to read or share.",
+            )
+        if record is not None:
+            st.caption(f"Kept in this workspace {formats.moment(record.created_at)}.")
+
+
+def _tested(plan: ExperimentPlan) -> str:
+    """Where the lab's part comes from, in a line."""
+    source = plan.label
+    if plan.revision is not None:
+        source += f", revision {plan.revision}"
+    if plan.model_file:
+        source += f" ({plan.model_file})"
+    line = f"The lab's test, from the {source} and {plan.decision}."
+    if plan.tested_on:
+        line += f" Tested on: {plan.tested_on}"
+    return line
 
 
 def _basis(proposal: RosterProposal) -> str:

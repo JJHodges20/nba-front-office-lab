@@ -6,7 +6,8 @@ question asked in it and the answer that came back, as it came back - the data b
 the value model it read are recorded, and nothing rewrites it; a newer answer comes from
 asking again. Findings are answers the user bookmarked, each a copy so that it outlasts the
 history it came from. Proposals are the rosters the assistant proposed, waiting until the
-user saves or declines each; approvals are every press of those buttons.
+user saves or declines each; approvals are every press of those buttons. Experiments are
+the experiment proposals for the lab's models the user chose to keep (A8).
 
 The codec turns an answer - its results, their rows and charts, its evidence and proposals
 - into plain JSON and back, so that the page can draw an old answer exactly as it was.
@@ -34,6 +35,7 @@ from front_office.domain.assistant import (
     Step,
     ToolResult,
 )
+from front_office.domain.experiments import ExperimentProposal
 from front_office.domain.proposals import RosterProposal
 
 RESEARCH_PAGE = "AI Research"
@@ -155,6 +157,24 @@ class ProposalRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class ExperimentRecord:
+    """An experiment proposal the user kept in a workspace (A8): kept for review, never
+    applied."""
+
+    experiment_id: int
+    workspace_id: int
+    proposal: ExperimentProposal
+    note: str | None
+    """The user's note on it."""
+    turn_id: int | None
+    created_at: datetime
+
+    @property
+    def fingerprint(self) -> str:
+        return self.proposal.fingerprint
+
+
+@dataclass(frozen=True, slots=True)
 class Approval:
     """One press of a proposal's save or decline button."""
 
@@ -239,6 +259,7 @@ def _result(result: ToolResult) -> dict[str, Any]:
         "limits": list(result.limits),
         "charts": [_chart(chart) for chart in result.charts],
         "proposals": [proposal.model_dump(mode="json") for proposal in result.proposals],
+        "experiments": [proposal.model_dump(mode="json") for proposal in result.experiments],
     }
 
 
@@ -257,6 +278,9 @@ def _result_from(data: dict[str, Any]) -> ToolResult:
         limits=tuple(data.get("limits", ())),
         charts=tuple(_chart_from(item) for item in data.get("charts", ())),
         proposals=tuple(RosterProposal.model_validate(item) for item in data.get("proposals", ())),
+        experiments=tuple(
+            ExperimentProposal.model_validate(item) for item in data.get("experiments", ())
+        ),
     )
 
 

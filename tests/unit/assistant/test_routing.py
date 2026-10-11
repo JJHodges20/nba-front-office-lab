@@ -56,7 +56,7 @@ class TestFirstMove:
         sent = ollama.chat_payloads[0]
         assert sent["options"]["num_ctx"] == 8192 and sent["options"]["num_predict"] == 1024
         assert sent["think"] is False
-        assert len(sent["tools"]) == 22, "moves_and_rumors and contract_updates joined them at A7"
+        assert len(sent["tools"]) == 23, "propose_experiment joined them at A8"
         assert sent["messages"][0]["role"] == "system" and RULES in sent["messages"][0]["content"]
 
     def test_an_invalid_call_is_sent_back_once(self) -> None:
