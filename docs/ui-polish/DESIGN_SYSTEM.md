@@ -1,0 +1,170 @@
+# Forest Terminal - design system
+
+**Status: the colours (sections 1-3) are in effect since P1 (2026-10-11)**, as the owner
+decided: both themes kept, the computer's setting followed until Dark or Light is chosen
+in the app's menu (the browser remembers it), and `#2f8556` / `#1f6b45` for actions. Sections
+4-7 are still proposals, for the phases named in them. The evidence behind each value is in
+[BASELINE_AUDIT.md](BASELINE_AUDIT.md).
+
+The roadmap's direction: a near-black canvas, a dark forest-green accent, balanced
+density, the whole workbench in scope, navigation and behaviour unchanged. This proposal
+keeps the lab's existing rules: one palette in `apps/workbench/wb/theme.py`, stated again in
+`.streamlit/config.toml` and kept in step by `tests/ui/test_theme.py`; colour chosen by
+the job it does; no state or provenance shown by colour alone; native Streamlit settings
+before any CSS (the workbench has none today).
+
+## 1. Principles
+
+1. **One source of truth.** Every colour is a role in `wb/theme.py`. The page theme in
+   `config.toml` repeats the roles Streamlit can take, and a test fails if the two drift.
+2. **Green is for the brand and for action, not for data.** Primary buttons, selected
+   controls, links and focus take the forest green. Charts keep their multi-hue categorical
+   order, their blue accent and their blue-and-red poles: a loss never turns green.
+3. **Native first.** Streamlit 1.64 sets the page, sidebar, widgets, tables, badges,
+   headings and chart defaults from `config.toml`. What it cannot set - a raised surface, a
+   focus-ring colour, a hover shade, tabular numerals, page padding - is left at Streamlit's
+   derived default unless a later phase shows a real need, and then goes in one small,
+   documented CSS helper, never in a page.
+4. **Both themes work.** Dark is the design target; light stays a complete compatibility
+   theme with the same roles (decision D1 in the audit chooses how dark becomes the default).
+5. **Contrast is measured, not judged.** Every proposed value below was checked with the
+   same arithmetic as the theme tests, and the new roles get tests of their own in P1.
+
+## 2. Colour roles
+
+"Before P1" is what shipped with A9; "P1" is in `wb/theme.py` and `.streamlit/config.toml`
+now. Contrast is the WCAG ratio; "OKLab" is the theme tests' colour difference x100.
+
+| Role (`Palette` field) | Used for | Dark before P1 | **Dark, P1** | Light before P1 | **Light, P1** |
+| --- | --- | --- | --- | --- | --- |
+| `plane` | Page background (`backgroundColor`) | `#0d0d0d` | **`#0a0d0b`** | `#f9f9f7` | keep |
+| `surface` | Cards, sidebar, widget fills, chart backgrounds (`secondaryBackgroundColor`, sidebar `backgroundColor`) | `#1a1a19` | **`#151b17`** | `#fcfcfb` | keep |
+| `ink` | Text (`textColor`), chart titles | `#ffffff` | **`#f1f5f2`** | `#0b0b0b` | keep |
+| `ink_secondary` | Chart axis titles, legends | `#c3c2b7` | **`#a7b4a9`** | `#52514e` | keep |
+| `ink_muted` | Tick labels, quiet text | `#898781` | **`#7f9084`** | `#898781` | keep |
+| `grid` | Gridlines, borders (`borderColor`, `dataframeBorderColor`) | `#2c2c2a` | **`#2a362e`** | `#e1e0d9` | keep |
+| `axis` | Hover borders, reference marks | `#383835` | **`#3a4a40`** | `#c3c2b7` | keep |
+| `deemphasis` | Context marks beside the subject | `#52514e` | **`#4e5e54`** | `#c3c2b7` | keep |
+| **`brand`** (new) | `primaryColor`: primary buttons, selected tabs and toggles, sliders, focus | (blue `#3987e5`, = `series[0]`) | **`#2f8556`** | (blue `#2a78d6`) | **`#1f6b45`** |
+| **`link`** (new) | `linkColor` | (blue `#3987e5`) | **`#79b391`** | (blue `#2a78d6`) | **`#1f6b45`** |
+| `series` | Categorical chart colours, fixed order | 8 hues, blue first | keep | 8 hues, blue first | keep |
+| `positive` / `negative` | Either side of a baseline | `#3987e5` / `#e66767` | keep | `#2a78d6` / `#e34948` | keep |
+| `good` / `warning` / `serious` / `critical` | State, always with an icon and a word | `#0ca30c` `#fab219` `#ec835a` `#d03b3b` | keep | same | keep |
+
+**Why `brand` is a new role, not a new `series[0]`.** Before P1 the tests tied
+`primaryColor` to the chart accent (`series[0]`). Turning the accent green would have made
+every chart's first series green and moved the one colour the series order was measured
+around. A separate `brand` role keeps the charts exactly as they are. P1 changed one parity
+assertion - `primaryColor == colors.brand` instead of `colors.accent` - added parity for
+`linkColor`, the table colours, `grayColor` and the sidebar's second colour, and added
+contrast tests for the new roles; no existing threshold was loosened.
+
+**Why `#2f8556` and not the roadmap's `#244f38`.** Streamlit has one `primaryColor`. It
+fills primary buttons under a white label, and it also draws selected tabs, toggles,
+sliders and focus borders straight on the page. `#244f38` makes a superb button
+(white label 9.3:1) but those controls would almost vanish on black (2.1:1, under the 3:1
+that a control needs). `#2f8556` is the darkest forest green that serves both:
+
+| Candidate | White label on it (needs 4.5) | Against the page | Against a card |
+| --- | --- | --- | --- |
+| Today's blue `#3987e5` | **3.64** - fails | 5.37 | 4.81 |
+| Roadmap `#244f38` | 9.33 | **2.09** - fails | **1.87** - fails |
+| `#316749` | 6.63 | **2.95** - fails | **2.64** - fails |
+| `#2e7d52` | 5.03 | 3.88 | 3.47 |
+| **`#2f8556` (proposed)** | **4.56** | **4.29** | **3.84** |
+| `#348a5b` | **4.26** - fails | 4.59 | 4.11 |
+
+So the change also fixes a weakness of the current theme: white on today's blue primary
+button is 3.64:1 in dark and 4.42:1 in light, both under 4.5. In light, `#1f6b45` gives a
+white label 6.47:1 and stands 6.13:1 against the page.
+
+**What the green stays apart from.** `#2f8556` is far from the chart accent (OKLab 22.1
+from blue) but near the "good" status green (12.4) and the two green chart slots (7.3, 8.0).
+That is acceptable because a state always carries an icon and a word, and the brand never
+appears inside a chart. The provenance tags are another matter (section 5).
+
+**Roadmap tokens not proposed for P1.** `surface_raised #1d2620`, `forest_hover #316749`,
+`focus_ring #91c9a6` and the deep `#244f38` have no Streamlit setting: Streamlit derives
+hover, raised and focus shades from the roles above. They are kept here as candidates if
+P2 or P3 shows a need for a small CSS helper. (`#91c9a6` would stand 10.3:1 on the page.)
+
+## 3. Checked against the theme tests
+
+The P1 dark palette, with the series unchanged, passes every check `tests/ui/test_theme.py`
+made before P1:
+
+| Check | Threshold | Dark before P1 | Dark, P1 |
+| --- | --- | --- | --- |
+| Neighbouring series, normal / colour-blind | >= 15 / >= 8 | 19.3 / 8.4 | 19.3 / 8.4 |
+| First three series, every pair | >= 15 / >= 8 | 20.9 / 9.4 | 20.9 / 9.4 |
+| A fourth scatter series would fail | < 15 or < 8 | 10.6 / 4.8 | 10.6 / 4.8 |
+| Diverging poles on the surface | >= 3 | 4.79 / 5.39 | 4.81 / 5.41 |
+| Accent / de-emphasis on the surface | >= 3 / >= 1.5 | 4.79 / 2.19 | 4.81 / 2.54 |
+| Ink / secondary / muted on the surface | >= 7 / 4.5 / 3 | 17.4 / 9.7 / 4.8 | 15.9 / 8.1 / 5.2 |
+| Grid < 1.5, axis < 2.0, grid < axis | | 1.24 / 1.48 | 1.39 / 1.86 |
+| Every dark series on the surface | >= 3 | 3.5 to 5.7 | 3.5 to 5.7 |
+| Dark surface against light surface | > 15 | 17.0 | 17.0 |
+
+Checks P1 added, in both themes: a white label on `brand` >= 4.5; `brand` against `plane`
+and `surface` >= 3; `link` against `plane` and `surface` >= 4.5; the brand is no series
+colour, no state colour, and at least 15 from the chart accent; and parity of
+`primaryColor`, `linkColor`, the table colours, `grayColor` and the sidebar's colours with
+the palette. Status colours on the new dark surface: good 5.2, warning 9.5, serious 6.6,
+critical 3.6.
+
+## 4. Type, shape and spacing
+
+Kept from today's `config.toml`, which already fits the brief:
+
+- **Font:** `system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif` (Segoe UI on
+  Windows), 15px base; headings 2rem / 1.4 / 1.15 / 1 / 0.95 / 0.9 at weights 650 / 600.
+  Charts use the same family at 13px, ticks 12px.
+- **Corners:** `baseRadius = "8px"`; buttons follow it. Bars keep their 4px data end.
+- **Borders:** widget and sidebar borders on, in the `grid` colour.
+- **Figures:** `st.metric` tiles with a border, up to five a row; context kept to about
+  twenty characters (CLAUDE.md), three a row where it is longer.
+- **Spacing:** Streamlit's own gaps; rows of controls use `gap="small"`. Page padding and
+  tabular numerals have no native setting and stay as they are unless P2/P3 shows a need.
+
+Candidates to evaluate in P2/P3, not proposed yet: `metricValueFontSize` (tiles' numbers
+are 2.25rem by default), `buttonRadius`, and `dataframeHeaderBackgroundColor` set apart
+from `surface`.
+
+## 5. Tags: provenance, state and outcome
+
+Every tag is a word and an icon as well as a colour (`components.py`). Today:
+
+| Vocabulary | Members and colours |
+| --- | --- |
+| Provenance | Measured blue, Derived gray, Estimate orange, Modeled green, Your assumption violet, Reported yellow |
+| Source state | Up to date green, Stale orange, Failing red, Not supplied gray |
+| Answer outcome | Supported green, Partly answered orange, Not enough to answer gray, Question back blue, Declined gray |
+
+Two questions for P3, not decided here:
+
+- **Modeled is green**, the status hue for "good", and next to a green brand it will read as
+  an action or a success rather than as "an estimate from a fitted model". Options: move
+  Modeled to a hue no state uses (teal or violet family), or leave it.
+- **Note** is drawn gray, orange and blue on different pages, and "Out of date" is defined
+  in four views: one definition each, in `components.py`.
+
+## 6. Charts
+
+Unchanged: the house rules of `wb/charts.py` (one scale, 2px lines, bars at most 24px,
+ringed markers, no dashes, text in ink, legends only for several series, three scatter
+and four line series at most) and the categorical order. The chart surface follows the
+`surface` role, so charts take the new dark card colour with no builder change. P4 checks
+that the page palette and the chart palette never disagree (audit finding F2).
+
+## 7. The assistant's surfaces (guidance for P7)
+
+The answer is drawn by `wb/answers.py` on the AI Research page, and in short in the *Ask
+AI about this* dialog. Proposed presentation, once the tokens are in place:
+
+- The user's question: a quiet `surface` card with its mode, focus and time.
+- The answer: its outcome tag first (the word, the icon, the colour), then the text, then
+  notes and limits; modeled figures keep their interval in the text.
+- Tool activity, evidence and "how it was answered": collapsed by default, as now.
+- Rosters and experiments to review: bordered cards, the action buttons last and labelled
+  with what they do; nothing is saved without the click, as now.
+- Errors and an offline model: a tagged line that says what to do; the conversation stays.

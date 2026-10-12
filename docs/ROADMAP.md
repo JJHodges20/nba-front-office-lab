@@ -85,6 +85,25 @@ Lettered so as not to clash with the milestones above; each passes the same gate
 | A8 | Research proposals | Experiments for the models, written up, never applied | Done (2026-10-11; drafted only when asked, for the four tested models: the assistant's idea in words beside the lab's own test from each model's file and decision; kept by the user's click in the workspace's own list, or downloaded; nothing applied, the model files checked byte for byte; 48/59 end to end, and the experiment questions drafted when and only when asked, 8/8) |
 | A9 | Release audit | Every test, the evaluation, failure and offline runs, documentation | Done (2026-10-11; the suite's rare stall traced to the optimizer's solver called from threads in turn, and every solve put on one thread; *Stop* honoured as soon as a reply comes back; a damaged research file said in plain words and set aside on request, never deleted; questions about meanings or for a verdict sent back to the lab's tools; the network audited against the source register and the suite held to this machine; 49, 49 and 47 of 59 end to end, no unsupported figure shown, calls valid 93% against 98%; a working session of twenty questions timed twice; install, recovery and known limits in the release notes) |
 
+## UI polish: Dark Forest (P0-P8)
+
+The whole workbench made into one near-black, forest-green analytical workspace, its
+navigation, numbers, data and behaviour unchanged. The plan is the user's *Dark Forest UI
+Modernization* roadmap; the record is [ui-polish/BASELINE_AUDIT.md](ui-polish/BASELINE_AUDIT.md)
+and [ui-polish/DESIGN_SYSTEM.md](ui-polish/DESIGN_SYSTEM.md). Each phase stops for review.
+
+| # | Phase | Deliverable | Status |
+| --- | --- | --- | --- |
+| P0 | Audit | Baseline: pages, tests, screenshots, findings, decisions, the P1 plan | Done (2026-10-11; 100 screenshots in both themes at four sizes, 19 findings, nothing changed) |
+| P1 | Tokens | The forest-green brand and the near-black neutrals in the palette and the page theme, with tests | Done (2026-10-11; the owner's decisions: both themes kept, Dark chosen once in the menu; `#2f8556` / `#1f6b45` for actions, never for data) |
+| P2 | Shell | Navigation, filters, headers, empty states | Planned |
+| P3 | Shared components | Tiles, tags, tables, controls | Planned |
+| P4 | Charts | Chart styling in the new theme, the theme detection | Planned |
+| P5 | League and Explore pages | Page-by-page polish | Planned |
+| P6 | Build, Forecast and System pages | Page-by-page polish | Planned |
+| P7 | The assistant's surfaces | AI Research and *Ask AI about this* | Planned |
+| P8 | Accessibility and final audit | Keyboard, zoom, every size, the full regression | Planned |
+
 ## Completion gate for every milestone
 
 - Targeted automated tests pass.

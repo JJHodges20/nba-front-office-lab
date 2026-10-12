@@ -37,6 +37,14 @@ chosen player opens the Profile tab.
 **Data status** is at the foot of the sidebar on every page: when the league data was
 last fetched, whether a contract file has been supplied, and which build is on screen.
 
+**Dark or light.** The workbench is designed dark - near-black with a forest-green accent
+for buttons, selected tabs and links - and has a matching light theme. It starts in your
+computer's own setting. To choose, open the menu at the top right (the three dots) and
+pick *Dark*, *Light* or *System*: your browser remembers the choice, through restarts, until
+its site data is cleared. Another browser, a private window or another port starts from
+the computer's setting again. Charts keep their own colours in both themes; green is never
+used for data.
+
 ## Reading a page
 
 - **Tags under the title** say what kinds of number the page holds.

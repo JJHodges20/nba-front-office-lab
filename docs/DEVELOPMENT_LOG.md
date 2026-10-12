@@ -3,6 +3,64 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## UI polish P0 and P1 - the audit and the Dark Forest tokens (2026-10-11)
+
+The first two phases of the user's *Dark Forest UI Modernization* roadmap: a near-black,
+forest-green workbench, with navigation, numbers, data and behaviour unchanged. Nothing
+about the analytics, the models, the data or the assistant changed.
+
+**P0, the audit** ([ui-polish/BASELINE_AUDIT.md](ui-polish/BASELINE_AUDIT.md)), read-only:
+the 14 pages and both assistant surfaces inventoried; the design as built (no custom CSS
+anywhere, one palette in two places); the theme tests' arithmetic run on the roadmap's
+colours; four throwaway Streamlit apps to learn how 1.64 picks a theme; and 100
+screenshots of a disposable copy of the real data, every page in both themes and the key
+pages at 1440x900, 1366x768, 1024x768 and 390x844, none with an error. Nineteen findings,
+among them: the app follows the computer's theme (light here); white on the old blue
+primary button was 3.64:1; the filters sit below the fold of the sidebar; at phone width
+the sidebar covers the page; at tablet width the headline tiles cut off their own numbers;
+the research page puts about 660px of controls before the first answer.
+
+**The owner's decisions** (2026-10-11): keep both themes, the computer's setting followed
+until Dark or Light is chosen in the app's menu - checked to survive closing the browser,
+restarting the app and a change of colours, kept per browser and per port; and the forest
+greens `#2f8556` (dark) and `#1f6b45` (light) for actions, never for data.
+
+**P1, built**
+
+- **Two new roles** in `wb/theme.py`: `brand` (Streamlit's `primaryColor`: primary
+  buttons under a white label, selected tabs and toggles, sliders, focus) and `link`. The
+  roadmap's deeper `#244f38` would have left the selected controls at 2.1:1 on black.
+- **The dark neutrals moved toward the forest**: page `#0a0d0b`, cards `#151b17`, text
+  `#f1f5f2`, secondary and muted text, gridlines `#2a362e`, axes, de-emphasis. The eight
+  chart colours, the diverging poles and the four state colours are as they were, so every
+  chart is unchanged in colour; it sits on the new card colour.
+- **`.streamlit/config.toml`** states the same in `[theme.dark]` and `[theme.light]`.
+- **Tests** (`tests/ui/test_theme.py`): the primary colour's parity moved from the chart
+  accent to the brand; parity added for links, table borders and headers, gray and the
+  sidebar's second colour; new checks that a white label on the brand is at least 4.5:1,
+  the brand at least 3:1 on page and card, links at least 4.5:1, and the brand no chart or
+  state colour and at least 15 from the chart accent. No threshold was loosened.
+- **Documents**: [ui-polish/DESIGN_SYSTEM.md](ui-polish/DESIGN_SYSTEM.md) (colours in effect,
+  the rest still proposals), the user's guide on choosing Dark or Light, this roadmap's
+  phase table.
+
+**Found in the browser and left for P4** (finding F2): just after Dark is chosen in the
+menu, a Plotly chart keeps the light palette - a white panel on the dark page - until the
+next click redraws the page; after a click or a reload it is right. The charts read the
+theme when they are drawn, and Streamlit does not run the page again on a theme change.
+Once chosen, the theme is remembered, so this is seen once.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| `tests/ui/test_theme.py` | 31 passed, six of them new |
+| `test_charts.py`, `test_components.py`, `test_formats.py` | 282 passed, unchanged |
+| `pytest -n auto` | 3,956 passed (5 min 13 s); at P0, 3,950 |
+| The pages in a browser | The P0 set taken again on the same data copy (`data/ui-polish/screenshots/p1/`, 100 shots, both themes, four sizes), no page with an error; compared with P0, only colours changed: the near-black, the forest-tinted cards, sidebar and borders, green on the selected tab, segment, slider and the primary buttons, every chart's colours as before |
+| Boundaries and data | Three files of code and configuration; no view, component, chart builder, service or data touched; the browser pass read a disposable copy |
+
 ## Milestone A9 - AI Research Assistant: the release audit (2026-10-11)
 
 Every check of the release, run and written down: the test suite, the live model's tests,

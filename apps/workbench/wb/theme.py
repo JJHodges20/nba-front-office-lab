@@ -4,6 +4,10 @@ Every colour a chart uses comes from here, by role. The categorical order is fix
 is what keeps neighbouring series apart for colour-blind readers, so slots are assigned
 in sequence and never reordered or extended: a chart that needs more series than it can
 carry is the wrong chart. ``tests/ui/test_theme.py`` checks the separation numerically.
+
+The page's brand is a forest green (``brand``, ``link``; UI polish P1,
+``docs/ui-polish/DESIGN_SYSTEM.md``): it marks actions and selection, never data, so the
+charts keep their own accent and their categorical order.
 """
 
 from __future__ import annotations
@@ -43,6 +47,12 @@ class Palette:
     serious: str
     critical: str
     """Status colours. Reserved for state, and always shown with an icon and a label."""
+    brand: str
+    """The page's primary colour: primary buttons under a white label, and the selected tab,
+    toggle, slider and focus drawn straight on the page - so it must hold both, which is why
+    it is a mid forest green rather than a deep one. Never a chart colour."""
+    link: str
+    """Links in text: the brand, light enough to read as text on the page."""
 
     @property
     def accent(self) -> str:
@@ -81,17 +91,21 @@ LIGHT = Palette(
     warning="#fab219",
     serious="#ec835a",
     critical="#d03b3b",
+    brand="#1f6b45",
+    link="#1f6b45",
 )
 
+# Near-black with a trace of the forest in every neutral: the page, its cards, its text
+# and its lines. The series, the poles and the states are the same as before P1.
 DARK = Palette(
     mode="dark",
-    surface="#1a1a19",
-    plane="#0d0d0d",
-    ink="#ffffff",
-    ink_secondary="#c3c2b7",
-    ink_muted="#898781",
-    grid="#2c2c2a",
-    axis="#383835",
+    surface="#151b17",
+    plane="#0a0d0b",
+    ink="#f1f5f2",
+    ink_secondary="#a7b4a9",
+    ink_muted="#7f9084",
+    grid="#2a362e",
+    axis="#3a4a40",
     series=(
         "#3987e5",
         "#d95926",
@@ -102,13 +116,15 @@ DARK = Palette(
         "#9085e9",
         "#e66767",
     ),
-    deemphasis="#52514e",
+    deemphasis="#4e5e54",
     positive="#3987e5",
     negative="#e66767",
     good="#0ca30c",
     warning="#fab219",
     serious="#ec835a",
     critical="#d03b3b",
+    brand="#2f8556",
+    link="#79b391",
 )
 
 

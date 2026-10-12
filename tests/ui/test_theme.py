@@ -103,6 +103,27 @@ def test_status_colours_are_not_series_colours(colors: Palette) -> None:
     assert not status & set(colors.series)
 
 
+@PALETTES
+def test_the_brand_holds_a_white_label_and_shows_on_the_page(colors: Palette) -> None:
+    """Streamlit has one primary colour: the fill under a primary button's white label, and
+    the selected tab, toggle, slider and focus drawn straight on the page (UI polish P1).
+    The roadmap's deeper forest green, #244f38, would have failed the second line (2.1:1)."""
+    assert contrast("#ffffff", colors.brand) >= TEXT_CONTRAST
+    assert contrast(colors.brand, colors.plane) >= MARK_CONTRAST
+    assert contrast(colors.brand, colors.surface) >= MARK_CONTRAST
+    assert contrast(colors.link, colors.plane) >= TEXT_CONTRAST
+    assert contrast(colors.link, colors.surface) >= TEXT_CONTRAST
+
+
+@PALETTES
+def test_the_brand_is_not_a_chart_colour(colors: Palette) -> None:
+    """Actions and selection are green; data keeps its own colours, so a chart never takes
+    a series for a button, nor a loss for a success."""
+    assert colors.brand not in colors.series and colors.link not in colors.series
+    assert difference(colors.brand, colors.accent) >= NORMAL_FLOOR
+    assert colors.brand not in {colors.good, colors.warning, colors.serious, colors.critical}
+
+
 def test_the_palette_follows_the_theme_type() -> None:
     assert palette("dark") is DARK
     assert palette("light") is LIGHT
@@ -131,9 +152,23 @@ class TestPageThemeMatchesTheCharts:
         assert page["backgroundColor"] == colors.plane
         assert page["secondaryBackgroundColor"] == colors.surface
         assert page["textColor"] == colors.ink
-        assert page["primaryColor"] == colors.accent
         assert page["borderColor"] == colors.grid
+        assert page["dataframeBorderColor"] == colors.grid
+        assert page["dataframeHeaderBackgroundColor"] == colors.surface
+        assert page["grayColor"] == colors.ink_muted
         assert page["sidebar"]["backgroundColor"] == colors.surface
+        assert page["sidebar"]["secondaryBackgroundColor"] == colors.plane
+
+    @pytest.mark.parametrize(("mode", "colors"), [("light", LIGHT), ("dark", DARK)])
+    def test_the_brand_marks_actions_and_links(
+        self, config: dict, mode: str, colors: Palette
+    ) -> None:
+        """UI polish P1: the primary colour is the brand, no longer the chart accent, which
+        keeps the charts exactly as they were."""
+        page = config[mode]
+        assert page["primaryColor"] == colors.brand
+        assert page["linkColor"] == colors.link
+        assert page["primaryColor"] != colors.accent
 
     @pytest.mark.parametrize(("mode", "colors"), [("light", LIGHT), ("dark", DARK)])
     def test_categorical_order_and_status_colours(
