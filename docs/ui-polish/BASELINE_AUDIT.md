@@ -138,6 +138,7 @@ would address it; nothing is changed by this audit.
 | F17 | **The assistant's context is the sidebar only.** The dialog asks about the sidebar's season, team and player; Team Builder alone passes its roster. A built roster chosen on Roster Fit, Postseason or the Simulator, the Simulator's own team, and Benchmarks' era and stage are not passed. Five pages have no *Ask* button (League Overview, Contract Explorer, Analytics Lab, Roster Optimizer, Data Health). | Contextual questions | Functional, not cosmetic: a separate proposal, not part of this polish unless approved (decision D6) | - |
 | F18 | **The theme applies only when started from the project root** (`fol ui` does; `streamlit run` from elsewhere is unthemed). | Anyone bypassing `fol ui` | Documented in the release notes; no change proposed | - |
 | F19 | `charts.stacked_bars` has no series cap (parts past the eighth slot would be dropped). | Future charts | A cap with an error, as the other builders have | P4 |
+| F20 | **The top bar does not mark the open page's group** (found at P2, `p2/dark-checks-team-held.png`). Streamlit draws the six group menus alike whatever page is open; in an opened menu the open page is marked (tinted and bold, `aria-current`), and the title and the browser tab name it. A menu exists in the page only while open, so a style rule cannot mark its group. | Knowing where a page sits | The group's name above each page's title, from the shared header (decision D7) | P3 |
 
 What already works well, and should be kept: one header pattern, consistent tiles and
 tabs, every empty state saying why and what to do, tags with words and icons, tables with
@@ -224,9 +225,10 @@ theme's dialog states beyond the empty form.
 | D1 | How dark becomes the default | **Keep both themes; choose *Dark* once in the menu** (remembered in the browser). Dark-only removes the light theme, the menu choice, and breaks the chart palette's theme detection (F1). **Decided by the owner, 2026-10-11, as recommended.** |
 | D2 | The primary colour | **`#2f8556` dark, `#1f6b45` light**, as a new `brand` role; charts keep their blue accent. The roadmap's `#244f38` is too dark for selected controls. **Decided by the owner, 2026-10-11, as recommended.** |
 | D3 | Modeled's green tag next to a green brand | Decide in P3 between a non-state hue for Modeled and leaving it |
-| D4 | Navigation position | Keep the sidebar and tighten it, or move the groups to a top bar so the filters are always in view - same groups, labels, order and paths either way |
-| D5 | One small CSS helper | Accept one documented helper for what Streamlit cannot set (page padding, tabular numerals), or none |
+| D4 | Navigation position | Keep the sidebar and tighten it, or move the groups to a top bar so the filters are always in view - same groups, labels, order and paths either way. **Decided by the owner at P2, from prototype screenshots (`data/ui-polish/screenshots/p2-options/`): the top bar.** |
+| D5 | One small CSS helper | Accept one documented helper for what Streamlit cannot set (page padding, tabular numerals), or none. **Decided by the owner at P2: one small rule, the space above titles.** |
 | D6 | The assistant's context (F17) | Leave out of the polish; a separate proposal if wanted |
+| D7 | The open page's group (F20) | A small label with the group's name ("Explore") above each title, drawn by the shared header in P3, or leave it to the title and the menu |
 
 ## 12. P1 plan: centralized tokens
 

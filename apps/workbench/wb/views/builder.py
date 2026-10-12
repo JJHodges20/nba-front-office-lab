@@ -136,7 +136,7 @@ def _create_form(filters: Filters, *, key: str) -> None:
                     name, stats_season=stats_season, payroll_season=payroll_season
                 )
             except RosterError as error:
-                st.error(str(error), icon=":material/error:")
+                components.alert("error", str(error))
             else:
                 st.session_state[CREATED] = created
                 st.rerun()
@@ -172,7 +172,7 @@ def _manage(filters: Filters, roster: pd.Series) -> None:
                     notes=notes,
                 )
             except RosterError as error:
-                st.error(str(error), icon=":material/error:")
+                components.alert("error", str(error))
             else:
                 st.rerun()
     st.divider()
@@ -318,7 +318,7 @@ def _add_player(filters: Filters, summary: RosterSummary) -> None:
         )
         if button.form_submit_button("Add", type="primary", icon=":material/person_add:"):
             if player_id is None:
-                st.error("Choose a player first.", icon=":material/error:")
+                components.alert("error", "Choose a player first.")
             else:
                 _apply(
                     lambda: data.lab().builder.add_player(
@@ -335,7 +335,7 @@ def _apply(change) -> None:  # type: ignore[no-untyped-def]
     try:
         change()
     except RosterError as error:
-        st.error(str(error), icon=":material/error:")
+        components.alert("error", str(error))
     else:
         st.rerun()
 

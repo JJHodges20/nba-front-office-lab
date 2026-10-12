@@ -35,11 +35,23 @@ class TestFrame:
     def test_an_imported_contract_file_is_reported_as_supplied(
         self, app, contract_template: Path
     ) -> None:
+        """UI polish P2: a source that needs nothing done is its state in a word, with what
+        lies behind it - the file's own description - on hover. A source that needs something
+        done keeps its line under the badge (the test above)."""
         opened = app(contract_template)
-        sidebar = "\n".join(element.value for element in opened.sidebar.markdown)
-        assert "Contract file: supplied" in sidebar
+        (badge,) = [
+            element
+            for element in opened.sidebar.markdown
+            if "Contract file: supplied" in element.value
+        ]
+        assert "invented for tests" in badge.proto.help
         captions = "\n".join(caption.value for caption in opened.sidebar.caption)
-        assert "invented for tests" in captions
+        assert "invented for tests" not in captions, "said once, on hover"
+
+    def test_the_data_status_links_to_data_health(self, app, plain_home: Path) -> None:
+        opened = app(plain_home)
+        links = [link.proto.label for link in opened.sidebar.get("page_link")]
+        assert links == ["Data Health"]
 
     def test_before_any_data_it_says_how_to_get_some(self, app, project: Path) -> None:
         opened = app(project)

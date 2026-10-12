@@ -13,9 +13,10 @@ no data yet it says so and tells you to run `fol refresh`. Stop it with Ctrl+C.
 
 ## The frame
 
-**Navigation** is at the top of the sidebar, in six groups: League, Explore, Build,
-Forecast, Ask and System. **Filters** are below it, and a choice you make on one page still
-holds on the next. Each page reads the filters it can use: the League Overview, the
+**Navigation** is the bar across the top, in six groups: League, Explore, Build,
+Forecast, Ask and System - open a group to see its pages. On a phone the groups are in
+the sidebar instead. **Filters** are in the sidebar, always in view, and a choice you make
+on one page still holds on the next. Each page reads the filters it can use: the League Overview, the
 explorers and the Analytics Lab read them all; Player Value reads the season, the team
 and the player; the Contract Explorer and the Scenario Simulator read the team; Roster
 Fit and Postseason Outlook read the season and the team; Winning Benchmarks chooses its
@@ -34,8 +35,11 @@ the left of the row. The tick clears again once the choice is made; the sidebar 
 who is chosen, and is where to change or clear it. In the Player Explorer a newly
 chosen player opens the Profile tab.
 
-**Data status** is at the foot of the sidebar on every page: when the league data was
-last fetched, whether a contract file has been supplied, and which build is on screen.
+**Data status** is at the foot of the sidebar on every page: whether the league data is up
+to date and whether a contract file has been supplied - hover over either for the
+details, and a line under it says what to do when something needs doing - which build is
+on screen, and a link to Data Health, where all of it is in full. On a phone the sidebar
+starts closed: the arrows at the top left open it.
 
 **Dark or light.** The workbench is designed dark - near-black with a forest-green accent
 for buttons, selected tabs and links - and has a matching light theme. It starts in your

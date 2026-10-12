@@ -2,9 +2,10 @@
 
 **Status: the colours (sections 1-3) are in effect since P1 (2026-10-11)**, as the owner
 decided: both themes kept, the computer's setting followed until Dark or Light is chosen
-in the app's menu (the browser remembers it), and `#2f8556` / `#1f6b45` for actions. Sections
-4-7 are still proposals, for the phases named in them. The evidence behind each value is in
-[BASELINE_AUDIT.md](BASELINE_AUDIT.md).
+in the app's menu (the browser remembers it), and `#2f8556` / `#1f6b45` for actions. **The
+frame and the style rules (sections 8-9) are in effect since P2**: the navigation in a top
+bar and one style rule, both the owner's choice. Sections 4-7 are still proposals, for the
+phases named in them. The evidence behind each value is in [BASELINE_AUDIT.md](BASELINE_AUDIT.md).
 
 The roadmap's direction: a near-black canvas, a dark forest-green accent, balanced
 density, the whole workbench in scope, navigation and behaviour unchanged. This proposal
@@ -123,8 +124,9 @@ Kept from today's `config.toml`, which already fits the brief:
 - **Borders:** widget and sidebar borders on, in the `grid` colour.
 - **Figures:** `st.metric` tiles with a border, up to five a row; context kept to about
   twenty characters (CLAUDE.md), three a row where it is longer.
-- **Spacing:** Streamlit's own gaps; rows of controls use `gap="small"`. Page padding and
-  tabular numerals have no native setting and stay as they are unless P2/P3 shows a need.
+- **Spacing:** Streamlit's own gaps; rows of controls use `gap="small"`. The space above a
+  page's title is the one style rule (section 9). Tabular numerals have no native setting
+  and stay as they are unless P3 shows a need.
 
 Candidates to evaluate in P2/P3, not proposed yet: `metricValueFontSize` (tiles' numbers
 are 2.25rem by default), `buttonRadius`, and `dataframeHeaderBackgroundColor` set apart
@@ -168,3 +170,30 @@ AI about this* dialog. Proposed presentation, once the tokens are in place:
 - Rosters and experiments to review: bordered cards, the action buttons last and labelled
   with what they do; nothing is saved without the click, as now.
 - Errors and an offline model: a tagged line that says what to do; the conversation stays.
+
+## 8. The frame (P2)
+
+- **Navigation in a top bar** (`st.navigation(position="top")`, the owner's choice): the six
+  groups - League, Explore, Build, Forecast, Ask, System - are menus across the top, each
+  opening its pages in the same order, under the same names and addresses. On a phone the
+  menu folds into the sidebar.
+- **The sidebar holds the filters and the data status**, so season, phase, team, player and
+  the comparison window are always in view. It starts open on a desktop and closed on a
+  phone (`initial_sidebar_state="auto"`), where it would cover the page.
+- **Data status**: each source's state in a word and an icon; what lies behind it on hover;
+  a line under it only when something needs doing (stale, failing, not supplied); the
+  build; and a link to Data Health, where everything is in full.
+- **Messages**: `components.alert(kind, message)` draws every error, warning, success and
+  note, one icon per kind - error `error`, warning `warning`, success `check_circle`,
+  note `info` - on every page.
+
+## 9. The style rules
+
+What Streamlit's theme cannot set lives in one file, `apps/workbench/wb/style.css`,
+applied once per run by the frame through `wb/style.py` - never from a page.
+`tests/ui/test_style.py` checks that the file holds these rules and nothing else, that only
+the frame applies it, and that no page injects HTML or CSS of its own.
+
+| Rule | Why | If Streamlit renames the hook |
+| --- | --- | --- |
+| `[data-testid="stMainBlockContainer"] { padding-top: 2.5rem; }` | With the top bar, Streamlit leaves 8rem above every title (6rem on a phone); 2.5rem keeps the title clear of the bar and shows about 80px more of each page on a desktop, 50px on a phone, measured in a browser (the owner's choice, P2) | The gap returns to Streamlit's own; nothing else changes |

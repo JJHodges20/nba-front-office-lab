@@ -373,21 +373,20 @@ def proposal_card(
 
 def _saved(saved: ProposalSaved) -> None:
     if saved.created:
-        st.success(
-            f"Saved as “{escaped(str(saved.name))}”. The Team Builder has it.",
-            icon=":material/check_circle:",
+        components.alert(
+            "success", f"Saved as “{escaped(str(saved.name))}”. The Team Builder has it."
         )
     elif saved.saved:
-        st.info(
+        components.alert(
+            "info",
             f"Already saved as “{escaped(str(saved.name))}”. It was not saved a second time.",
-            icon=":material/info:",
         )
     else:
-        st.warning(
+        components.alert(
+            "warning",
             "Not saved. "
             + " ".join(escaped(reason) for reason in saved.refused)
             + " Ask the question again for rosters made from the lab as it is now.",
-            icon=":material/warning:",
         )
 
 

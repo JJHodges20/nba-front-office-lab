@@ -96,7 +96,7 @@ and [ui-polish/DESIGN_SYSTEM.md](ui-polish/DESIGN_SYSTEM.md). Each phase stops f
 | --- | --- | --- | --- |
 | P0 | Audit | Baseline: pages, tests, screenshots, findings, decisions, the P1 plan | Done (2026-10-11; 100 screenshots in both themes at four sizes, 19 findings, nothing changed) |
 | P1 | Tokens | The forest-green brand and the near-black neutrals in the palette and the page theme, with tests | Done (2026-10-11; the owner's decisions: both themes kept, Dark chosen once in the menu; `#2f8556` / `#1f6b45` for actions, never for data) |
-| P2 | Shell | Navigation, filters, headers, empty states | Planned |
+| P2 | Shell | Navigation, filters, headers, empty states | Done (2026-10-11; the owner's choices: the navigation in a top bar, so the filters are always in view - same groups, pages, order and addresses - and one style rule, the space above titles; the sidebar closed on a phone; a quieter data status with a link to Data Health; one form for every message) |
 | P3 | Shared components | Tiles, tags, tables, controls | Planned |
 | P4 | Charts | Chart styling in the new theme, the theme detection | Planned |
 | P5 | League and Explore pages | Page-by-page polish | Planned |

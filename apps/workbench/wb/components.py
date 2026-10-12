@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any, Literal
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -126,10 +127,29 @@ def tagged(tag: tuple[str, str, str], text: str) -> None:
     st.markdown(f":{color}-badge[{icon} {word}] {text}")
 
 
-def state_badge(state: str, label: str | None = None) -> None:
-    """A status with its icon and its word, so the colour is never the only signal."""
+def state_badge(state: str, label: str | None = None, *, help: str | None = None) -> None:
+    """A status with its icon and its word, so the colour is never the only signal; ``help``
+    is what lies behind it, on hover."""
     text, icon, color = STATES[state]
-    st.badge(label or text, icon=icon, color=color)
+    st.badge(label or text, icon=icon, color=color, help=help)
+
+
+AlertKind = Literal["error", "warning", "success", "info"]
+ALERTS: dict[str, tuple[Callable[..., Any], str]] = {
+    "error": (st.error, ":material/error:"),
+    "warning": (st.warning, ":material/warning:"),
+    "success": (st.success, ":material/check_circle:"),
+    "info": (st.info, ":material/info:"),
+}
+"""One icon for each kind of message, the same on every page (UI polish P2)."""
+
+
+def alert(kind: AlertKind, message: str) -> None:
+    """A message about what just happened - something refused, something to check, something
+    done, something to know - in one form on every page. ``message`` is markdown: text from
+    outside the lab is escaped by the caller."""
+    draw, icon = ALERTS[kind]
+    draw(message, icon=icon)
 
 
 def source_word(source: str, state: str) -> str:

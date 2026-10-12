@@ -623,15 +623,13 @@ def _save(scenario: Scenario, name: str) -> None:
         )  # fmt: skip
         if st.button("Save", key=SAVE, icon=":material/save:"):
             if not roster_name.strip():
-                st.error("Give the roster a name first.")
+                components.alert("error", "Give the roster a name first.")
             else:
                 roster_id = data.simulator_save(scenario, roster_name.strip())
                 st.session_state[SAVED] = roster_id
     saved = st.session_state.get(SAVED)
     if saved is not None:
-        st.success(
-            f"Saved as roster {saved}. Open it in the Team Builder.", icon=":material/check:"
-        )
+        components.alert("success", f"Saved as roster {saved}. Open it in the Team Builder.")
 
 
 # --- the profile -----------------------------------------------------------------------------

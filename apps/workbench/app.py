@@ -2,8 +2,9 @@
 
 Run it with ``fol ui``, or ``streamlit run apps/workbench/app.py`` from the project root.
 
-This file is the frame every page sits in: the navigation, the global filters and the
-data status in the sidebar. A page draws itself for whatever the filters say.
+This file is the frame every page sits in: the navigation in the top bar, the global
+filters and the data status in the sidebar (UI polish P2, so the filters are always in
+view). A page draws itself for whatever the filters say.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from datetime import UTC, datetime
 
 import streamlit as st
 
-from wb import ask, components, data, formats, state
+from wb import ask, components, data, formats, state, style
 from wb.views import (
     benchmarks,
     builder,
@@ -34,8 +35,10 @@ st.set_page_config(
     page_title="NBA Front Office Lab",
     page_icon=":material/sports_basketball:",
     layout="wide",
-    initial_sidebar_state="expanded",
+    # Open on a desktop, closed on a phone, where it would cover the page (UI polish P2).
+    initial_sidebar_state="auto",
 )
+style.apply()
 
 RESEARCH_PAGE = st.Page(
     research.render,
@@ -45,6 +48,12 @@ RESEARCH_PAGE = st.Page(
 )
 # Ask AI about this, on the other pages, opens the answer here (A6).
 ask.RESEARCH = RESEARCH_PAGE
+HEALTH_PAGE = st.Page(
+    health.render,
+    title="Data Health",
+    icon=":material/monitor_heart:",
+    url_path="health",
+)
 
 PAGES = {
     "League": [
@@ -118,14 +127,7 @@ PAGES = {
         ),
     ],
     "Ask": [RESEARCH_PAGE],
-    "System": [
-        st.Page(
-            health.render,
-            title="Data Health",
-            icon=":material/monitor_heart:",
-            url_path="health",
-        ),
-    ],
+    "System": [HEALTH_PAGE],
 }
 
 
@@ -145,16 +147,20 @@ def not_built() -> None:
 
 
 def data_status(build: int | None, built_at: datetime | None) -> None:
-    """Where the data stands, at the foot of the sidebar on every page."""
+    """Where the data stands, at the foot of the sidebar on every page: each source's state
+    in a word, what lies behind it on hover, and a line under it only when something needs
+    doing - the whole story is on Data Health, one click away (UI polish P2)."""
     now = datetime.now(UTC).replace(tzinfo=None, second=0, microsecond=0)
     with st.sidebar:
         st.divider()
         st.markdown("**Data**")
         for source in data.sources(build, now):
             word = components.source_word(source.source, source.state).lower()
-            components.state_badge(source.state, f"{source.title}: {word}")
-            st.caption(source.detail)
+            components.state_badge(source.state, f"{source.title}: {word}", help=source.detail)
+            if source.state != "ok":
+                st.caption(source.detail)
         st.caption(f"Build {build}, {formats.moment(built_at)}")
+        st.page_link(HEALTH_PAGE, label="Data Health", icon=":material/monitor_heart:")
 
 
 status = data.status()
@@ -162,7 +168,7 @@ if not status.is_built:
     not_built()
     st.stop()
 
-page = st.navigation(PAGES, position="sidebar", expanded=True)
+page = st.navigation(PAGES, position="top")
 state.sidebar(status)
 page.run()
 data_status(status.build_id, status.built_at)

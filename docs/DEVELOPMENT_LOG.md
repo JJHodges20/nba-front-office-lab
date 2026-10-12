@@ -3,6 +3,58 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## UI polish P2 - the frame: a top bar, the filters in view, one form for messages (2026-10-11)
+
+The frame every page sits in, made to the owner's choices. The pages, their groups,
+names, order and addresses, the filters and what they do, the numbers and the data are
+as they were.
+
+**The owner's decisions** (2026-10-11), from prototype screenshots of both layouts
+(`data/ui-polish/screenshots/p2-options/`): the navigation in a top bar (D4), and one small
+style rule, the space above the titles (D5).
+
+**Built**
+
+- **The navigation in a top bar** (`st.navigation(..., position="top")`): the six groups
+  are menus across the top, each with its pages in the same order, names and addresses; on
+  a phone they fold into the sidebar. The sidebar holds the filters and the data status
+  alone, so season, phase, team, player and the comparison window are in view on every
+  page at every size (finding F4).
+- **The sidebar starts closed on a phone** and open on a desktop
+  (`initial_sidebar_state="auto"`; F5).
+- **A quieter data status**: each source in a word and an icon, its details on hover
+  (`components.state_badge(..., help=...)`), a line under it only when something needs
+  doing, the build, and a link to Data Health.
+- **One style rule** (`wb/style.css`, applied once per run by `wb/style.py` from `app.py`):
+  the space above every title, from Streamlit's 8rem with a top bar (6rem on a phone) to
+  2.5rem. Pages start about 50px higher than at P1 at every size (F8). A test holds the
+  file to the rules listed in DESIGN_SYSTEM.md section 9 and keeps every page from
+  styling itself.
+- **One form for every message**: `components.alert(kind, message)` draws the 20 errors,
+  warnings, successes and notes in six files, one icon for each kind. Three had differed:
+  the simulator's "Give the roster a name first." had no icon, its save used `check` where
+  the others use `check_circle`, and Contract Explorer's "Choose a file..." warning had the
+  note's icon.
+- **Documents**: DESIGN_SYSTEM.md sections 8 (the frame) and 9 (the style rules);
+  CLAUDE.md's new rule that styling is the theme's; the user's guide on the frame; the
+  audit's D4 and D5; this roadmap's phase table.
+
+**Found in the browser**, for the owner (finding F20, decision D7): the top bar does not
+mark the open page's group. An opened menu marks the page, and the title names it, but a
+menu exists in the page only while it is open, so no style rule can mark its group. A
+small label with the group's name above each title, from the shared header, could (P3).
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New and changed tests | `test_style.py` (3 new: the stylesheet holds the agreed rule and nothing else, each rule is listed in DESIGN_SYSTEM.md, only the frame applies it and no page injects HTML or CSS); one icon for each kind of message; the contract file's details in the badge's hover, not a caption; the Data Health link |
+| `pytest -n auto` | 3,961 passed (5 min 35 s); at P1, 3,956 |
+| The frame in a browser, dark and light | 24 checks in each theme, all passed: every page opened from its menu, at its own address, with its heading and no error; the title's box at 38px; no page list in the desktop sidebar; a team chosen on Team Explorer kept through Player Explorer and back; the contract file's details on hover; the Data Health link; a warning drawn as a warning; on a phone the sidebar closed at first and, opened, holding the pages and the filters |
+| The pages in a browser | The P0 set taken again (`data/ui-polish/screenshots/p2/`, 100 shots under the same names, both themes, four sizes), no page with an error. Compared with P1: the menus across the top; the filters at the head of the sidebar, all in view at 1366x768 and 1024x768; every page about 50px higher; at phone width the page in view at first, not the sidebar. Colours, charts, tables and tiles as at P1 |
+| Boundaries and data | The frame, two components and the message calls of six views; no service, model, chart builder or data touched; the browser pass read the disposable copy |
+
 ## UI polish P0 and P1 - the audit and the Dark Forest tokens (2026-10-11)
 
 The first two phases of the user's *Dark Forest UI Modernization* roadmap: a near-black,

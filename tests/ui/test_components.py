@@ -159,3 +159,29 @@ def test_too_few_games_names_the_span_it_could_not_draw() -> None:
     assert components.TOO_FEW_GAMES.format(games=20).startswith(
         "Form over 20 games needs 20 games played"
     )
+
+
+def test_every_kind_of_message_has_its_one_icon() -> None:
+    """UI polish P2: errors, warnings, successes and notes are drawn one way on every page."""
+
+    def script() -> None:
+        from wb import components
+
+        components.alert("error", "Refused.")
+        components.alert("warning", "Check this.")
+        components.alert("success", "Saved.")
+        components.alert("info", "Already saved.")
+
+    opened = drawn(script)
+    drawn_as = {
+        "error": [(e.value, e.icon) for e in opened.error],
+        "warning": [(e.value, e.icon) for e in opened.warning],
+        "success": [(e.value, e.icon) for e in opened.success],
+        "info": [(e.value, e.icon) for e in opened.info],
+    }
+    assert drawn_as == {
+        "error": [("Refused.", ":material/error:")],
+        "warning": [("Check this.", ":material/warning:")],
+        "success": [("Saved.", ":material/check_circle:")],
+        "info": [("Already saved.", ":material/info:")],
+    }

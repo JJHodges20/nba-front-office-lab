@@ -198,7 +198,7 @@ def _unreadable(research: WorkspaceService, error: WorkspaceUnreadable) -> None:
         try:
             moved = research.set_aside()
         except WorkspaceError as failed:
-            st.error(answers.escaped(str(failed)), icon=":material/error:")
+            components.alert("error", answers.escaped(str(failed)))
         else:
             _after(
                 f"The old file was moved to {moved}. A new one has been started."
@@ -342,7 +342,7 @@ def _new_workspace(research: WorkspaceService, *, busy: bool) -> None:
             try:
                 made = research.create(name, goal=goal or None)
             except WorkspaceError as error:
-                st.error(str(error), icon=":material/error:")
+                components.alert("error", str(error))
             else:
                 _after(f"Created “{made.name}”.", show=made.workspace_id, sent="new_workspace")
 
@@ -441,7 +441,7 @@ def _settings(
                     ),
                 )
             except (WorkspaceError, ValueError) as error:
-                st.error(str(error), icon=":material/error:")
+                components.alert("error", str(error))
             else:
                 _after(f"Saved “{saved.name}”.")
         st.divider()
@@ -459,7 +459,7 @@ def _settings(
                 try:
                     api.summarize(key)
                 except api.SummaryError as error:
-                    st.warning(str(error), icon=":material/warning:")
+                    components.alert("warning", str(error))
                 else:
                     _after("The conversation is summarized in the notes.")
 
@@ -633,7 +633,7 @@ def _finding(research: WorkspaceService, finding: Finding) -> None:
                     try:
                         research.update_finding(key, title=title, note=note or None)
                     except WorkspaceError as error:
-                        st.error(str(error), icon=":material/error:")
+                        components.alert("error", str(error))
                     else:
                         _after("Finding saved.")
             if st.button("Delete", key=f"ai_f_delete_{key}", icon=":material/delete:"):
@@ -774,7 +774,7 @@ def _turn_actions(
                     try:
                         research.save_finding(turn, title, note or None)
                     except WorkspaceError as error:
-                        st.error(str(error), icon=":material/error:")
+                        components.alert("error", str(error))
                     else:
                         _after(f"Saved “{title.strip()}” to the findings.", sent=f"finding_{key}")
         if changed and st.button(

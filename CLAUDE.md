@@ -334,7 +334,13 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   adds the table view and the exports. The house rules (one scale, thin marks, ink text,
   series caps) are tested in `tests/ui/test_charts.py`; do not work around them in a page.
 - **Colours live in `wb/theme.py`.** `.streamlit/config.toml` repeats them and a test
-  keeps the two in step. A new colour has to pass `tests/ui/test_theme.py`.
+  keeps the two in step. A new colour has to pass `tests/ui/test_theme.py`. The page's
+  primary colour is the forest-green `brand`, never a chart colour (UI polish P1).
+- **Styling is the theme's.** No page writes CSS or HTML. What the theme cannot set is a
+  rule in `wb/style.css`, applied once by the frame (`style.apply()`), listed in
+  `docs/ui-polish/DESIGN_SYSTEM.md` and held to that list by `tests/ui/test_style.py`; a new
+  rule is the owner's decision. Errors, warnings, successes and notes go through
+  `components.alert`, one icon per kind (UI polish P2).
 - **Every figure says what it is**: measured, derived, estimate, modeled or the user's
   assumption. Estimates over a span carry "≈". Missing is a dash and an explanation,
   never a zero. A page that shows a modeled value lists the Modeled tag in its header.

@@ -1,0 +1,14 @@
+/*
+ * The workbench's own style rules: what Streamlit's theme (.streamlit/config.toml) cannot
+ * set. Applied once per run by the frame through wb/style.py - never from a page. Each rule
+ * hooks a data-testid, which a Streamlit upgrade may rename; the rule then simply stops
+ * applying and the page looks as Streamlit draws it. docs/ui-polish/DESIGN_SYSTEM.md lists
+ * every rule and why; tests/ui/test_style.py keeps the two in step.
+ */
+
+/* UI polish P2: with the navigation in the top bar, Streamlit leaves 8rem above every page's
+   title (6rem on a phone). 2.5rem keeps the title clear of the bar and brings about 80px
+   more of each page into view on a desktop, about 50px on a phone (measured in a browser). */
+[data-testid="stMainBlockContainer"] {
+    padding-top: 2.5rem;
+}

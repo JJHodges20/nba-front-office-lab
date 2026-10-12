@@ -215,7 +215,7 @@ def _form(
             )
             st.session_state.pop(SAVED, None)
         except ValidationError as error:
-            st.error("; ".join(item["msg"] for item in error.errors()), icon=":material/error:")
+            components.alert("error", "; ".join(item["msg"] for item in error.errors()))
             return None
     return st.session_state.get(REQUEST)
 
@@ -400,14 +400,12 @@ def _plan(report: OptimizerReport, plan: RosterPlan) -> None:
                 try:
                     roster = data.optimizer_save(shown.index.tolist(), name, report.request)
                 except (OptimizerError, RosterError) as error:  # what the lab refuses is shown
-                    st.error(str(error), icon=":material/error:")
+                    components.alert("error", str(error))
                 else:
                     st.session_state[SAVED] = (plan.number, name, roster)
     saved = st.session_state.get(SAVED)
     if saved and saved[0] == plan.number:
-        st.success(
-            f"Saved as “{saved[1]}”. The Team Builder has it.", icon=":material/check_circle:"
-        )
+        components.alert("success", f"Saved as “{saved[1]}”. The Team Builder has it.")
 
 
 def _listed(names) -> str:  # type: ignore[no-untyped-def]
