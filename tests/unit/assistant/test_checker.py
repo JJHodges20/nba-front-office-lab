@@ -225,6 +225,30 @@ class TestWording:
     def test_saying_what_happened_or_what_the_user_can_do_is_not_a_claim(self, plain: str) -> None:
         assert wording(plain, []) == ()
 
+    @pytest.mark.parametrize(
+        ("told", "name"),
+        [
+            # A8 (R03), after a result: the user cannot call the lab's tools.
+            ("Use the roster_fit tool to verify defensive roles and minutes.", "roster_fit"),
+            ("You can call `research_docs` for the details.", "research_docs"),
+            ("Get each player's minutes via player_stats with view games.", "player_stats"),
+        ],
+    )
+    def test_a_tool_named_for_the_user_to_use_is_caught(self, told: str, name: str) -> None:
+        (found,) = wording(told, [])
+        assert found.phrase == name and "cannot call the lab's tools" in found.rule
+
+    @pytest.mark.parametrize(
+        "plain",
+        [
+            "The figures come from player_value's model evidence [r1].",
+            "Use the Roster Fit page to see the profile.",
+            "Run the season again with a healthier roster in the Scenario Simulator.",
+        ],
+    )
+    def test_saying_where_a_figure_came_from_or_naming_a_page_is_not(self, plain: str) -> None:
+        assert wording(plain, []) == ()
+
 
 class TestCitations:
     def test_a_result_that_does_not_exist_is_found(self) -> None:

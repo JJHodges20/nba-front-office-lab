@@ -53,7 +53,7 @@ from front_office.services import Lab  # noqa: E402
 CASES = ROOT / "tests" / "assistant" / "fixtures" / "experiment_cases.yaml"
 RESULTS = ROOT / "data" / "assistant" / "benchmarks"
 REPORT = ROOT / "docs" / "research" / "EXPERIMENT_PROPOSALS.md"
-MILESTONE = "A8"
+MILESTONE = "A9"
 
 
 def model_files(project: Path) -> dict[str, str]:

@@ -62,8 +62,9 @@ last fetched, whether a contract file has been supplied, and which build is on s
 
 Hover for exact values. Under every chart, *Table view and export* shows the same
 values as a table and offers them as CSV, and the chart itself as an interactive HTML
-file. For a static image use the camera button that appears at the chart's top right;
-it saves a PNG at twice screen size.
+file - which loads Plotly's script from its website when you open it, so it needs an
+internet connection to draw. For a static image use the camera button that appears at the
+chart's top right; it saves a PNG at twice screen size.
 
 A *form* chart shows a metric over the trailing 5, 10 or 20 games. Its line starts at
 the first date on which that many games had been played, so every point is an average
@@ -289,7 +290,8 @@ played are answered from that season's figures.
   changes, whatever you keep. The assistant drafts one only when asked.
 - *Quick or Deep*: Quick for one fact or one comparison, Deep for a longer look - more
   tool calls, more time, the model thinking first. A question under way shows its steps
-  as they come, and *Stop* ends it at the next step, keeping what was gathered.
+  as they come, and *Stop* ends it at the next step, keeping what was gathered: whatever the
+  model was writing when you pressed it is not acted on.
 - *Each answer* opens with its kind: supported, qualified (part answered; what is missing,
   limited or estimated is said), not enough to answer, a question back, or declined. A
   name with several readings - two players called Brown, a year that could be either
@@ -314,7 +316,10 @@ played are answered from that season's figures.
   notes as background, never as evidence. *Export* gives the workspace as a document to
   read or as data. *Archive or delete* puts a workspace away (restore it any time), clears
   its questions (notes, findings and rosters stay) or deletes it - each only once you tick
-  the box.
+  the box. If the file that keeps the workspaces cannot be read - damaged, or made by a
+  newer version of the lab - the page says so instead, and *Set it aside and start afresh*
+  renames it beside itself (never deleting it) and starts a new one. Copies made before
+  each upgrade of the file are in `data/assistant/backups/`.
 - *Findings*: *Save as finding* under an answer keeps a copy of it, with your title and
   note, in the workspace's findings - it stays even if the history is cleared.
 - *Old answers*: each answer records the data build and player value model it read. When

@@ -30,7 +30,7 @@ from front_office.domain.proposals import RosterProposal
 from front_office.domain.research import Focus, SavedTurn
 from front_office.domain.tables.current import SOURCES
 from front_office.pipelines.build import build_database
-from front_office.services import Lab, WorkspaceError
+from front_office.services import Lab, WorkspaceError, WorkspaceUnreadable
 from front_office.services.workspaces import DEFAULT_NAME, HISTORY_TURNS
 
 START = datetime(2026, 10, 10, 13, 0, 0)
@@ -366,3 +366,30 @@ class TestExport:
             "None proposed.",
         ):
             assert part in markdown
+
+
+class TestDamage:
+    """A9: a research file that cannot be used is said in words, and set aside on request -
+    kept, never deleted - after which the research starts afresh."""
+
+    def test_a_damaged_file_is_said_and_set_aside(self, home: Lab) -> None:
+        service = home.workspaces
+        service.create("Before the damage")
+        path = home.settings.research_path
+        path.write_bytes(b"not a database " * 300)
+        with pytest.raises(WorkspaceUnreadable, match="Set it aside"):
+            service.list()
+        moved = service.set_aside()
+        assert moved is not None and moved.parent == path.parent
+        assert moved.read_bytes() == b"not a database " * 300
+        assert service.default().name == DEFAULT_NAME, "a new store, and a workspace in it"
+
+    def test_a_file_that_opens_is_never_set_aside(self, home: Lab) -> None:
+        service = home.workspaces
+        kept = service.create("Kept")
+        assert service.set_aside() is None
+        assert [w.workspace_id for w in service.list()] == [kept.workspace_id]
+
+    def test_an_unreadable_file_is_a_workspace_error(self) -> None:
+        """So every place that already says a WorkspaceError on the page says this too."""
+        assert issubclass(WorkspaceUnreadable, WorkspaceError)

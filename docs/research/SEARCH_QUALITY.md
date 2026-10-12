@@ -2,7 +2,7 @@
 
 # Search quality
 
-How well the assistant's two ways of finding reporting serve typical research questions: Ollama's web search, and the news feeds the source register allows (decision 0018, A7). 12 frozen queries (`tests/assistant/fixtures/search_cases.yaml`), run 2026-10-11 02:17 UTC. Counts, not thresholds: one run is one sample of a web that changes by the hour.
+How well the assistant's two ways of finding reporting serve typical research questions: Ollama's web search, and the news feeds the source register allows (decision 0018, A7). 12 frozen queries (`tests/assistant/fixtures/search_cases.yaml`), run 2026-10-11 23:29 UTC. Counts, not thresholds: one run is one sample of a web that changes by the hour.
 
 ## What is counted
 
@@ -18,27 +18,27 @@ How well the assistant's two ways of finding reporting serve typical research qu
 
 | Case | Query | Kind | Results | Left out | Repeats | On topic | Dated | Fresh | Feeds (on topic) |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| Q01 | Boston Celtics injury news | news | 10 | 0 | 0 | 10 | 1 | 1 | 6 (4) |
+| Q01 | Boston Celtics injury news | news | 10 | 0 | 0 | 10 | 1 | 1 | 7 (5) |
 | Q02 | New York Knicks contract extension | news | 10 | 0 | 0 | 10 | 2 | 2 | 15 (11) |
-| Q03 | Golden State Warriors roster moves | news | 10 | 2 | 0 | 8 | 2 | 0 | 15 (9) |
+| Q03 | Golden State Warriors roster moves | news | 10 | 3 | 0 | 7 | 3 | 1 | 15 (10) |
 | Q04 | Oklahoma City Thunder preseason | news | 10 | 3 | 0 | 7 | 1 | 1 | 15 (7) |
-| Q05 | Los Angeles Lakers trade rumors | news | 10 | 0 | 0 | 10 | 1 | 0 | 15 (10) |
-| Q06 | NBA free agent signings this week | news | 10 | 1 | 0 | 7 | 4 | 4 | 26 (15) |
+| Q05 | Los Angeles Lakers trade rumors | news | 10 | 0 | 0 | 10 | 0 | 0 | 15 (10) |
+| Q06 | NBA free agent signings this week | news | 10 | 1 | 0 | 9 | 5 | 5 | 27 (15) |
 | Q07 | Victor Wembanyama Spurs season outlook | news | 10 | 1 | 0 | 8 | 2 | 2 | 15 (1) |
-| Q08 | Denver Nuggets news | news | 10 | 1 | 0 | 9 | 1 | 1 | 15 (11) |
+| Q08 | Denver Nuggets news | news | 10 | 1 | 0 | 8 | 0 | 0 | 15 (11) |
 | B01 | Boston Celtics 2008 championship team | background | 10 | 5 | 0 | 4 | 1 | - | - |
 | B02 | history of the NBA three-point line | background | 10 | 0 | 0 | 5 | 1 | - | - |
 | K01 | NBA luxury tax line 2026-27 | contract | 10 | 2 | 0 | 7 | 3 | - | - |
-| K02 | NBA rookie scale extension deadline | contract | 10 | 2 | 0 | 5 | 4 | - | - |
+| K02 | NBA rookie scale extension deadline | contract | not run: ollama.com could not be reached (ReadTimeout) | | | | | | |
 
 ## Over all queries
 
-- Queries run: 12 of 12.
-- Results: 120; left out from refused sites: 17; repeats: 0; kept: 103.
-- On topic: 90 of 103 kept results.
-- Dated by their address: 23 of 103.
-- Fresh, for the 8 news queries: 11 of 72 kept results dated within each query's days.
-- Feeds, for the 8 news queries: 122 items in the same days, 68 of them on topic.
+- Queries run: 11 of 12.
+- Results: 110; left out from refused sites: 16; repeats: 0; kept: 94.
+- On topic: 85 of 94 kept results.
+- Dated by their address: 19 of 94.
+- Fresh, for the 8 news queries: 12 of 71 kept results dated within each query's days.
+- Feeds, for the 8 news queries: 124 items in the same days, 70 of them on topic.
 
 ## Reading it
 

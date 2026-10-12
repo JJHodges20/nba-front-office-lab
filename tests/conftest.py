@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import shutil
-from collections.abc import Callable
+import socket
+from collections.abc import Callable, Iterator
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -49,6 +52,71 @@ for _logger, _phrase in BARE_MODE_NOISE.items():
     logging.getLogger(_logger).addFilter(
         lambda record, phrase=_phrase: phrase not in record.getMessage()
     )
+
+
+LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost"})
+"""Where a test may connect: this machine - asyncio's own pipes, a test's local server."""
+
+
+class NetworkReached(Exception):
+    """Not an ``OSError``: no provider may take it for a failed fetch and carry on."""
+
+
+@pytest.fixture(autouse=True)
+def _no_network(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[list[str]]:
+    """Nothing in the suite reaches the network outside the ``network`` and ``ollama``
+    markers (A9 network audit): a connection anywhere but this machine, or a name looked up,
+    fails the test that made it - even where the code under test caught the error."""
+    if request.node.get_closest_marker("network") or request.node.get_closest_marker("ollama"):
+        yield []
+        return
+    reached: list[str] = []
+    connect, connect_ex, lookup = (
+        socket.socket.connect,
+        socket.socket.connect_ex,
+        socket.getaddrinfo,
+    )
+
+    def outside(host: object) -> bool:
+        if not isinstance(host, str) or host in LOOPBACK:
+            return False
+        try:
+            return not ipaddress.ip_address(host.split("%")[0]).is_loopback
+        except ValueError:
+            return True  # a name: looking it up asks the network
+
+    def refuse(what: object, opened: socket.socket | None = None) -> NetworkReached:
+        reached.append(repr(what))
+        if opened is not None:
+            opened.close()  # the caller expected an OSError, and would leave it open
+        return NetworkReached(f"a test reached the network: {what!r}")
+
+    def guarded_connect(self: socket.socket, address: Any) -> Any:
+        if isinstance(address, tuple) and outside(address[0]):
+            raise refuse(address, self)
+        return connect(self, address)
+
+    def guarded_connect_ex(self: socket.socket, address: Any) -> Any:
+        if isinstance(address, tuple) and outside(address[0]):
+            raise refuse(address, self)
+        return connect_ex(self, address)
+
+    def guarded_lookup(host: Any, *args: Any, **kwargs: Any) -> Any:
+        name = host.decode() if isinstance(host, bytes) else host
+        if outside(name):
+            try:
+                ipaddress.ip_address(name.split("%")[0])  # an address is looked up nowhere
+            except ValueError:
+                raise refuse(host) from None
+        return lookup(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket.socket, "connect", guarded_connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", guarded_connect_ex)
+    monkeypatch.setattr(socket, "getaddrinfo", guarded_lookup)
+    yield reached
+    assert not reached, f"the test reached the network: {', '.join(reached)}"
 
 
 @pytest.fixture(autouse=True)

@@ -50,6 +50,15 @@ what was found, what was changed and what was left, and the forecasts now carryi
 error of a test that projected minutes too - 3.63 points of net rating, not the 3.01 of
 a test that knew them.
 
+The AI research assistant extension (A0-A9) is complete too: the AI Research page, where
+a language model running on this computer answers questions in plain words from the lab's
+own tools - its data, its tested models, its documents, what has happened since the last
+build, and the web - with every figure checked against what the tools returned. It saves
+nothing on its own: a roster it proposes, or an experiment, is kept only when you press
+its button. What it was tested against, and how it did, is in
+[docs/AI_EVALUATION.md](docs/AI_EVALUATION.md); what this release holds and its known
+limits are in [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md).
+
 The postseason chances and the simulator's seasons are the lab's forecasts, and they are
 shown as estimates with intervals beside the models' record on past seasons. Player value
 and a roster's projection are estimates with a stated error, shown as such; the optimizer
@@ -76,6 +85,20 @@ or by hand:
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
+
+### The AI assistant (optional)
+
+Everything else in the lab works without it.
+
+1. Install Ollama from ollama.com and start it. It must run on this computer: the lab
+   talks to it at 127.0.0.1 only, and refuses Ollama's cloud models.
+2. Get the model once: `ollama pull qwen3:8b` (about 5 GB; it fits an 8 GB graphics card).
+3. For web search, which is optional: copy `.env.example` to `.env` and put your own
+   Ollama account's key after `FOL_OLLAMA_API_KEY=`. `.env` is never committed. Without a
+   key, links you paste into a question are still read.
+
+The AI Research page says at the top whether the assistant is ready, and what to do if it
+is not.
 
 ## Using it
 
@@ -171,6 +194,19 @@ team-by-team detail and `--force` fetches again what is already stored. `fol bui
 template --output FILE --seasons N` chooses where the template goes and how many seasons
 of salary columns it carries.
 
+### When something goes wrong
+
+| What you see | What to do |
+| --- | --- |
+| AI Research says *Assistant: offline* | Start the Ollama app. Every other page works without it. |
+| AI Research says *No model* | `ollama pull qwen3:8b`, then reload the page. |
+| An answer is taking too long | Press *Stop*: what was gathered so far is kept. A Quick question stops looking things up after about 90 seconds, a Deep one after about 5 minutes. |
+| *Your saved research cannot be opened* | The file that keeps your workspaces (`data/assistant/assistant.sqlite`) is damaged, or was made by a newer version of the lab. Press *Set it aside and start afresh*: the file is renamed beside itself (`assistant-set-aside-<time>.sqlite`), never deleted, and a new one is started. Copies made before each upgrade of the file are in `data/assistant/backups/`; to go back to one, stop the workbench and copy it over `data/assistant/assistant.sqlite`. |
+| Games, moves, injuries or news look old | `fol current status` says when each was last fetched and whether the last try failed; `fol current refresh` fetches what is due. A failed fetch keeps the last copy and says how old it is. |
+| *Web search: not set up* | Put your key in `.env` (see Setup). |
+| The database is missing, or a page says no data has been built | `fol build` makes it again from the raw store in `data/raw/`; `fol refresh` fetches first. |
+| A page shows an error after an update | Stop the workbench (Ctrl+C) and start it again: a running server keeps the old code. |
+
 ## Development
 
 ```powershell
@@ -201,7 +237,8 @@ tests/              unit, architecture, integration and interface tests
 - [Postseason research](docs/research/POSTSEASON.md) - the postseason model, how it was tested and how its chances have come out
 - [Simulator research](docs/research/SIMULATOR.md) - what a season is drawn from, the figures measured, the wins test, and the season ahead as drawn
 - [Full-system audit](docs/AUDIT.md) - what the audit of milestone 14 found, changed and left
-- [The AI research assistant](docs/AI_ASSISTANT_SPEC.md) - a local model answering from the lab's tools, in progress; [how it is evaluated](docs/AI_EVALUATION.md), [the models tried](docs/research/ASSISTANT_MODELS.md), [its answers end to end](docs/research/ASSISTANT_ANSWERS.md), [its experiment proposals](docs/research/EXPERIMENT_PROPOSALS.md)
+- [The AI research assistant](docs/AI_ASSISTANT_SPEC.md) - a local model answering from the lab's tools; [how it is evaluated](docs/AI_EVALUATION.md), [the models tried](docs/research/ASSISTANT_MODELS.md), [its answers end to end](docs/research/ASSISTANT_ANSWERS.md), [its experiment proposals](docs/research/EXPERIMENT_PROPOSALS.md), [a working session timed](docs/research/ASSISTANT_SESSION.md)
+- [Release notes](docs/RELEASE_NOTES.md) - what the assistant's release holds, how to install and recover it, and its known limits
 - [Architecture](docs/ARCHITECTURE.md) - the layers and the rules between them
 - [Data dictionary](docs/DATA_DICTIONARY.md) - generated from the table contracts
 - [Metric glossary](docs/METRICS.md) - every player, team and roster metric, generated from the catalogs

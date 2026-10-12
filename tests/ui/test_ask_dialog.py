@@ -54,6 +54,16 @@ def test_the_dialog_opens_on_what_the_page_shows(model, page, home: Path) -> Non
     assert app.text_area(key="ai_ask_question").label == "Your question"
 
 
+def test_with_ollama_offline_the_dialog_says_so_and_cannot_ask(page, home: Path) -> None:
+    """A9 audit: every page test runs with Ollama offline (``tests/ui/conftest.py``); the
+    dialog says how to start it and offers nothing to press."""
+    app = page(home, "teams", **{state.TEAM: BOS})
+    app.button(key="ai_ask").click().run()
+    said = texts(app)
+    assert "The assistant cannot answer yet" in said and "Start the Ollama app" in said
+    assert not [button for button in app.button if button.key == "ai_ask_go"]
+
+
 def draw_body(page: str) -> None:
     """The dialog's body drawn inline, under the sidebar, as a page would open it."""
     from wb import ask, data, state
@@ -85,3 +95,17 @@ def test_a_question_from_a_page_is_about_what_it_shows_and_kept(model, open_at, 
     system = ollama.chat_payloads[0]["messages"][0]["content"]
     assert f"team id {BOS}" in system or f"team_id {BOS}" in system
     assert app.session_state[state.TEAM] == BOS, "the sidebar is as it was"
+
+
+def test_a_damaged_research_file_is_said_and_the_pages_still_draw(page, home: Path) -> None:
+    """A9: with the research file unreadable, every other page draws as before, and the
+    dialog says why nothing can be asked and where it is put right."""
+    research = load_settings(home).research_path
+    research.parent.mkdir(parents=True, exist_ok=True)
+    research.write_bytes(b"not a database " * 300)
+    page(home, "teams", **{state.TEAM: BOS})
+    app = AppTest.from_function(draw_body, kwargs={"page": "Team Explorer"})
+    app.run()
+    assert not app.exception, [error.value for error in app.exception]
+    assert "Your saved research cannot be opened" in texts(app)
+    assert not [area for area in app.text_area if area.key == "ai_ask_question"]

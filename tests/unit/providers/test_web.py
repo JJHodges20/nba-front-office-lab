@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+import requests
 
 from front_office.providers.web import (
     KEY_VARIABLE,
@@ -16,6 +17,7 @@ from front_office.providers.web import (
     WebError,
     is_public,
     refused_site,
+    requests_send,
     search_key,
 )
 from tests.web_fakes import ARTICLE, FakeWeb, Story, page, redirect, robots, rss, search_results
@@ -276,3 +278,43 @@ class TestTheSearchKey:
         with pytest.raises(WebError, match="not set up"):
             provider.search("Knicks")
         assert web.requests == []
+
+
+class TestTheRequestsTransport:
+    """A9: the one place the lab's web requests leave the machine."""
+
+    @pytest.mark.parametrize(
+        "failure",
+        [
+            requests.Timeout("read timed out for https://news.example.org/story?key=secret"),
+            requests.ConnectionError("no route to https://news.example.org/story?key=secret"),
+        ],
+    )
+    def test_out_of_reach_names_the_site_and_never_the_request(
+        self, monkeypatch: pytest.MonkeyPatch, failure: Exception
+    ) -> None:
+        def fail(*args: object, **kwargs: object) -> None:
+            raise failure
+
+        monkeypatch.setattr(requests, "request", fail)
+        with pytest.raises(WebError) as raised:
+            requests_send("GET", "https://news.example.org/story?key=secret", {}, None, 5, 1000)
+        said = str(raised.value)
+        assert said == f"news.example.org could not be reached ({type(failure).__name__})"
+        assert "secret" not in said
+
+    def test_a_body_past_its_limit_is_cut_and_said_to_be(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class Long(requests.Response):
+            def iter_content(self, chunk_size: int | None = 1, decode_unicode: bool = False):  # type: ignore[no-untyped-def, override]
+                yield from (b"x" * 600, b"y" * 600, b"z" * 600)
+
+        answer = Long()
+        answer.status_code = 200
+        answer._content_consumed = True
+        answer.headers["Content-Type"] = "text/html"
+        monkeypatch.setattr(requests, "request", lambda *a, **k: answer)
+        got = requests_send("GET", "https://news.example.org/story", {}, None, 5, 1000)
+        assert (got.status, got.truncated, len(got.body)) == (200, True, 1000)
+        assert got.headers == {"content-type": "text/html"} and got.peer is None

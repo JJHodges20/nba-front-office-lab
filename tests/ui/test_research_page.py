@@ -26,12 +26,13 @@ from front_office.domain.research import Focus, SavedTurn
 from front_office.pipelines.build import BuildReport
 from front_office.providers.ollama import OllamaProvider, OllamaUnavailable
 from front_office.services import Lab
-from tests.helpers import BOS, BROWN, NYK, WHITE
+from tests.helpers import BOS, BROWN, BRUNSON, NYK, TATUM, WHITE
 from tests.ollama_fakes import ScriptedOllama, chat_chunks, tool_call
 from tests.ui.conftest import drawn, texts
 from wb import answers
 
 HISTORY = tool_call("team_stats", team_id=BOS, season="2025-26", view="history")
+DAMAGED = b"not a database " * 300
 NOTHING = chat_chunks("Nothing to look up [no figures].")
 
 
@@ -117,6 +118,26 @@ def test_offline_says_how_to_start_ollama_and_cannot_be_asked(page, home: Path) 
     assert "Ask a question in “My research”" in said, "a workspace is made to start in"
 
 
+def test_a_damaged_research_file_is_set_aside_on_request(page, home: Path) -> None:
+    """A9: the file that keeps the workspaces cannot be read. The page says so in plain words,
+    nothing can be asked, and the button moves the file aside - kept as it was - and starts
+    afresh."""
+    research = load_settings(home).research_path
+    research.parent.mkdir(parents=True, exist_ok=True)
+    research.write_bytes(DAMAGED)
+    app = page(home, "research")
+    said = texts(app)
+    assert "Your saved research cannot be opened" in said and "file is not a database" in said
+    assert not [box for box in app.chat_input if box.key == "ai_question"], "nowhere to keep it"
+    app.button(key="ai_set_aside").click().run()
+    assert not app.exception, [error.value for error in app.exception]
+    said = texts(app)
+    assert "The old file was moved to" in said and "Ask a question in “My research”" in said
+    (moved,) = research.parent.glob("assistant-set-aside-*.sqlite")
+    assert moved.read_bytes() == DAMAGED
+    assert app.chat_input(key="ai_question") is not None, "a workspace to ask in again"
+
+
 def test_the_status_shows_web_search_and_each_current_source(page, home: Path) -> None:
     said = texts(page(home, "research"))
     assert "Web search: not set up" in said
@@ -153,6 +174,43 @@ def test_an_answer_shows_its_outcome_its_rows_its_chart_and_its_evidence(
     # AppTest files an expander that has an icon among the status blocks.
     folded = [block.label for block in app.status]
     assert "Evidence: 1 source" in folded and "How it was answered" in folded
+    assert len(app.dataframe) >= 1
+
+
+def test_running_the_page_again_asks_nothing_again_and_draws_the_answer_once(
+    model, page, home: Path
+) -> None:
+    """A9: a page runs again on every click anywhere on it. Running it again asks the model
+    nothing more, keeps no second turn, and draws the answer once."""
+    ollama = model(
+        ScriptedOllama(chats=[chat_chunks(tool_calls=[HISTORY]), chat_chunks("It went well [r1].")])
+    )
+    app = ask(page(home, "research"), "How have the Celtics' seasons gone?")
+    asked = len(ollama.chat_payloads)
+    for _ in range(3):
+        app.run()
+    assert not app.exception, [error.value for error in app.exception]
+    assert len(ollama.chat_payloads) == asked and len(kept(home)) == 1
+    assert texts(app).count("It went well [r1].") == 1
+
+
+def test_a_chart_the_house_rules_refuse_is_not_drawn_and_the_rows_are(
+    model, page, home: Path
+) -> None:
+    """A9 audit: four players compared would be four series where the house rules allow
+    three. The page says so, and the rows are there."""
+    four = tool_call("compare_players", player_ids=[TATUM, BROWN, WHITE, BRUNSON], season="2025-26")
+    model(
+        ScriptedOllama(
+            chats=[chat_chunks(tool_calls=[four]), chat_chunks("They are side by side [r1].")]
+        )
+    )
+    app = ask(page(home, "research"), "Compare the four players I picked.")
+    (turn,) = kept(home)
+    assert turn.answer is not None and turn.answer.results[0].charts, "the tool chose a chart"
+    said = texts(app)
+    assert "Not drawn: compare at most 3, not 4. Every figure is in the rows below." in said
+    assert not [key for key in drawn(app) if key.startswith(f"ai_chart_t{turn.turn_id}")]
     assert len(app.dataframe) >= 1
 
 
@@ -553,6 +611,9 @@ def test_a_dollar_is_shown_as_a_dollar_and_an_image_is_not_fetched() -> None:
     assert answers.prose("Tatum earns $40M; Brown $30M.") == "Tatum earns \\$40M; Brown \\$30M."
     assert answers.prose("See ![x](https://example.com/t.png) now") == "See (image left out) now"
     assert answers.escaped("[r1] *bold* $5") == "\\[r1\\] \\*bold\\* \\$5"
+    # A9 network audit: an image by reference was still drawn, and so fetched.
+    by_reference = answers.prose("See ![x][r] now.\n\n[r]: https://example.com/t.png")
+    assert "![" not in by_reference and by_reference.startswith("See !\\[x][r] now.")
 
 
 def test_a_time_is_written_plainly() -> None:

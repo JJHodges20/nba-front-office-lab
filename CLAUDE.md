@@ -47,6 +47,7 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\python.exe scripts\evaluate_answers.py --write   # the assistant's whole answers, end to end (docs/research/ASSISTANT_ANSWERS.md)
 .\.venv\Scripts\python.exe scripts\evaluate_search.py --write    # web search and the news feeds on frozen queries, live (docs/research/SEARCH_QUALITY.md)
 .\.venv\Scripts\python.exe scripts\evaluate_experiments.py --write   # experiment proposals drafted end to end on frozen questions (docs/research/EXPERIMENT_PROPOSALS.md)
+.\.venv\Scripts\python.exe scripts\measure_session.py --write    # a working session timed, asked twice on a copy of the data (docs/research/ASSISTANT_SESSION.md)
 .\.venv\Scripts\fol.exe current refresh            # fetch what is due: this season's games, transactions, the injury report, the news feeds
 .\.venv\Scripts\fol.exe current status             # when each current source was last fetched, and what is held
 .\.venv\Scripts\python.exe scripts\make_fixtures.py   # rebuild tests/fixtures/raw from data/raw
@@ -103,12 +104,13 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   `docs/research/BENCHMARKS.md`, `docs/research/PLAYER_VALUE.md`,
   `docs/research/ROSTER_FIT.md`, `docs/research/POSTSEASON.md`,
   `docs/research/SIMULATOR.md`, `docs/research/ASSISTANT_MODELS.md`,
-  `docs/research/ASSISTANT_ANSWERS.md`, `docs/research/SEARCH_QUALITY.md` and
-  `docs/research/EXPERIMENT_PROPOSALS.md` come from
+  `docs/research/ASSISTANT_ANSWERS.md`, `docs/research/SEARCH_QUALITY.md`,
+  `docs/research/EXPERIMENT_PROPOSALS.md` and `docs/research/ASSISTANT_SESSION.md` come from
   `fol dictionary|metrics|benchmarks --write`, `fol value report --write`,
   `fol fit report --write`, `fol playoffs report --write`, `fol simulate report --write`,
   `scripts/benchmark_ollama.py --write`, `scripts/evaluate_answers.py --write`,
-  `scripts/evaluate_search.py --write` and `scripts/evaluate_experiments.py --write`. The
+  `scripts/evaluate_search.py --write`, `scripts/evaluate_experiments.py --write` and
+  `scripts/measure_session.py --write`. The
   first two are checked by tests; the research
   documents depend on the database, so regenerate them at a milestone gate after the
   data, a model, the evidence or the research code changes.
@@ -141,7 +143,10 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   bind: the payroll line and a season's minutes. It returns several distinct rosters, each
   cut off before the next search, and names why nothing was found. It needs salaries from
   the user's contract file; tests and the demo use invented ones
-  (`docs/decisions/0013-roster-optimizer.md`). SciPy's `milp` (HiGHS) is the solver.
+  (`docs/decisions/0013-roster-optimizer.md`). SciPy's `milp` (HiGHS) is the solver, and
+  every solve goes through `modeling/optimizer.SOLVER`, one thread: called from one thread
+  and then another - a page's runs, the assistant's questions - HiGHS hung or crashed (A9).
+  Never call `milp` directly.
 - **A postseason chance is read off a file, with its interval, never fitted on a page.**
   `fol playoffs fit --write` writes `configs/models/postseason.json` (a game model carried
   through the series format and the bracket, and a season model of conditional steps);
@@ -231,13 +236,19 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   a new file is made at the latest version, an older one is backed up to `backups/` first,
   and ids are never reused. A turn keeps its whole answer as JSON (`domain/research.py`'s
   codec), so an old answer draws exactly as it was and is never rewritten - asking again
-  makes a new turn.
+  makes a new turn. A file that cannot be used - damaged, not the store, or from a later
+  lab - is `ResearchUnreadable`, checked with SQLite's `quick_check` before anything is
+  written to it; AI Research then offers *Set it aside and start afresh*
+  (`WorkspaceService.set_aside`), which renames it and its `-wal`/`-shm` beside itself and
+  never deletes it (A9). A locked file is not a damaged one: it is never offered.
 - **A question runs in a workspace** (`api.start(question, workspace_id)`). A follow-up reads
   the last three answered turns of its own workspace's conversation under way and nothing
   else. The workspace's notes reach the model's prompt but never the answer checker: they
   are background, not evidence. A "he" or "they" with nothing to mean is asked about before
   the model runs (`orchestrator._nobody_named`). Every proposed roster waits in its workspace
-  until the user saves or declines it, and every press is logged.
+  until the user saves or declines it, and every press is logged. *Stop* is looked for before
+  each reply, as soon as a reply comes back, and before each call: nothing a reply asks for
+  is run once the user has pressed it (A9).
 - **Saved rosters place their starters with `domain/lineup.py`**: from the nine who play the
   most, each at a position they are listed at where the roster allows (the user's wish at
   the A5 review), and of the lineups that fit, the one with the most projected impact (at
@@ -297,7 +308,9 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   git-ignored `.env` (template: `.env.example`, which must never hold a value) - never
   `OLLAMA_API_KEY`, never printed, never in a test (the
   conftest removes it). Tests use `tests/web_fakes.py`; nothing in the suite reaches the
-  network outside the `network` and `ollama` markers.
+  network outside the `network` and `ollama` markers, and a guard in `tests/conftest.py`
+  fails any test that tries (A9). Only `providers` import what opens a connection
+  (`interfaces` too, for `fol ui`'s check on its own server); an architecture test says so.
 - **The evaluation cases are frozen.** `tests/assistant/fixtures/cases.yaml`: never edit a
   case to make a model pass. `tests/assistant/test_cases.py` recomputes every figure in it
   through the services; when a rebuild or refit changes one, update it deliberately and

@@ -271,6 +271,25 @@ class TestTheRequestsTransport:
         with pytest.raises(OllamaUnavailable, match="within 5 seconds"):
             list(requests_transport("GET", "http://127.0.0.1:11434/api/version", None, 5))
 
+    def test_a_stream_cut_off_midway_is_unavailable(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A9: Ollama stopped, or the machine slept, while it was answering: what came
+        before is passed on, then the reason, never a half-answer as if whole."""
+
+        class Cut(requests.Response):
+            def iter_lines(self, *args: Any, **kwargs: Any):  # type: ignore[no-untyped-def, override]
+                yield b'{"message": {"content": "The Cel"}}'
+                raise requests.exceptions.ChunkedEncodingError("Connection broken")
+
+        answer = Cut()
+        answer.status_code = 200
+        answer._content_consumed = True
+        monkeypatch.setattr(requests, "request", lambda *a, **k: answer)
+        seen: list = []
+        with pytest.raises(OllamaUnavailable, match="Ollama stopped answering"):
+            for item in requests_transport("POST", "http://127.0.0.1:11434/api/chat", {}, 5):
+                seen.append(item)
+        assert seen == [{"message": {"content": "The Cel"}}]
+
     def test_text_that_is_not_json_is_an_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(requests, "request", lambda *a, **k: self.response(200, b"<html>"))
         with pytest.raises(OllamaError, match="not JSON"):

@@ -91,6 +91,14 @@ class TestWebSearch:
         assert again.status is ResultStatus.UNAVAILABLE and "used up" in again.text
         assert len(web.searched()) == 1
 
+    def test_a_search_with_the_network_down_says_so(self, keyed: None, lab: Lab) -> None:
+        """A9: with a key but no network, the search fails in words and adds no source."""
+        tools, book = handlers(FakeWeb())
+        found = tools["web_search"](lab, t.WebSearch(query="Knicks title"))
+        assert found.status is ResultStatus.UNAVAILABLE
+        assert found.text.startswith("The search failed: ") and "could not be reached" in found.text
+        assert book.sources == () and found.evidence == ()
+
     def test_a_search_that_finds_nothing(self, keyed: None, lab: Lab) -> None:
         tools, _ = handlers(FakeWeb({SEARCH_URL: search_results()}))
         found = tools["web_search"](lab, t.WebSearch(query="G League draft prospect"))
@@ -140,6 +148,13 @@ class TestReadSource:
         found = tools["read_source"](lab, t.ReadSource(source_id="u1"))
         assert found.status is ResultStatus.UNAVAILABLE
         assert "u1 was not read" in found.text and "robots.txt" in found.text
+
+    def test_a_page_that_cannot_be_reached_says_so(self, lab: Lab) -> None:
+        """A9: offline, or the site is down: the page is not read and nothing stands in."""
+        tools, _ = handlers(FakeWeb(), sources=(Source(id="u1", url=STORY),))
+        found = tools["read_source"](lab, t.ReadSource(source_id="u1"))
+        assert found.status is ResultStatus.UNAVAILABLE
+        assert found.text.startswith("u1 could not be read: ") and found.evidence == ()
 
     def test_pages_count_against_the_budget_once_each(self, lab: Lab) -> None:
         sources = (Source(id="u1", url=STORY), Source(id="u2", url=OTHER), Source(id="u3", url=STORY + "/2"))  # fmt: skip

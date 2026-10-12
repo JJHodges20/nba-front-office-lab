@@ -18,6 +18,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from functools import cached_property
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -41,7 +42,7 @@ from front_office.domain.research import (
 from front_office.domain.tables.current import SOURCES
 from front_office.services.lab import Lab
 from front_office.services.proposals import ProposalSaved
-from front_office.storage import ResearchStore, StorageError
+from front_office.storage import ResearchStore, ResearchUnreadable, StorageError, set_aside
 
 DEFAULT_NAME = "My research"
 HISTORY_TURNS = 3
@@ -57,6 +58,19 @@ class WorkspaceError(ValueError):
     """What the user asked of a workspace cannot be done; the message says why."""
 
 
+class WorkspaceUnreadable(WorkspaceError):
+    """The research file cannot be used - damaged, not the store, or made by a later lab
+    (A9). Nothing was written to it; :meth:`WorkspaceService.set_aside` is the remedy."""
+
+    def __init__(self, message: str, *, path: Path, reason: str, backups: Path) -> None:
+        super().__init__(message)
+        self.path = path
+        self.reason = reason
+        """What is wrong with it, in SQLite's words or the store's."""
+        self.backups = backups
+        """Where the copies made before each upgrade are."""
+
+
 class WorkspaceService:
     def __init__(self, lab: Lab) -> None:
         self._lab = lab
@@ -66,8 +80,30 @@ class WorkspaceService:
         try:
             with ResearchStore(self._lab.settings.research_path) as store:
                 yield store
+        except ResearchUnreadable as error:
+            raise WorkspaceUnreadable(
+                str(error), path=error.path, reason=error.reason, backups=error.backups
+            ) from error
         except StorageError as error:
             raise WorkspaceError(str(error)) from error
+
+    def set_aside(self) -> Path | None:
+        """Move a research file that cannot be used out of the way - renamed beside itself,
+        never deleted - so that the next use starts a new one (A9). Returns where it went; a
+        file that opens is left where it is, and ``None`` says so."""
+        path = self._lab.settings.research_path
+        try:
+            with ResearchStore(path):
+                return None
+        except ResearchUnreadable:
+            pass
+        try:
+            return set_aside(path, _now())
+        except OSError as error:
+            raise WorkspaceError(
+                f"{path} could not be moved ({error.strerror or error}). Close any program "
+                "that has it open, then try again."
+            ) from error
 
     # --- workspaces ------------------------------------------------------------------------
 

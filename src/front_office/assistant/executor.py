@@ -33,6 +33,9 @@ PLAYER_FIELDS = (
     "exclude_player_ids",
 )
 TEAM_FIELDS = ("team_id",)
+SHORTEST_END = 3
+"""Digits a refused id needs before the one id ending in them is offered: "1" ends a tenth
+of every id, "2752" one team's."""
 ROSTER = "roster"
 READ = Permission.READ
 
@@ -164,24 +167,32 @@ class Executor:
         return None
 
     def _not_held(self, kind: str, strangers: Sequence[int]) -> str:
-        """Why ids are refused - and, where one is an id of the other kind, where it belongs:
-        live at A7 a model gave the Knicks' team id for the player as well, and when told
-        only that no player has it, gave up."""
+        """Why ids are refused - and what was likely meant: where one is an id of the other
+        kind, the field it belongs in (live at A7 a model gave the Knicks' team id for the
+        player as well, and when told only that no player has it, gave up); where one is the
+        end of exactly one id of its kind, that id (in every A8 run a model asked for team
+        2752, the end of the Knicks' 1610612752)."""
         said = f"the lab holds no {kind} with id {', '.join(map(str, strangers))}."
-        if kind == "player":
-            other, field = "team", "team_id"
-            named = {int(k): f"the {v}" for k, v in self._lab.team_labels()["full_name"].items()}
-        else:
-            other, field = "player", "player_id"
-            named = {int(k): str(v) for k, v in self._lab.entities.players()["full_name"].items()}
+        teams = {int(k): f"the {v}" for k, v in self._lab.team_labels()["full_name"].items()}
+        players = {int(k): str(v) for k, v in self._lab.entities.players()["full_name"].items()}
+        same, other = (players, teams) if kind == "player" else (teams, players)
+        other_kind, field = ("team", "team_id") if kind == "player" else ("player", "player_id")
         crossed = [
-            f"{key} is the id of {named[key]}, a {other}" for key in strangers if key in named
+            f"{key} is the id of {other[key]}, a {other_kind}" for key in strangers if key in other
         ]
         if crossed:
             return (
                 f"{said} {'; '.join(crossed)}: give it as {field}, and leave the {kind} out "
                 "unless the question names one."
             )
+        whole = [
+            f"{ids[0]} - the id of {same[ids[0]]} - ends in {key}"
+            for key in strangers
+            if len(str(key)) >= SHORTEST_END
+            and len(ids := [known for known in same if str(known).endswith(str(key))]) == 1
+        ]
+        if whole:
+            return f"{said} {'; '.join(whole)}: give the whole id."
         return (
             f"{said} Use an id from the names in the question, or look the name up with "
             "resolve_entities."

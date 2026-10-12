@@ -16,11 +16,17 @@ The search is an integer programme solved exactly (HiGHS, through SciPy). After 
 roster is found it is cut off - the next may share at most all but a few of its players
 - so that several strong rosters come back rather than one. The weights behind any one
 "best" roster are assumptions; several make the trade-offs visible.
+
+Every solve runs on one thread of its own (``SOLVER``), whoever asks: called from one
+thread and then another - as a page's runs and the assistant's questions each have their
+own - HiGHS hung or crashed.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -52,6 +58,17 @@ OPTIMAL, TIME_LIMIT, INFEASIBLE, NO_POOL = "optimal", "time_limit", "infeasible"
 MIP_GAP = 1e-7
 """The relative gap at which the solver may stop: a hundred-thousandth of a point on a
 roster worth ten, far below any difference that matters."""
+SOLVER = ThreadPoolExecutor(max_workers=1, thread_name_prefix="highs")
+"""The one thread every solve runs on. At A9 a stress test called the solver from a new
+thread and then the main thread, three hundred times in each of twelve processes: none
+finished in two minutes, and the crash handler logged access violations in the threads that
+called it. Solving on the main thread alone, or on this one thread, all twelve finished in
+eight seconds. Two solves asked at once wait their turn; each is bounded by the request's
+time limit."""
+
+
+def _solve(*args: Any, **kwargs: Any) -> Any:
+    return SOLVER.submit(milp, *args, **kwargs).result()
 
 
 def quality(pool: pd.DataFrame, replacement: float) -> pd.Series:
@@ -227,7 +244,7 @@ class _Problem:
         """Solve once: the status and the chosen players as a 0/1 vector, or ``None``."""
         objective = -(self.quality - SALARY_TIE_BREAK * self.salary)
         lower = self.locked.astype("float64")
-        result = milp(
+        result = _solve(
             objective,
             constraints=self.constraints(cuts, with_rating=with_rating),
             integrality=np.ones(len(self.players)),

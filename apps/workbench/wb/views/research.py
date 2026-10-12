@@ -36,7 +36,12 @@ from front_office.domain.research import (
     SavedTurn,
     Workspace,
 )
-from front_office.services import CurrentSource, WorkspaceError, WorkspaceService
+from front_office.services import (
+    CurrentSource,
+    WorkspaceError,
+    WorkspaceService,
+    WorkspaceUnreadable,
+)
 from wb import answers, components, data, formats, state
 from wb.components import ASSUMPTION, DERIVED, ESTIMATE, MEASURED, MODELED, REPORTED
 from wb.state import Filters
@@ -110,6 +115,12 @@ EXAMPLES = (
     "Suggest an experiment that might make the player projections better.",
 )
 SIDEBAR = "Sidebar's"
+UNREADABLE = (
+    "The file that keeps your workspaces - their questions, answers, findings and notes - "
+    "cannot be read ({reason}). Nothing has been changed or deleted. Set it aside to start a "
+    "new, empty one: the old file stays on this computer, renamed, as it is now. Copies made "
+    "before each upgrade of the lab are in {backups}."
+)
 
 
 def render() -> None:
@@ -124,6 +135,14 @@ def render() -> None:
     )
     _status(status)
     research = data.research()
+    try:
+        _research(research, filters, status)
+    except WorkspaceUnreadable as error:
+        _unreadable(research, error)
+
+
+def _research(research: WorkspaceService, filters: Filters, status: api.AssistantStatus) -> None:
+    """The open workspace: its shelf, its conversations, and the question box."""
     job: api.Job | None = st.session_state.get(JOB)
     workspace = _workspace_bar(research, filters, ready=status.is_ready, busy=job is not None)
     notice = st.session_state.pop(NOTICE, None)
@@ -159,6 +178,33 @@ def render() -> None:
     asked = st.chat_input(PROMPT, key="ai_question", disabled=not can_ask)
     if asked and asked.strip():
         _start(_question(asked.strip(), filters, workspace), workspace.workspace_id)
+
+
+def _unreadable(research: WorkspaceService, error: WorkspaceUnreadable) -> None:
+    """The research file cannot be used (A9): say so in plain words, and offer to set it
+    aside - renamed, never deleted - so that a new one starts. Nothing can be asked until
+    then: a question has no workspace to be kept in."""
+    components.empty(
+        "Your saved research cannot be opened",
+        answers.escaped(UNREADABLE.format(reason=error.reason, backups=error.backups)),
+        icon=":material/error:",
+    )
+    if st.button(
+        "Set it aside and start afresh",
+        key="ai_set_aside",
+        type="primary",
+        icon=":material/drive_file_move:",
+    ):
+        try:
+            moved = research.set_aside()
+        except WorkspaceError as failed:
+            st.error(answers.escaped(str(failed)), icon=":material/error:")
+        else:
+            _after(
+                f"The old file was moved to {moved}. A new one has been started."
+                if moved is not None
+                else "The file opens now, so nothing was moved."
+            )
 
 
 def _question(text: str, filters: Filters, workspace: Workspace) -> api.Question:

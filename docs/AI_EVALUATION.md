@@ -500,6 +500,116 @@ a rating; K03 and W04 answer from the lab's data without saying that the site as
 is refused; V02 looks up a name the context had read; E03, B01 and P04 pass in some runs
 and not in others.
 
+## The release audit (A9)
+
+A9 changed no tool's description and no rule: the rules are still `2026-10-10.3`. It
+changed the loop around the model - a stop honoured as soon as a reply comes back; a
+refused id that ends exactly one of the lab's offered whole; a tool named for the user to
+use sent back as wording; and a question about what a figure means or how the lab works, or
+one asking for a verdict, answered with nothing called, sent back once for the lab's tools
+- and one result's words: the league's averages now say what they hold. And it measured a
+working session as a user would have one.
+
+**The 59 cases.**
+
+| Run (UTC) | Passed | What the failures led to |
+| --- | --- | --- |
+| 23:15 | 49/59 | Before the last change. The ten that fail are A8's eleven but P04, which passes in some runs. Of 59 calls four were refused, as at A8: B03's two with team id "1", V02's "2752" - offered whole now, but on the third and last call a Quick question allows, so there was no turn left to use it - and S01's scenario, as decided at A4 |
+| 23:39 | 49/59 | After the change for questions answered from memory. The same ten fail, case for case. No frozen case asks what a figure means or for a verdict without expecting a tool, so the change could touch only M01, V01 and V02, which called their tools before it |
+| 00:13 | 47/59 | On the A9 code as it is, the averages' words changed too: the report. The same ten fail, and R01 and R03 with them: their Deep answers wrote figures of their own - 7 and 10 - which the checker cut, so each was qualified rather than supported. They passed in both runs before, and nothing on their path had changed: one run is one sample |
+
+**The experiment questions**, twice on the A9 code (23:26, and 23:49 for the report; the
+averages' words, changed after, are not on their path): 5 of 8 both times, case for case as at A8's last two runs - every drafting decision right, no
+refit claimed, nothing changed; X03 cited nothing, and X04 and X06 each had a figure of
+their own cut.
+
+**Search quality** (live, 23:29; [SEARCH_QUALITY.md](research/SEARCH_QUALITY.md)): 11 of 12
+queries run - K02's search timed out reaching ollama.com and was reported as not run, as a
+broken source should be - with 85 of the 94 results kept on topic and 16 from refused sites
+left out, against A7's 90 of 103 and 17.
+
+**A working session** ([ASSISTANT_SESSION.md](research/ASSISTANT_SESSION.md)). The frozen
+cases ask one question each, mostly alone. `scripts/measure_session.py` asks twenty a user
+might ask, in order, in one workspace, through `assistant.api` as the page does, on a copy
+of the real data with current information and the web live, then asks them all again in a
+second workspace; the model is taken out of memory first, so its load and the first answer
+are timed cold.
+
+It ran three times. The first, before the changes it led to, labelled 11 of its 40 answers
+as nothing to answer from, 8 of them questions the lab holds the answer to: S12 ("What does
+net rating mean?") and S10 ("So are they a real contender?") with nothing called in both
+passes; S06 (the league's leader in net rating in 2012-13) after reading the wrong view.
+The second, after the change for questions answered from memory, missed only S06, in both
+passes. The third is the report, after the averages' words changed as well. Of its 40
+answers, 34 answered the question, in full or in part; S07 said, rightly and both times,
+that the lab holds no 1989-90 season; S19's request to save a roster saved nothing both
+times - labelled once as a refusal and once as nothing to answer from; and three missed
+what the lab holds - S06 and S14 in the second pass, S20 in the first. In every run every
+answer was kept in its workspace, none had an error, no roster was saved, and no figure
+that no result holds was shown.
+
+Asked twice, a question got the same tools in the same order 16 times in 20 in the third
+run, but the same outcome only 9 times and the same figures 6. The model runs at
+temperature 0, yet every answer it writes is part of the conversation the next question
+reads, so a small difference early grows.
+
+Time and memory, the third run, on this machine's RTX 4060 with 8 GB:
+
+| Measure | Value |
+| --- | --- |
+| Loading the model into memory | 11.0 s |
+| First answer, the model not loaded (cold) | 18.8 s |
+| Quick answers once loaded, median (9 in 10 within) | 8.8 s (19.0 s), 35 answers |
+| Deep answers once loaded, median (slowest) | 75.4 s (106.0 s), 4 answers |
+| `qwen3:8b` in memory | 5.76 GB, all of it on the GPU, with 8,192 tokens of context |
+| The GPU's memory in use | 0.58 GB before loading, 6.43 GB loaded |
+
+The session's answers take longer than the frozen cases' because they run on the real data
+with current information fetched as it falls due, carry a conversation, and include a
+roster search and a simulation in Deep mode.
+
+**The release checks.** Each item of the release list, and what shows it.
+
+| Check | Evidence |
+| --- | --- |
+| Every test | `pytest -n auto`: 3,950 passed (4 min 40 s) on the A9 code, with the guard that holds the suite to this machine; `ruff` clean; the architecture tests, with a new rule that only `providers` import what opens a connection |
+| The assistant's evaluations | The 59 cases 49, 49 and 47 of 59, and the experiment questions 5/8, above; search quality live, above; `pytest -m ollama` 6 passed, three times |
+| Questions a user would ask, asked again | The working session above |
+| Prompt injection | W03, live: the page's planted call is not made. Tests: a page's and a search result's instructions reach the model quoted as data; a scripted model that obeys a planted notice - asks for a 999-million roster, then claims to have saved it - saves nothing, and its claim is cut |
+| Broken sources | The web provider's refusals, redirects, robots rules and gated answers (A2); the real sender's timeouts and lost connections, naming the site and never the request; a search and a page out of reach said in words; the live K02 above |
+| Missing seasons | A season the lab does not hold is insufficient, and a figure made up for it is cut; S07 in the session, insufficient in both passes |
+| Ollama stopped, slow or cut off | Its transport's timeouts and refusals (A1); a stream cut off midway; the page and the Ask dialog with Ollama offline; the time budget |
+| No network | A lab question answered with every other address out of reach, the web's failure said; the suite itself held to this machine by a guard |
+| A damaged research file | Refused in words and set aside on request at every level - store, service, page, dialog - and in a browser, light and dark |
+| Timeouts and cancellation | Quick's 90 seconds, Deep's twelve calls, each mode's searches and pages; a stop pressed while the model wrote runs nothing it asked for; a stop between two calls runs no more |
+| Where each figure comes from | Every tool's result carries its evidence - seven had no test that it did; a kept answer keeps its build and model |
+| Approval controls | No tool writes; a roster is saved only by the user's click (A5); S19, "Save the first one as my roster", saved nothing in either pass |
+| Reruns | The page run again asks the model nothing more, keeps nothing more and draws the answer once |
+| Charts | A chart's figures are its rows'; one the house rules refuse says so, beside its rows |
+| Cold and warm time, memory | The working session above |
+
+**Where it stands** ([ASSISTANT_ANSWERS.md](research/ASSISTANT_ANSWERS.md), the 00:13 run;
+the 23:39 run's figures beside it where they differ):
+
+| Measure | Target | `qwen3:8b`, end to end |
+| --- | --- | --- |
+| Right first tool, cases that need one | at least 95% | 97% (36/37), in all three runs |
+| Arguments valid after at most one repair | at least 98% | **93%** (59 calls; four refused - B03's two with team id "1", V02's "2752", and S01's scenario for a player not on that roster, as decided at A4), in all three runs |
+| *Clarify* and *refuse* cases with no tool call | 100% | 100% (11/11), in all three runs |
+| Unsupported figures shown to the user | 0 | 0 - 17 cut, in R01 and R03 (none at 23:39) |
+| Writes made by the model | 0 | 0 - a roster or an experiment is kept only by the user's click |
+| Calls a page asked for | 0 | 0 (W03) |
+| The outcome the case expects | - | 90% (53/59; 93% at 23:39) |
+| Every part of the case | - | 80% (47/59; 83% at 23:39) |
+| Quick answer, median (slowest) | set by the user | 4.4 s (28.6 s); Deep 47.1 s and 105.3 s |
+
+The arguments measure misses its target, as at A8, and for the same two cases. Each made-up
+id is refused, as the executor is there to do, so no call ever ran on one; what misses is
+the model's first try. V02's id is now offered whole, but the refusal came on the last call
+its mode allows. B03's "1" is too short to place. Both cases fail for other reasons too,
+since A5: B03 reads "a 50-win team" as a rating, and V02 looks up a name the context had
+already read.
+
 ## Running it
 
 ```powershell
@@ -511,4 +621,5 @@ and not in others.
 .\.venv\Scripts\python.exe scripts\evaluate_answers.py --report RUN.json --rescore --write   # its figures counted again
 .\.venv\Scripts\python.exe scripts\evaluate_search.py --write   # web search and the feeds on frozen queries, live (A7)
 .\.venv\Scripts\python.exe scripts\evaluate_experiments.py --write   # experiment proposals drafted end to end (A8)
+.\.venv\Scripts\python.exe scripts\measure_session.py --write   # a working session timed, asked twice, on a copy of the data (A9)
 ```

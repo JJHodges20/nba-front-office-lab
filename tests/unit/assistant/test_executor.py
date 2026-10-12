@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import pytest
+
 from front_office.assistant.executor import Executor
 from front_office.assistant.lab_tools import HANDLERS, Found
 from front_office.assistant.routing import Call
 from front_office.domain.assistant import ResultStatus
 from front_office.services import Lab
-from tests.helpers import BOS, BROWN
+from tests.helpers import BOS, BROWN, TATUM
 
 
 def call(tool: str, **arguments) -> Call:  # type: ignore[no-untyped-def]
@@ -67,6 +69,19 @@ def test_a_team_s_id_given_for_a_player_is_sent_where_it_belongs(lab: Lab) -> No
     assert "resolve_entities" not in result.text
 
 
+def test_an_id_cut_short_is_offered_whole(lab: Lab) -> None:
+    """In every A8 run a model asked for team 2752, the end of the Knicks' 1610612752."""
+    end = int(str(BOS)[-4:])
+    result = Executor(lab).run(call("team_stats", team_id=end, season="2025-26"))
+    assert result.status is ResultStatus.ERROR
+    assert f"{BOS} - the id of the Boston Celtics - ends in {end}: give the whole id" in result.text
+
+
+def test_an_id_too_short_to_place_gets_the_lookup(lab: Lab) -> None:
+    result = Executor(lab).run(call("team_stats", team_id=38, season="2025-26"))
+    assert "give the whole id" not in result.text and "resolve_entities" in result.text
+
+
 def test_a_player_s_id_given_for_a_team_is_sent_where_it_belongs(lab: Lab) -> None:
     result = Executor(lab).run(call("team_stats", team_id=BROWN, season="2025-26"))
     assert f"{BROWN} is the id of Jaylen Brown, a player: give it as player_id" in result.text
@@ -88,3 +103,23 @@ def test_the_text_the_model_reads_is_bounded(lab: Lab) -> None:
         call("data_status")
     )
     assert len(result.text) < 260 and result.text.endswith("(cut short; the page has the rest)")
+
+
+SOURCED = (
+    call("resolve_entities", text="Celtics"),
+    call("data_status"),
+    call("player_stats", player_id=BROWN, season="2025-26"),
+    call("compare_players", player_ids=[BROWN, TATUM], season="2025-26"),
+    call("league_context", view="standings", season="2025-26"),
+    call("historical_benchmarks", stage="won_championship"),
+    call("metric_definition", metric="net_rating"),
+)
+
+
+@pytest.mark.parametrize("asked", SOURCED, ids=lambda asked: asked.tool)
+def test_every_answer_says_what_it_rests_on(lab: Lab, asked: Call) -> None:
+    """A9 audit: these seven tools had no test that what they return carries its evidence;
+    every other tool's tests check it."""
+    result = Executor(lab).run(asked)
+    assert result.status is ResultStatus.OK, result.text
+    assert result.evidence, f"{asked.tool} answered without saying what it rests on"

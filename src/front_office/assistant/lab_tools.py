@@ -830,17 +830,32 @@ def league_context(lab: Lab, args: t.LeagueContext) -> Found:
             (lab_evidence(lab, "playoff_results"),),
             kinds=("measured",),
         )
+    # The model reads the most recent seasons, says how many the lab holds, and is given the
+    # season it asked about too: shown the last twelve and nothing more, a model concluded
+    # that the lab held nothing before 2014-15, when asked who led the league in net rating
+    # in 2012-13 - a team's figure, which this view does not hold at all (A9 session, S06).
     averages = lab.league.averages()
     catalog = lab.teams.metrics
     recent = averages.tail(MAX_ROWS)
+    asked = args.season if args.season in averages.index else None
+    added = asked is not None and asked not in recent.index
+    chosen = pd.concat([averages.loc[[asked]], recent]) if added else recent
     rows = [
         [str(index), *(shown(catalog, k, row[k]) for k in TREND_KEYS)]
-        for index, row in recent.iloc[::-1].iterrows()
+        for index, row in chosen.iloc[::-1].iterrows()
     ]
+    held = (
+        "every season held"
+        if len(recent) == len(averages)
+        else f"the last {len(recent)} of the {len(averages)} seasons held"
+    )
+    title = f"League averages by season, newest first: {held}, from {averages.index[0]}"
     return Found(
         ResultStatus.OK,
-        "League averages by season, newest first",
-        grid(["Season", *(label(catalog, k) for k in TREND_KEYS)], rows),
+        title + (f", and {asked} as asked" if added else ""),
+        grid(["Season", *(label(catalog, k) for k in TREND_KEYS)], rows, limit=len(rows))
+        + "\nThe league's averages, not any team's: each team's net rating and its place in a "
+        "season are in the team_ranks view.",
         averages,
         (lab_evidence(lab, "team_seasons"),),
         kinds=kinds_of(catalog, TREND_KEYS),

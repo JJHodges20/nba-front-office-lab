@@ -9,7 +9,9 @@ deleting a workspace deletes what it holds through their foreign keys.
 The file is versioned. A new file is made at the latest version. An older one is first
 copied to ``backups/`` beside it with SQLite's own backup, then brought forward one version
 at a time in a single transaction, so a failed step leaves it as it was. A file made by a
-later lab is refused rather than guessed at, and so is a file that is not this store.
+later lab is refused rather than guessed at, and so is a file that is not this store or
+that SQLite finds damaged (A9): nothing is written to such a file, and ``set_aside`` moves it
+out of the way, kept, so that the next opening starts a new store.
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ import pandas as pd
 from sqlalchemy import Connection, Engine, MetaData, create_engine, delete, func, inspect, select
 from sqlalchemy import insert as sql_insert
 from sqlalchemy import update as sql_update
+from sqlalchemy.exc import DatabaseError, OperationalError
 
 from front_office.domain.experiments import TESTED_MODELS
 from front_office.domain.seasons import Season
@@ -58,6 +61,46 @@ EDITABLE = ("name", "goal", "notes", "archived", *FOCUS)
 
 class ResearchNotFound(StorageError):
     """No workspace, turn or finding with that id."""
+
+
+class ResearchUnreadable(StorageError):
+    """The file cannot be used as the research store: not a database, a damaged one, a
+    database that is not this store, or one made by a later lab. Nothing is written to it;
+    :func:`set_aside` moves it out of the way, and the lab starts a new one (A9)."""
+
+    def __init__(self, path: Path, reason: str) -> None:
+        self.path = path
+        self.reason = reason
+        self.backups = path.parent / BACKUPS
+        super().__init__(
+            f"{path} cannot be used ({reason}). Set it aside, and the lab starts a new research "
+            f"store; the file itself is kept, and copies made before each upgrade are in "
+            f"{self.backups}."
+        )
+
+
+SIDE_FILES = ("-wal", "-shm")
+"""What SQLite's write-ahead log keeps beside a file, which goes with it when it moves."""
+
+
+def set_aside(path: Path, now: datetime) -> Path | None:
+    """Move an unusable research store out of the way - renamed beside itself, never
+    deleted - so that the next opening starts a new one. Returns where it went, or ``None``
+    when nothing was there."""
+    if not path.exists():
+        return None
+    stamp = f"{now:%Y%m%dT%H%M%S}"
+    target = path.with_name(f"{path.stem}-set-aside-{stamp}{path.suffix}")
+    number = 1
+    while target.exists():
+        number += 1
+        target = path.with_name(f"{path.stem}-set-aside-{stamp}-{number}{path.suffix}")
+    for suffix in SIDE_FILES:
+        side = path.with_name(path.name + suffix)
+        if side.exists():
+            side.replace(target.with_name(target.name + suffix))
+    path.replace(target)
+    return target
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,6 +137,34 @@ def _utc_now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
+def _said(error: DatabaseError) -> str:
+    """SQLite's own words, without the statement and the link SQLAlchemy adds."""
+    return str(error.orig or error).splitlines()[0]
+
+
+_PASSED: dict[Path, tuple[tuple[int, int], ...]] = {}
+"""Files that passed the quick check, with how they looked then (``_looks``)."""
+
+
+def _looks(path: Path) -> tuple[tuple[int, int], ...]:
+    """A file's size and time of change, and its write-ahead log's, before it is opened:
+    a write changes one or the other. The check reads every page, about 13 ms for 20 MB."""
+    found = []
+    for name in (path.name, path.name + SIDE_FILES[0]):
+        try:
+            stat = path.with_name(name).stat()
+        except FileNotFoundError:
+            found.append((-1, -1))
+        else:
+            found.append((stat.st_size, stat.st_mtime_ns))
+    return tuple(found)
+
+
+def _quick_check(engine: Engine) -> list[str]:
+    with engine.connect() as connection:
+        return [str(row[0]) for row in connection.exec_driver_sql("PRAGMA quick_check")]
+
+
 class ResearchStore:
     """The research store. Open it in a ``with`` block: on Windows an open connection keeps
     the file locked."""
@@ -121,10 +192,28 @@ class ResearchStore:
         self.backup: Path | None = None
         """Where the file was copied before this opening migrated it, if it did."""
         try:
+            if not fresh:
+                self._check_readable()
             self._bring_up_to_date(fresh)
-        except BaseException:
+        except BaseException as error:
             self.engine.dispose()
+            if isinstance(error, DatabaseError) and not isinstance(error, OperationalError):
+                # Locked or out of reach is worth another try; damaged is not.
+                raise ResearchUnreadable(self.path, _said(error)) from None
             raise
+
+    def _check_readable(self) -> None:
+        """SQLite's own quick check, before anything is written: a damaged file is not
+        brought forward, where a migration could make it worse. A file that passed is not
+        checked again until it changes: a page opens the store a dozen times a run."""
+        looks = _looks(self.path)
+        if _PASSED.get(self.path) == looks:
+            return
+        found = _quick_check(self.engine)
+        if found != ["ok"]:
+            first = found[0] if found else "no answer from its check"
+            raise ResearchUnreadable(self.path, f"SQLite finds it damaged: {first}")
+        _PASSED[self.path] = looks
 
     def __enter__(self) -> ResearchStore:
         return self
@@ -169,15 +258,15 @@ class ResearchStore:
                 )
             return
         if RESEARCH_SCHEMA.name not in names:
-            raise StorageError(
-                f"{self.path} is not the lab's research store: it has no version table. "
-                "Move it aside and the lab will start a new one."
+            raise ResearchUnreadable(
+                self.path, "a database, but not the lab's research store: it has no version table"
             )
         version = self.version()
         if version > self.latest:
-            raise StorageError(
-                f"{self.path} was made by a later version of the lab (version {version}; "
-                f"this one knows up to {self.latest}). It is left as it is."
+            raise ResearchUnreadable(
+                self.path,
+                f"made by a later version of the lab: version {version}, where this one knows "
+                f"up to {self.latest}",
             )
         if version == self.latest:
             return

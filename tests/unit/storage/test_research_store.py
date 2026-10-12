@@ -10,6 +10,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 from front_office.domain.schema import validate_frame
 from front_office.domain.tables.research import (
@@ -20,7 +21,14 @@ from front_office.domain.tables.research import (
     RESEARCH_TURNS,
     RESEARCH_WORKSPACES,
 )
-from front_office.storage import ResearchNotFound, ResearchStore, StorageError
+from front_office.storage import (
+    ResearchNotFound,
+    ResearchStore,
+    ResearchUnreadable,
+    StorageError,
+    research,
+    set_aside,
+)
 from front_office.storage.research import MIGRATIONS, Migration
 
 
@@ -401,7 +409,7 @@ class TestVersions:
     def test_a_file_from_a_later_lab_is_refused(self, path: Path) -> None:
         with ResearchStore(path, migrations=self.later()):
             pass
-        with pytest.raises(StorageError, match="later version of the lab"):
+        with pytest.raises(ResearchUnreadable, match="later version of the lab"):
             ResearchStore(path)
 
     def test_a_file_that_is_not_the_store_is_refused(self, path: Path) -> None:
@@ -412,8 +420,97 @@ class TestVersions:
             other.commit()
         finally:
             other.close()
-        with pytest.raises(StorageError, match="not the lab's research store"):
+        with pytest.raises(ResearchUnreadable, match="not the lab's research store"):
             ResearchStore(path)
+
+
+NOISE = bytes(range(256)) * 16
+"""Four kilobytes that are not a database."""
+
+
+class TestDamage:
+    """A9: a file the store cannot use is refused in words that say what to do, nothing is
+    written to it, and on request it is set aside - kept - so that a new store starts."""
+
+    @pytest.mark.parametrize("damage", ["noise", "cut in half"])
+    def test_a_damaged_file_is_refused_and_left_as_it_is(self, path: Path, damage: str) -> None:
+        with ResearchStore(path) as first:
+            for number in range(40):
+                first.create_workspace(f"Workspace {number}", goal="x" * 200)
+        whole = path.read_bytes()
+        broken = NOISE if damage == "noise" else whole[: len(whole) // 2]
+        path.write_bytes(broken)
+        with pytest.raises(ResearchUnreadable) as caught:
+            ResearchStore(path)
+        assert caught.value.path == path
+        assert "Set it aside" in str(caught.value) and "backups" in str(caught.value)
+        assert "[SQL:" not in caught.value.reason, "SQLite's words, not SQLAlchemy's"
+        assert path.read_bytes() == broken, "nothing was written to it"
+
+    def test_a_file_is_checked_again_only_once_it_has_changed(
+        self, path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A page opens the store a dozen times a run: an unchanged file is checked once."""
+        checks: list[int] = []
+        real = research._quick_check
+
+        def counted(engine):  # type: ignore[no-untyped-def]
+            checks.append(1)
+            return real(engine)
+
+        monkeypatch.setattr(research, "_quick_check", counted)
+        with ResearchStore(path) as made:
+            made.create_workspace("One")
+        for _ in range(3):
+            with ResearchStore(path):
+                pass
+        assert len(checks) == 1, "a new file is not checked; an unchanged one once"
+        with ResearchStore(path) as store:
+            store.create_workspace("Two")
+        with ResearchStore(path):
+            pass
+        assert len(checks) == 2, "a write changes the file, and it is checked again"
+
+    def test_a_locked_file_is_not_called_damaged(
+        self, path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Locked or out of reach is worth another try, and the file is fine: it is never
+        offered to be set aside."""
+        with ResearchStore(path):
+            pass
+
+        def locked(self: ResearchStore) -> None:
+            raise OperationalError(
+                "PRAGMA quick_check", {}, sqlite3.OperationalError("database is locked")
+            )
+
+        monkeypatch.setattr(ResearchStore, "_check_readable", locked)
+        with pytest.raises(OperationalError, match="database is locked"):
+            ResearchStore(path)
+
+    def test_set_aside_keeps_the_file_and_its_log_and_a_new_store_starts(self, path: Path) -> None:
+        path.parent.mkdir(parents=True)
+        path.write_bytes(NOISE)
+        log = path.with_name(path.name + "-wal")
+        log.write_bytes(b"the log")
+        moved = set_aside(path, datetime(2026, 10, 11, 9, 30, 0))
+        assert moved == path.with_name("assistant-set-aside-20261011T093000.sqlite")
+        assert moved.read_bytes() == NOISE and not path.exists()
+        assert moved.with_name(moved.name + "-wal").read_bytes() == b"the log"
+        assert not log.exists()
+        with ResearchStore(path) as fresh:
+            assert fresh.version() == MIGRATIONS[-1].version and fresh.workspaces().empty
+
+    def test_two_set_aside_in_one_second_are_both_kept(self, path: Path) -> None:
+        moment = datetime(2026, 10, 11, 9, 30, 0)
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"first")
+        first = set_aside(path, moment)
+        path.write_bytes(b"second")
+        second = set_aside(path, moment)
+        assert first is not None and second is not None and first != second
+        assert (first.read_bytes(), second.read_bytes()) == (b"first", b"second")
+        assert set_aside(path, moment) is None, "nothing there, nothing moved"
 
 
 def _schema(path: Path, table: str) -> tuple:

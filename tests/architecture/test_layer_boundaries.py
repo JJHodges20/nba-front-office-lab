@@ -77,6 +77,20 @@ LIBRARY_OWNERS: dict[str, set[str]] = {
     "pypdf": {"processing"},
 }
 
+# What can open a connection (the A9 network audit). The lab reaches the network through
+# providers alone; the command line's check that `fol ui` has started asks this machine's own
+# server. The workbench and the scripts reach the network only through the providers.
+NETWORK_MODULES: dict[str, set[str]] = {
+    "requests": {"providers"},
+    "nba_api": {"providers"},
+    "httpx": {"providers"},
+    "aiohttp": {"providers"},
+    "socket": {"providers"},
+    "http.client": {"providers"},
+    "urllib.request": {"providers", "interfaces"},
+}
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+
 # Whole-dollar amounts this large in source code are almost certainly a cap figure that
 # belongs in configs/seasons instead.
 LARGEST_ALLOWED_LITERAL = 9_999_999
@@ -317,6 +331,46 @@ def test_third_party_libraries_stay_in_their_layer() -> None:
                 if owners is not None and "apps" not in owners:
                     problems.append(f"{path.relative_to(REPO_ROOT)}:{line} apps imports {library}")
     assert not problems, "third-party library used outside its layer:\n" + "\n".join(problems)
+
+
+def network_imports(path: Path) -> Iterator[tuple[str, int]]:
+    """Every import of a module that can open a connection, ``from urllib import request``
+    included."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in ast.walk(tree):
+        names: list[str] = []
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            names = [node.module, *(f"{node.module}.{alias.name}" for alias in node.names)]
+        for name in names:
+            owner = next(
+                (key for key in NETWORK_MODULES if name == key or name.startswith(key + ".")),
+                None,
+            )
+            if owner is not None:
+                yield owner, node.lineno
+
+
+def test_network_access_is_imported_by_the_providers_alone(tmp_path: Path) -> None:
+    probe = tmp_path / "probe.py"
+    probe.write_text("from urllib import request\nimport http.client\n", encoding="utf-8")
+    assert [name for name, _ in network_imports(probe)] == ["urllib.request", "http.client"]
+    problems = []
+    for path in python_files(PACKAGE_DIR):
+        layer = layer_of(module_name(path)) or "<root>"
+        problems += [
+            f"{path.relative_to(REPO_ROOT)}:{line} {layer} imports {name}"
+            for name, line in network_imports(path)
+            if layer not in NETWORK_MODULES[name]
+        ]
+    for folder in (APPS_DIR, SCRIPTS_DIR):
+        for path in python_files(folder) if folder.is_dir() else []:
+            problems += [
+                f"{path.relative_to(REPO_ROOT)}:{line} imports {name}"
+                for name, line in network_imports(path)
+            ]
+    assert not problems, "network access outside the providers:\n" + "\n".join(problems)
 
 
 def test_no_cap_sized_dollar_figures_in_source_code() -> None:

@@ -169,6 +169,27 @@ WHO_IS_MEANT = (
 question, with no name in it and no team, player or roster in focus. Guessing would read one
 workspace's subject into another's."""
 GO_AHEAD = "Go ahead: call the tool now, then answer from its result."
+FROM_THE_LAB = (
+    "Answer from the lab, not from memory: call metric_definition for what a figure means, or "
+    "research_docs for how the lab works, then answer from its result."
+)
+FOR_THE_EVIDENCE = (
+    "The lab answers a question like this with its evidence, read now, not with a verdict: call "
+    "the tool that holds it - for a team's prospects its chances, postseason_outlook; for a "
+    "signing or a trade the players' value and salaries - then lay the evidence out."
+)
+"""Each names its own tools: one note for both sent "So are they a real contender?" to
+metric_definition, the tool it named first (A9 replay)."""
+EXPLAIN = re.compile(
+    r"\bwhat\s+(?:does|do|is|are)\b[^?]{0,60}?\b(?:mean|means|stand for)\b"
+    r"|\b(?:define|definition of|meaning of)\b"
+    r"|\bhow\s+(?:is|are|does|do)\b[^?]{0,60}?\b(?:calculated|computed|measured|worked out"
+    r"|decide|decides|choose|chooses|tested|work|works)\b",
+    re.IGNORECASE,
+)
+"""A question about what a figure means or how the lab works, whose answer the lab's own
+catalog and documents hold. In the A9 working session "What does net rating mean?" was
+answered from the model's memory, with nothing called, in both passes."""
 NO_SUCH_RESULT = (
     "That cites a result no tool has returned in this answer. Call the tool that gives it, "
     "then answer from its result."
@@ -214,6 +235,9 @@ class Assistant:
             steps.append(step)
             if on_step is not None:
                 on_step(step)
+
+        def halted() -> bool:
+            return should_stop is not None and should_stop()
 
         with self._lab.remembering():
             found = find_mentions(question, self._lab.entities, season=context.season)
@@ -267,7 +291,7 @@ class Assistant:
 
         with self._lab.remembering():
             while True:
-                if should_stop is not None and should_stop():
+                if halted():
                     stopped = True
                     record(Step("model", "stopped by the user"))
                     break
@@ -277,38 +301,51 @@ class Assistant:
                     messages.append({"role": "user", "content": NO_MORE_TOOLS})
                 reply = self._chat(messages, offering, mode)
                 record(Step("model", _describe(reply), reply.wall_seconds))
+                if halted():
+                    # Pressed while the model was writing, the likeliest moment (A9 audit):
+                    # nothing the reply asks for is run, and no draft is checked or shown.
+                    stopped = True
+                    record(Step("model", "stopped by the user"))
+                    break
                 cited = checker.phantoms(reply.content, (r.result_id for r in results))
                 promised = PROMISE.search(reply.content) is not None
                 deferred = _defers(reply.content, results, by_name)
+                remembered = _from_memory(question, reply.content, results)
                 if (
                     offering
                     and not reply.tool_calls
                     and not nudged
-                    and (promised or cited or deferred)
+                    and (promised or cited or deferred or remembered)
                 ):
                     # Said it would look something up and stopped, put it off - offered to,
-                    # or named a tool for the user to use - or cited a result no tool
-                    # returned (copying an earlier turn): asked once to make the call.
+                    # or named a tool for the user to use - cited a result no tool returned
+                    # (copying an earlier turn), or answered from memory what the lab holds:
+                    # asked once to make the call.
                     nudged = True
                     why = (
                         f"cited {', '.join(cited)} without calling a tool"
                         if cited
                         else "said it would call a tool and did not"
                         if promised
-                        else str(deferred)
+                        else str(deferred or (remembered and remembered[0]))
                     )
                     record(Step("repair", why))
                     messages.append({"role": "assistant", "content": reply.content})
-                    messages.append(
-                        {"role": "user", "content": NO_SUCH_RESULT if cited else GO_AHEAD}
+                    note = (
+                        NO_SUCH_RESULT
+                        if cited
+                        else GO_AHEAD
+                        if promised or deferred or not remembered
+                        else remembered[1]
                     )
+                    messages.append({"role": "user", "content": note})
                     continue
                 if not offering or not reply.tool_calls:
                     draft = reply.content
                     break
                 messages.append(_assistant_turn(reply))
                 for raw in reply.tool_calls:
-                    if calls_left <= 0:
+                    if calls_left <= 0 or halted():
                         break
                     calls_left -= 1
                     began = self._clock()
@@ -593,6 +630,23 @@ def _defers(text: str, results: Sequence[ToolResult], tools: Iterable[str]) -> s
     named = [name for name in tools if re.search(rf"\b{re.escape(name)}\b", text)]
     if named:
         return f"named {', '.join(named)} instead of calling it"
+    return None
+
+
+def _from_memory(question: str, text: str, results: Sequence[ToolResult]) -> tuple[str, str] | None:
+    """Why a reply that called nothing should have: the question asks what a figure means or
+    how the lab works, which its catalog and documents hold, or asks for a verdict, which
+    the lab answers with its evidence - and the reply declines nothing. In the A9 working
+    session "What does net rating mean?" and "So are they a real contender?" were each
+    answered with nothing called, from the model's memory or the conversation, in both
+    passes, and then read as nothing to answer from. Returns why, and what the model is
+    told."""
+    if results or DECLINING.search(text):
+        return None
+    if EXPLAIN.search(question):
+        return "answered from memory what the lab's catalog or documents hold", FROM_THE_LAB
+    if checker.VERDICT.search(question) or WHAT_TO_DO.search(question):
+        return "answered a question for a verdict without the lab's evidence", FOR_THE_EVIDENCE
     return None
 
 

@@ -844,8 +844,10 @@ def workings(answer: Answer, *, steps: tuple[Step, ...] = (), seconds: float = 0
 
 def prose(text: str) -> str:
     """The model's or the user's words as markdown that shows what they say: a dollar sign
-    is a dollar sign rather than the start of a formula, and an image is not fetched."""
-    return IMAGE.sub("(image left out)", text).replace("$", "\\$")
+    is a dollar sign rather than the start of a formula, and an image is not fetched - one
+    written inline is left out, and any other (``![x][r]`` with ``[r]: <address>`` further
+    on, A9) is shown as the characters it is."""
+    return IMAGE.sub("(image left out)", text).replace("![", "!\\[").replace("$", "\\$")
 
 
 def escaped(text: str) -> str:

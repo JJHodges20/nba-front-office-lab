@@ -6,6 +6,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
+from front_office.assistant import lab_tools
 from front_office.assistant import tools as t
 from front_office.assistant.lab_tools import HANDLERS, grid, ordinal, shown
 from front_office.domain.assistant import EvidenceKind, ResultStatus
@@ -140,6 +141,25 @@ class TestLeague:
         ranks = run(lab, "league_context", view="team_ranks", season="2025-26")
         assert len(ranks.table) == 30
 
+    def test_league_averages_say_what_they_hold_and_where_a_teams_rating_is(
+        self, lab: Lab, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A9 session (S06): shown the last twelve seasons and nothing more, a model said the
+        lab held nothing before them, asked who led the league in 2012-13."""
+        every = run(lab, "league_context", view="averages")
+        assert every.title == (
+            "League averages by season, newest first: every season held, from 1996-97"
+        )
+        monkeypatch.setattr(lab_tools, "MAX_ROWS", 1)
+        found = run(lab, "league_context", view="averages", season="2012-13")
+        assert found.title == (
+            "League averages by season, newest first: the last 1 of the 3 seasons held, "
+            "from 1996-97, and 2012-13 as asked"
+        )
+        lines = found.text.splitlines()
+        assert lines[2].startswith("| 2025-26 |") and lines[3].startswith("| 2012-13 |")
+        assert lines[-1].endswith("are in the team_ranks view.")
+
     def test_benchmarks_are_frequencies(self, lab: Lab) -> None:
         found = run(lab, "historical_benchmarks", stage="won_championship", measure="wins_per_82")
         assert "| 55 to 60 | 10 | 0 | 0.0% | 0.0% to 27.8% |" in found.text
@@ -215,6 +235,15 @@ class TestCharts:
         )
         assert list(chart.frame["season"]) == sorted(chart.frame["season"])
         assert chart.reference == 0.0 and chart.frame["text"].iloc[-1] == "+8.3"
+
+    def test_a_chart_draws_the_rows_own_figures(self, lab: Lab) -> None:
+        """A9 audit: nothing in a chart is computed for it - its figures are the rows'."""
+        found = run(lab, "team_stats", team_id=BOS, season="2025-26", view="history")
+        (chart,) = found.charts
+        assert found.table is not None
+        rows = found.table.set_index("season")["net_rating"]
+        plotted = chart.frame.set_index("season")["net_rating"]
+        pd.testing.assert_series_equal(plotted, rows.loc[plotted.index], check_names=False)
 
     def test_a_players_season_is_percentile_bars(self, lab: Lab) -> None:
         (chart,) = run(lab, "player_stats", player_id=TATUM, season="2025-26").charts

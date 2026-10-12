@@ -19,7 +19,7 @@ import streamlit as st
 import front_office.assistant.api as api
 from front_office.domain.assistant import Mode
 from front_office.domain.research import SavedTurn, Workspace
-from front_office.services import WorkspaceService
+from front_office.services import WorkspaceService, WorkspaceUnreadable
 from wb import answers, components, data, state
 
 RESEARCH: Any = None
@@ -97,7 +97,21 @@ def body(about: About) -> None:
     """What the dialog holds. A plain function, so that a test can draw it inline: a dialog
     reruns alone in a browser, which ``AppTest`` cannot follow."""
     research = data.research()
-    workspace = _open_workspace(research)
+    try:
+        workspace = _open_workspace(research)
+    except WorkspaceUnreadable as error:
+        components.empty(
+            "Your saved research cannot be opened",
+            answers.escaped(
+                f"The file that keeps your workspaces cannot be read ({error.reason}), so a "
+                "question has nowhere to be kept. AI Research can set it aside and start a new "
+                "one; nothing is deleted."
+            ),
+            icon=":material/error:",
+        )
+        if RESEARCH is not None:
+            st.page_link(RESEARCH, label="Open AI Research", icon=":material/open_in_new:")
+        return
     st.caption(
         answers.escaped(
             f"About {about.label}. Asked in the workspace “{workspace.name}”; the sidebar does "

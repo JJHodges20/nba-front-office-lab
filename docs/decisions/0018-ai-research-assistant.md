@@ -571,3 +571,68 @@ the chart, and nothing fetched on opening the page - on 2026-10-10.
   user its proposal was "rejected due to a value error". The refusal now quotes what the
   idea holds and asks for the same idea again in words, and no refusal carries Pydantic's
   "Value error" for a model to pass on.
+
+## Settled while building A9, the release audit (2026-10-11)
+
+- **The solver runs on one thread.** The test suite stalled once in three runs at A9, and
+  once at A8, each time in an optimizer page test. A stress test found why: SciPy's HiGHS,
+  called from a new thread and then from the main thread, three hundred times in each of
+  twelve processes, finished in none of them within two minutes and logged access
+  violations; on the main thread alone, or on one thread kept for it, all twelve finished in
+  eight seconds. A Streamlit page runs in a new thread each time, and the assistant answers
+  in a thread of its own, so the workbench itself could have hung the same way. Every solve
+  now goes to one thread (`modeling/optimizer.SOLVER`); the same stress on the lab's own
+  solve finished in all twelve processes with nothing logged.
+- **A damaged research file is set aside, never deleted.** A file of random bytes, or one
+  cut short, reached the AI Research page as SQLite's own error. The store now checks a
+  file it did not just make with SQLite's quick check before writing anything to it, and
+  calls a file it cannot use `ResearchUnreadable` - a damaged one, a database that is not
+  the store, or one from a later lab, the last two refused before as well. The page says
+  what is wrong in plain words and offers *Set it aside and start afresh*, which renames the
+  file and its write-ahead log beside it and starts a new store; the Ask dialog says the
+  same and links to the page; every other page works as before. A locked file is not a
+  damaged one and is never offered for setting aside.
+- **Stop is honoured as soon as it can be.** The loop looked for a stop only before asking
+  the model, so the calls in a reply that came back after the press were all run - a
+  simulation or an optimizer search among them. It now looks as soon as a reply comes back,
+  and before each call.
+- **An id cut short is offered whole.** In every A8 run a model asked for team 2752, the
+  end of the Knicks' 1610612752. A refused id of three digits or more that ends exactly one
+  id of its kind now names that id; one too short to place still gets the lookup.
+- **What the lab holds is not answered from memory.** In the working session below,
+  "What does net rating mean?" and "So are they a real contender?" were each answered with
+  nothing called, in both passes - from the model's memory, or from the conversation's
+  earlier answers, a verdict slipped in - and so read as nothing to answer from; "How does
+  the lab decide a player's role?" once. A question about what a figure means or how the lab
+  works, or one asking for a verdict, answered with nothing called and nothing declined, is
+  now sent back once: the first to `metric_definition` or `research_docs`, the second for
+  the lab's evidence. One note for both sent the contender question to `metric_definition`,
+  the tool it named first; each now names its own. None of the frozen cases that expect no
+  call asks either kind of question.
+- **A result says what it holds.** Asked who led the league in net rating in 2012-13, the
+  model read the league's averages - the last twelve seasons, and nothing said of the rest -
+  and concluded that the lab held nothing before 2014-15; every team's ranks for the season,
+  another view of the same tool, hold the answer. The averages now say how many seasons the
+  lab holds and from when, add the season asked about, and say where a team's net rating is.
+- **A tool's name is not for the user.** "Use the roster_fit tool to verify" (R03, A8) told
+  the user to do what only the model can. After a result, such a sentence is wording the
+  checker sends back, as it sends back a verdict; a page's name is still the user's to use.
+- **The network, audited.** Every place the code can reach the network was set against the
+  source register. Nothing paid or undeclared runs: Ollama's cloud models, the one thing
+  that could cost money, are refused by name and by Ollama's remote flag. Now declared: the
+  injury report's file host, and Plotly's script, which a chart exported as HTML loads when
+  it is opened. The search allowance is unpublished and was not measured - measuring it
+  would mean using it up; the budget per question and a 429 said, never retried, bound it.
+  An image by reference in an answer (`![x][r]` with `[r]: <address>` further on) would have
+  been fetched by the browser; it is shown as the characters it is. Only `providers` import
+  what can open a connection (`interfaces` too, for `fol ui`'s check on its own server), and
+  the suite fails any test that connects anywhere but this machine.
+- **Release checks with no test before.** Instructions planted in a search result reach the
+  model quoted as data, as a page's do; a scripted model that obeys a planted notice - asks
+  the optimizer for a 999-million roster, then claims to have saved it - saves nothing, and
+  its claim is cut. With the network down the lab's own tools still answer and the web's
+  failure is said; a stream cut off mid-answer is said; the time budget, Deep's twelve
+  calls and each mode's searches and pages are held; a made-up figure for a season the lab
+  does not hold is cut; a chart the house rules refuse says so and the rows stay; and the
+  page asks the model nothing more, keeps nothing more, and draws an answer once however
+  often it runs again.

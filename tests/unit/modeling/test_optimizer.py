@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import threading
 from itertools import combinations
 
 import pandas as pd
 import pytest
 
 from front_office.domain.optimizer import ON_COURT, BudgetMode, OptimizerRequest
+from front_office.modeling import optimizer
 from front_office.modeling.optimizer import (
     INFEASIBLE,
     NO_POOL,
@@ -397,3 +399,41 @@ class TestTheRequest:
             OptimizerRequest(payroll_season="a", stats_season="b").budget_mode
             is BudgetMode.SALARY_CAP
         )
+
+
+class TestOneSolverThread:
+    """A9: HiGHS, called from one thread and then another, hung or crashed - in the test
+    suite, a page's run solving and then the test itself. Every solve runs on one thread."""
+
+    def ask(self) -> object:
+        return solve(TEN, request(), budget=100 * M, minimum_salary=None, replacement=REPLACEMENT)
+
+    def test_every_solve_runs_on_the_one_thread_whoever_asks(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        seen: list[int] = []
+        real = optimizer.milp
+
+        def recorded(*args: object, **kwargs: object) -> object:
+            seen.append(threading.get_ident())
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(optimizer, "milp", recorded)
+        self.ask()
+        asker = threading.Thread(target=self.ask)
+        asker.start()
+        asker.join()
+        assert len(seen) >= 2 and len(set(seen)) == 1
+        assert seen[0] not in (threading.get_ident(), asker.ident)
+
+    def test_threads_taking_turns_always_get_an_answer(self) -> None:
+        """The pattern that hung at A9, forty times over: a new thread solves, then this one."""
+        answers: list[object] = []
+        for _ in range(40):
+            asker = threading.Thread(target=lambda: answers.append(self.ask()), daemon=True)
+            asker.start()
+            asker.join(timeout=60)
+            assert not asker.is_alive(), "a solve asked from a new thread never came back"
+            answers.append(self.ask())
+        assert len(answers) == 80
+        assert all(found(outcome).player_ids == found(answers[0]).player_ids for outcome in answers)

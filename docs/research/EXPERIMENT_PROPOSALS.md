@@ -4,7 +4,7 @@
 
 Frozen questions (`tests/assistant/fixtures/experiment_cases.yaml`, frozen 2026-10-11) asked of `qwen3:8b` through the whole assistant on the fixture database, with the lab's own decisions beside it. Each answer is scored on what can be told without a judge; the ideas themselves are for the reader, and are listed below in the assistant's words.
 
-- Run: 2026-10-11T18:31:57 to 2026-10-11T18:37:18 UTC, milestone A8, rules 2026-10-10.3.
+- Run: 2026-10-11T23:49:36 to 2026-10-11T23:53:22 UTC, milestone A9, rules 2026-10-10.3.
 - Cases: 8; errors: 0.
 
 ## Summary

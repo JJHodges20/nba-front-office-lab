@@ -101,6 +101,18 @@ FREQUENCY_NOT_CHANCE = (
     "past teams did something - say it as a count and a share"
 )
 NO_VERDICT = "no verdicts or recommendations: lay out the evidence and the trade-offs"
+TOOL_FOR_THE_USER = (
+    "the user cannot call the lab's tools: say in plain words what the lab can show, or call "
+    "the tool yourself"
+)
+NAMED_FOR_USE = re.compile(
+    r"\b(?:use|call|run|try|via|using|through)\s+(?:the\s+)?[`'\"]?"
+    r"(?P<name>[a-z]+(?:_[a-z]+)+)[`'\"]?",
+    re.IGNORECASE,
+)
+"""A tool's name given to the user to use: "Use the roster_fit tool to verify..." (R03, A8).
+Before any result the orchestrator holds it to like a promise (A5); after one it is wording
+the user can do nothing with. A page's name is the user's to use, and stays."""
 NOTHING_DONE = (
     "you cannot save, change or delete anything; say so, and what the user can do instead"
 )
@@ -346,6 +358,7 @@ def wording(answer: str, tools: Iterable[str]) -> tuple[Wording, ...]:
         ]
     found += [Wording(m.group(0), NO_VERDICT) for m in VERDICT.finditer(answer)]
     found += [Wording(m.group(0), NOTHING_DONE) for m in DONE_FOR_THE_USER.finditer(answer)]
+    found += [Wording(m.group("name"), TOOL_FOR_THE_USER) for m in NAMED_FOR_USE.finditer(answer)]
     return tuple(found)
 
 

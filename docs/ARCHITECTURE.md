@@ -60,6 +60,12 @@ Third-party libraries are confined the same way: `nba_api` and `requests` only i
 only in `processing`; `typer` and `rich` only in `interfaces`; `streamlit` and `plotly` only
 in `apps/`.
 
+So is anything that can open a connection (A9): `requests`, `nba_api`, `socket`,
+`http.client` and `urllib.request` are imported in `providers` alone - with one exception,
+`urllib.request` in `interfaces`, where `fol ui` asks this machine's own server whether it
+has started. The workbench and `scripts/` import none of them; they reach the network
+through the providers.
+
 These rules are enforced by `tests/architecture/test_layer_boundaries.py`. A forbidden
 import fails the test suite. To change a rule, change this document and that test in the
 same commit and record why in `docs/decisions/`.
@@ -525,7 +531,10 @@ See [AI_ASSISTANT_SPEC.md](AI_ASSISTANT_SPEC.md) and [AI_EVALUATION.md](AI_EVALU
   page drawn without a browser against a database built from the fixtures, and a sweep
   that puts every control on every page through every value it offers.
 - Tests marked `network` call live services and are deselected by default
-  (`pytest -m network`).
+  (`pytest -m network`); so are those marked `ollama`, which need the local model. Every
+  other test is held to this machine (A9): `tests/conftest.py` fails a test that connects
+  anywhere else or looks a name up, even where the code under test caught the error
+  (`tests/architecture/test_offline.py` checks the guard itself).
 - Warnings are errors (`filterwarnings = ["error"]`).
 
 ## How to add a table

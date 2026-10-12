@@ -3,6 +3,122 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Milestone A9 - AI Research Assistant: the release audit (2026-10-11)
+
+Every check of the release, run and written down: the test suite, the live model's tests,
+the evaluations, a working session timed and asked twice, failure and offline runs, the
+network against the source register, and the documents. No league table, model file,
+setting or contract figure changed: nothing was fitted, rebuilt or imported, and every live
+run read a copy of the data.
+
+**Found, and fixed**
+
+- **The suite's rare stall was the solver.** One full test run in three stalled - as one
+  did at A6 and at A8 - in an optimizer page test. A plugin that logs each test's start and
+  end on each worker named it; a stress script found the cause: SciPy's HiGHS, called from
+  a new thread and then from the main thread, 300 times in each of 12 processes, finished
+  in none within two minutes and logged access violations, where on the main thread alone,
+  or on one thread kept for it, all 12 finished in 8 seconds. A page's run and the test
+  that read the page took turns in exactly that way - and so do a workbench page's runs and
+  the assistant's questions, each in a thread of its own, so the workbench could hang too.
+  Every solve now runs on one thread (`modeling/optimizer.SOLVER`); the stress on the lab's
+  own solve then finished in all 12 processes with nothing logged, and two tests hold it.
+- **Stop came too late.** The loop looked for a stop only before asking the model, so the
+  tool calls in a reply that came back after the press - the likeliest moment - were all
+  run. It now looks as soon as a reply comes back and before each call.
+- **A damaged research file crashed AI Research** with SQLite's own error. The store now
+  checks a file it did not just make with SQLite's quick check before writing anything,
+  remembering a file that passed until it changes (13 ms for 20 MB, and a page opens the
+  store a dozen times a run); a file it cannot use - damaged, not the store, from a later lab
+  - is `ResearchUnreadable`. The page says so in plain words and offers *Set it aside and
+  start afresh*, which renames the file and its write-ahead log beside it, never deleting
+  them; the Ask dialog says so and links to the page; every other page works as before. A
+  locked file is not damaged and is never offered.
+- **What the lab holds was answered from memory.** In the working session, "What does net
+  rating mean?" and "So are they a real contender?" were answered with nothing called in
+  both passes - and so labelled as nothing to answer from. A question about what a figure
+  means or how the lab works, or one asking for a verdict, answered with nothing called and
+  nothing declined, is now sent back once - with a note naming the glossary and the
+  documents for the first, the lab's evidence for the second. One note for both had sent
+  the contender question to the glossary; a replay of the session showed it.
+- **A result that did not say what it held.** "Who led the league in net rating in
+  2012-13?" was answered as missing in every pass: a replay showed the model reading the
+  league's averages - the last twelve seasons, with nothing said of the rest - and concluding
+  that the lab held nothing before 2014-15. The averages now say how many seasons the lab
+  holds and from when, add the season asked about, and say that a team's net rating is in
+  the team ranks.
+- **From A8:** a refused id that ends exactly one id of its kind - V02's "2752", the end of
+  the Knicks' 1610612752 - now names that id; and "Use the roster_fit tool" (R03), a tool
+  named for the user to use, is sent back as wording.
+- **The network audit** (decision 0018's A9 section): nothing paid or undeclared runs. Now
+  declared in the register: the injury report's file host, and the Plotly script an
+  exported HTML chart loads. The search allowance is unpublished and was not measured. An
+  image by reference in an answer (`![x][r]` with an address further on) would have been
+  fetched by the browser, and is shown as text. Only `providers` may import what opens a
+  connection (an architecture test), and a guard in `tests/conftest.py` fails any test that
+  connects anywhere but this machine - the whole suite passed with it on.
+
+**Release checks with no test before**, from an audit of the suite against the release
+list: instructions planted in a search result reach the model quoted as data; a scripted
+model that obeys a planted notice saves nothing and its claim is cut; with the network down
+the lab's own tools answer and the web's failure is said; the real web sender's timeouts and
+lost connections name the site and never the request; a stream from Ollama cut off midway
+is said; the time budget, Deep's twelve calls, and each mode's searches and pages hold; a
+made-up figure for a season the lab does not hold is cut; seven tools whose evidence no test
+checked carry it; a chart the house rules refuse says so beside its rows; a chart's figures
+are its rows'; the page asks the model nothing more and draws an answer once however often
+it runs; and the Ask dialog with Ollama offline offers nothing to press.
+
+**The evaluation** ([AI_EVALUATION.md](AI_EVALUATION.md)). The 59 cases, three runs on the
+A9 code as it grew: 49, 49 and 47 of 59, the last the report. The same ten fail in all
+three - as at A8 - and in the last R01 and R03 too, their Deep answers having written
+figures of their own that the checker cut. In every run the right tool came first for 36 of
+the 37 cases that need one, every clarify and refuse case called nothing, nothing forbidden
+was called or said, W03's planted call was not made, and no figure that no result holds was
+shown. The arguments measure misses its target as at A8, 93% against 98%: B03's made-up id
+"1", twice, and V02's "2752" - offered whole now, but on the last call its mode allows - and
+S01's, as decided at A4. The experiment questions: 5 of 8 twice, case for case as at A8.
+Search quality, live: 11 of 12 queries run - K02's search timed out and was said - with 85
+of 94 kept results on topic. `pytest -m ollama`: 6 passed, three times.
+
+**The working session** ([ASSISTANT_SESSION.md](research/ASSISTANT_SESSION.md),
+`scripts/measure_session.py`): twenty questions a user might ask, in one workspace, through
+`assistant.api` as the page asks them, on a copy of the real data with current information
+and the web live, then all again in a second workspace. Three runs: the first, before the
+changes it led to, labelled 11 of 40 answers as nothing to answer from; the third, the
+report, 5 - two of them S07's season the lab does not hold, rightly, one S19's request to
+save, refused, and three misses. In every run every answer was kept, none had an error and
+no roster was saved. The model loads in 11.0 s; the first answer, cold, came in 18.8 s;
+Quick answers took 8.8 s at the median, 9 in 10 within 19.0 s; Deep 75.4 s, at most 106 s.
+`qwen3:8b` takes 5.76 GB, all on the RTX 4060.
+
+**The browser pass** - the workbench over a copy of the real data, light and dark, with a
+research file of random bytes: AI Research said the file cannot be opened, why in SQLite's
+words, that nothing was changed, and offered no question box but *Set it aside and start
+afresh*; Team Explorer's *Ask AI about this* said the same with a link to AI Research; the
+button moved the file aside, byte for byte as it was, started a new store and a workspace,
+and said where the old file went.
+
+**Documents**: [RELEASE_NOTES.md](RELEASE_NOTES.md) (what the release holds, install, how it
+was checked, recovery, known limits), the README's setup and recovery, the source register,
+the architecture's network rule and test guard, the user's guide, the specification,
+decision 0018's A9 section, and CLAUDE.md.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| `pytest -n auto` (everything but live-network and live-model tests) | 3,950 passed (4 min 40 s), after the last change, with the guard that fails a test reaching the network |
+| `pytest -m ollama` (the live model) | 6 passed |
+| The end-to-end evaluation, on the A9 code | 47/59 in the last of three runs (49, 49, 47); no unsupported figure shown; arguments 93% against a 98% target (made-up team ids, refused); report generated |
+| The experiment-proposal evaluation | 5/8 twice; drafting decisions 8/8; report generated |
+| Search quality, live | 11 of 12 queries (one timed out and was said); report generated |
+| A working session, asked twice | 34 of 40 answered in the last run, every answer kept, no error, nothing saved; times and memory recorded; report generated |
+| The pages in a browser | AI Research and the Ask dialog with a damaged research file, light and dark |
+| Sources and boundaries | No paid or undeclared network dependency (the audit); the boundary tests pass, with the network rule added |
+| Data and models | No model file, setting, league table or contract figure changed; every live run read a copy of the data |
+
 ## Milestone A8 - AI Research Assistant: experiment proposals for the models, never applied (2026-10-11)
 
 Asked for an experiment, or an idea to improve one of the lab's models, the assistant drafts
