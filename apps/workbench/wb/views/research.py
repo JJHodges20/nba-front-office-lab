@@ -503,22 +503,23 @@ def _put_away(research: WorkspaceService, workspace: Workspace, *, busy: bool) -
                     research.update(kept.workspace_id, archived=False)
                     _after(f"Restored “{kept.name}”.", show=kept.workspace_id)
         st.divider()
-        clear = st.checkbox(
+        if components.confirmed_button(
+            "Clear history",
             "Forget this workspace's questions and answers (notes, findings and proposed "
             "rosters stay)",
+            key=f"ai_ws_clear_{key}",
             # Clearing begins a new conversation, and with it an unticked box.
-            key=f"ai_ws_clear_ok_{key}_{workspace.conversation}",
-        )
-        if st.button("Clear history", key=f"ai_ws_clear_{key}", disabled=not clear):
+            confirm_key=f"ai_ws_clear_ok_{key}_{workspace.conversation}",
+            icon=":material/delete_sweep:",
+        ):
             gone = research.clear_history(key)
             _after(f"Cleared {gone} question{'s' if gone != 1 else ''} from “{workspace.name}”.")
-        delete = st.checkbox(
+        if components.confirmed_button(
+            "Delete workspace",
             "Delete this workspace and everything in it (rosters saved from it stay in the Team "
             "Builder)",
-            key=f"ai_ws_delete_ok_{key}",
-        )
-        if st.button(
-            "Delete workspace", key=f"ai_ws_delete_{key}", type="primary", disabled=not delete
+            key=f"ai_ws_delete_{key}",
+            confirm_key=f"ai_ws_delete_ok_{key}",
         ):
             research.delete(key)
             _after(f"Deleted “{workspace.name}”.")
@@ -636,9 +637,15 @@ def _finding(research: WorkspaceService, finding: Finding) -> None:
                         components.alert("error", str(error))
                     else:
                         _after("Finding saved.")
-            if st.button("Delete", key=f"ai_f_delete_{key}", icon=":material/delete:"):
-                research.delete_finding(key)
-                _after("Finding deleted.")
+            with st.popover("Delete", icon=":material/delete:"):
+                if components.confirmed_button(
+                    "Delete finding",
+                    "I want to delete this finding",
+                    key=f"ai_f_delete_{key}",
+                    confirm_key=f"ai_f_delete_ok_{key}",
+                ):
+                    research.delete_finding(key)
+                    _after("Finding deleted.")
 
 
 def _experiment(research: WorkspaceService, record: ExperimentRecord) -> None:
@@ -653,9 +660,15 @@ def _experiment(research: WorkspaceService, record: ExperimentRecord) -> None:
             if st.button("Save", key=f"ai_x_save_{key}", type="primary"):
                 research.annotate_experiment(key, note or None)
                 _after("Note saved.")
-        if st.button("Delete", key=f"ai_x_delete_{key}", icon=":material/delete:"):
-            research.delete_experiment(key)
-            _after("Experiment proposal deleted.")
+        with st.popover("Delete", icon=":material/delete:"):
+            if components.confirmed_button(
+                "Delete proposal",
+                "I want to delete this experiment proposal",
+                key=f"ai_x_delete_{key}",
+                confirm_key=f"ai_x_delete_ok_{key}",
+            ):
+                research.delete_experiment(key)
+                _after("Experiment proposal deleted.")
 
 
 def _controls(
@@ -724,8 +737,7 @@ def _turn(
     with st.chat_message("assistant", avatar=":material/smart_toy:"):
         if turn.answer is None:
             components.tagged(
-                ("No answer", ":material/error:", "red"),
-                answers.escaped(turn.error or "Nothing came back."),
+                components.NO_ANSWER, answers.escaped(turn.error or "Nothing came back.")
             )
         else:
 

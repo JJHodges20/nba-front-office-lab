@@ -14,7 +14,19 @@ from wb import style
 
 APPS = Path(__file__).resolve().parents[2] / "apps" / "workbench"
 DESIGN_SYSTEM = Path(__file__).resolve().parents[2] / "docs" / "ui-polish" / "DESIGN_SYSTEM.md"
-RULES = {'[data-testid="stMainBlockContainer"]': {"padding-top": "2.5rem"}}
+RULES = {
+    # P2: the space above every title.
+    '[data-testid="stMainBlockContainer"]': {"padding-top": "2.5rem"},
+    # P3: rows of headline tiles wrap as a grid (components.figures keys them "tiles-").
+    '[class*="st-key-tiles-"] [data-testid="stHorizontalBlock"]': {
+        "display": "grid",
+        "grid-template-columns": "repeat(auto-fit, minmax(11rem, 1fr))",
+    },
+    '[class*="st-key-tiles-"] [data-testid="stColumn"]': {"width": "auto", "min-width": "0"},
+    '[class*="st-key-tiles-wide-"] [data-testid="stHorizontalBlock"]': {
+        "grid-template-columns": "repeat(auto-fit, minmax(14rem, 1fr))",
+    },
+}
 """Every rule the stylesheet may hold: its selector and its declarations."""
 
 

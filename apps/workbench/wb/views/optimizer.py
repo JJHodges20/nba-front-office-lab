@@ -91,11 +91,12 @@ def _form(
         st.markdown("**Payroll**")
         left, right = st.columns([2, 1])
         with left:
-            title = st.segmented_control(
+            # A list, not a row of buttons: five lines do not fit a narrow window (UI polish P3).
+            titles = [mode.title for mode in modes]
+            title = st.selectbox(
                 "Budget",
-                [mode.title for mode in modes],
-                default=defaults.budget_mode.title,
-                required=True,
+                titles,
+                index=titles.index(defaults.budget_mode.title),
                 key="opt_mode",
                 help="The line the payroll may not exceed. The lines are the season's cap rules.",
             )
@@ -252,7 +253,7 @@ def _results(filters, status: OptimizerStatus, request: OptimizerRequest) -> Non
         said += " The solver ran out of time on at least one roster, which may not be the best."
     st.caption(said)
     for reason in report.outcome.reasons:
-        components.tagged(("Note", ":material/info:", "orange"), reason[0].upper() + reason[1:])
+        components.tagged(components.NOTE, reason[0].upper() + reason[1:])
 
     _comparison(report)
     tabs = st.tabs(

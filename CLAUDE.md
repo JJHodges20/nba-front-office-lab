@@ -340,7 +340,18 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   rule in `wb/style.css`, applied once by the frame (`style.apply()`), listed in
   `docs/ui-polish/DESIGN_SYSTEM.md` and held to that list by `tests/ui/test_style.py`; a new
   rule is the owner's decision. Errors, warnings, successes and notes go through
-  `components.alert`, one icon per kind (UI polish P2).
+  `components.alert`, one icon per kind (UI polish P2). A tag that several pages use -
+  `components.NOTE`, `CHECK`, `OUT_OF_DATE`, `NO_ANSWER` - is written once; a test holds
+  every tag word to one icon and one colour (P3).
+- **Nothing in `app.py` may stand alone as an expression.** Streamlit's "magic" draws a bare
+  string or name in the main script on the page: write a note there as a `#` comment, never
+  a docstring under a constant (at P3 one appeared above every title). A test checks.
+- **What cannot be undone asks first** (the owner's decision, UI polish P3): a delete or a
+  clear is `components.confirmed_button`, off until its box is ticked and never the page's
+  primary button. A test keeps any page from drawing a plain Delete or Clear button.
+- **A segmented control is for a few short choices.** On a row of its own it wraps in a
+  narrow window; inside columns or beside other controls it cannot, and its last choices go
+  out of reach (the simulator's *Regression* at 1024px). There, a longer set is a selectbox.
 - **Every figure says what it is**: measured, derived, estimate, modeled or the user's
   assumption. Estimates over a span carry "≈". Missing is a dash and an explanation,
   never a zero. A page that shows a modeled value lists the Modeled tag in its header.
@@ -368,7 +379,11 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   holds for page text, notes, table headings, chart titles and the assistant's answers
   (its rule 13); keep a lab term such as net rating or 95% interval where it is needed.
 - **Headline tiles cut off long text.** Keep a figure's context to about twenty
-  characters, or give the row fewer tiles (`components.figures(..., per_row=3)`).
+  characters, or give the row fewer tiles (`components.figures(..., per_row=3)`). Each row
+  is a grid that wraps in a narrow window (UI polish P3): tiles at least 11rem in a row of
+  five, 14rem in a row of four or fewer. It hooks the rows' keys, `tiles-N` and
+  `tiles-wide-N`, counted afresh each run from `components.new_page()` in the frame: draw
+  tiles only through `components.figures`.
 - **The AI Research page reaches the assistant through `front_office.assistant.api`
   alone**, imported by its full name (`import front_office.assistant.api as api`: the
   boundary test reads `from front_office.assistant import api` as the whole package). A

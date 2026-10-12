@@ -27,8 +27,6 @@ TOP = 15
 LEVELS = "Levels"
 OWN_ROW = "value_model"
 
-OUT_OF_DATE = ("Out of date", ":material/schedule:", "orange")
-NOTE = ("Note", ":material/info:", "blue")
 FIT = "fol value fit --write"
 
 IDENTITY = {
@@ -92,7 +90,7 @@ def _notices(status: ValueStatus) -> None:
     """What a reader should know before trusting the page: is it current?"""
     if status.needs_build:
         components.tagged(
-            OUT_OF_DATE,
+            components.OUT_OF_DATE,
             f"The model on file is revision {status.revision}; the values on this page "
             f"were built with {status.applied_revision}. Run: fol build",
         )
@@ -100,13 +98,13 @@ def _notices(status: ValueStatus) -> None:
         seasons = status.finished_since
         span = seasons[0] if len(seasons) == 1 else f"{seasons[0]} to {seasons[-1]}"
         components.tagged(
-            OUT_OF_DATE,
+            components.OUT_OF_DATE,
             f"The model was fitted on seasons to {status.fitted_through}. {span} finished "
             f"since and is valued with the old weights. Run: {FIT}, then fol build",
         )
     if not status.is_fitted:
         components.tagged(
-            NOTE,
+            components.NOTE,
             "The model these values were built with is no longer on file, so its evidence "
             f"cannot be shown. Fit it again: {FIT}",
         )
@@ -586,7 +584,7 @@ def _money(filters: Filters, status: ValueStatus) -> None:
     market = money.market
     if market is None:
         components.tagged(
-            NOTE,
+            components.NOTE,
             "No price of a win can be read off these contracts: there are too few, or "
             "they do not pay more for more wins. Salary per win is shown without one.",
         )

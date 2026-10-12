@@ -170,5 +170,6 @@ if not status.is_built:
 
 page = st.navigation(PAGES, position="top")
 state.sidebar(status)
+components.new_page()
 page.run()
 data_status(status.build_id, status.built_at)

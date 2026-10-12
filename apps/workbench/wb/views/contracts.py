@@ -178,7 +178,7 @@ def _preview(preview: ContractPreview) -> None:
         )
     )
     for flag in preview.flags:
-        components.tagged(("Check", ":material/warning:", "orange"), flag)
+        components.tagged(components.CHECK, flag)
     if preview.changes:
         rows = pd.DataFrame(
             [

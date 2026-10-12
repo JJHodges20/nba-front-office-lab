@@ -12,3 +12,21 @@
 [data-testid="stMainBlockContainer"] {
     padding-top: 2.5rem;
 }
+
+/* UI polish P3: headline tiles (components.figures, rows keyed "tiles-"). Streamlit's columns
+   never wrap, so in a narrow window five tiles were cut to 103px. As a grid they take as
+   many equal columns as fit, none narrower than 11rem - 14rem in a row of four or fewer
+   ("tiles-wide-") - and wrap the rest. Without these rules they are Streamlit's columns. */
+[class*="st-key-tiles-"] [data-testid="stHorizontalBlock"] {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+
+[class*="st-key-tiles-"] [data-testid="stColumn"] {
+    width: auto;
+    min-width: 0;
+}
+
+[class*="st-key-tiles-wide-"] [data-testid="stHorizontalBlock"] {
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}

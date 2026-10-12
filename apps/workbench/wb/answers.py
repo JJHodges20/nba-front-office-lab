@@ -193,7 +193,7 @@ def outcome(answer: Answer) -> None:
 
 def notes(answer: Answer) -> None:
     for note in answer.warnings:
-        components.tagged(("Note", ":material/info:", "gray"), escaped(note))
+        components.tagged(components.NOTE, escaped(note))
 
 
 def options(answer: Answer, *, key: str, can_ask: bool, choose: Choose) -> None:

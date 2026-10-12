@@ -20,7 +20,6 @@ from wb.state import Filters
 SELECTED = "builder_roster"
 CREATED = "builder_roster_created"
 IN_ORDER = ("In order", ":material/check_circle:", "green")
-NOTE = ("Note", ":material/info:", "orange")
 BENCH = ROSTER_SLOTS[-1]
 SOURCES = {"contract": "Contract file", "assumed": "Your assumption"}
 NO_SALARY = "No salary"
@@ -176,12 +175,11 @@ def _manage(filters: Filters, roster: pd.Series) -> None:
             else:
                 st.rerun()
     st.divider()
-    confirmed = st.checkbox("I want to delete this roster", key=f"confirm_delete_{roster_id}")
-    if st.button(
+    if components.confirmed_button(
         "Delete roster",
-        icon=":material/delete:",
-        disabled=not confirmed,
+        "I want to delete this roster",
         key=f"delete_{roster_id}",
+        confirm_key=f"confirm_delete_{roster_id}",
     ):
         data.lab().builder.delete(roster_id)
         st.session_state.pop(SELECTED, None)
@@ -285,7 +283,7 @@ def _payroll(summary: RosterSummary) -> None:
 
 def _checks(summary: RosterSummary) -> None:
     for check in summary.checks:
-        components.tagged(IN_ORDER if check.passed else NOTE, check.message)
+        components.tagged(IN_ORDER if check.passed else components.CHECK, check.message)
 
 
 # --- the players ------------------------------------------------------------------------------

@@ -4,8 +4,10 @@
 decided: both themes kept, the computer's setting followed until Dark or Light is chosen
 in the app's menu (the browser remembers it), and `#2f8556` / `#1f6b45` for actions. **The
 frame and the style rules (sections 8-9) are in effect since P2**: the navigation in a top
-bar and one style rule, both the owner's choice. Sections 4-7 are still proposals, for the
-phases named in them. The evidence behind each value is in [BASELINE_AUDIT.md](BASELINE_AUDIT.md).
+bar and one style rule, both the owner's choice. **The tiles, tags and controls (sections 4,
+5, 9 and 10) are in effect since P3**: tiles that wrap, one look per tag, dropdowns where
+choices were cut off, and every delete asking first. Sections 6-7 are still proposals, for
+the phases named in them. The evidence behind each value is in [BASELINE_AUDIT.md](BASELINE_AUDIT.md).
 
 The roadmap's direction: a near-black canvas, a dark forest-green accent, balanced
 density, the whole workbench in scope, navigation and behaviour unchanged. This proposal
@@ -123,14 +125,18 @@ Kept from today's `config.toml`, which already fits the brief:
 - **Corners:** `baseRadius = "8px"`; buttons follow it. Bars keep their 4px data end.
 - **Borders:** widget and sidebar borders on, in the `grid` colour.
 - **Figures:** `st.metric` tiles with a border, up to five a row; context kept to about
-  twenty characters (CLAUDE.md), three a row where it is longer.
+  twenty characters (CLAUDE.md), three a row where it is longer. **Since P3 the tiles
+  wrap** (section 9): as many equal tiles as fit, at least 11rem wide in a row of five or
+  more and 14rem in a row of four or fewer, so a narrow window gives fewer a row instead of
+  cutting their numbers.
 - **Spacing:** Streamlit's own gaps; rows of controls use `gap="small"`. The space above a
-  page's title is the one style rule (section 9). Tabular numerals have no native setting
-  and stay as they are unless P3 shows a need.
+  page's title is a style rule (section 9). Tabular numerals have no native setting; P3
+  found no need for them.
 
-Candidates to evaluate in P2/P3, not proposed yet: `metricValueFontSize` (tiles' numbers
-are 2.25rem by default), `buttonRadius`, and `dataframeHeaderBackgroundColor` set apart
-from `surface`.
+Looked at in P3 and kept as they are: `metricValueFontSize` (the tiles' 2.25rem numbers read
+well and, wrapping, no longer get cut), `buttonRadius` (the 8px of every other corner), and
+the table colours (the header on `surface` stands apart from the rows on `plane`, numbers
+sit right, a missing value is a dash).
 
 ## 5. Tags: provenance, state and outcome
 
@@ -142,13 +148,19 @@ Every tag is a word and an icon as well as a colour (`components.py`). Today:
 | Source state | Up to date green, Stale orange, Failing red, Not supplied gray |
 | Answer outcome | Supported green, Partly answered orange, Not enough to answer gray, Question back blue, Declined gray |
 
-Two questions for P3, not decided here:
+Settled in P3:
 
-- **Modeled is green**, the status hue for "good", and next to a green brand it will read as
-  an action or a success rather than as "an estimate from a fitted model". Options: move
-  Modeled to a hue no state uses (teal or violet family), or leave it.
-- **Note** is drawn gray, orange and blue on different pages, and "Out of date" is defined
-  in four views: one definition each, in `components.py`.
+- **Modeled stays green** (decision D3, the owner's, 2026-10-11). `st.badge` offers seven
+  named colours and every one is already a provenance or a state, so no free hue exists.
+  The one swap tried - Modeled violet, *Your assumption* in the brand green - left *Your
+  assumption* dim on the dark page (the brand is 4.29:1 there, under the 4.5 small text
+  needs). The word and the icon tell Modeled apart, as before.
+- **One look per word.** The tags several pages use are written once in `components.py`:
+  `NOTE` (blue, `info`: something to know), `CHECK` (orange, `warning`: something to look
+  at, such as a rule a roster breaks), `OUT_OF_DATE` (orange, `schedule`) and `NO_ANSWER`
+  (red, `error`). "Note" had been blue on two pages, orange on two and gray in the answers;
+  Team Builder's broken rules are now *Check*. A test holds every tag word in the
+  workbench to one icon and one colour.
 
 ## 6. Charts
 
@@ -197,3 +209,22 @@ the frame applies it, and that no page injects HTML or CSS of its own.
 | Rule | Why | If Streamlit renames the hook |
 | --- | --- | --- |
 | `[data-testid="stMainBlockContainer"] { padding-top: 2.5rem; }` | With the top bar, Streamlit leaves 8rem above every title (6rem on a phone); 2.5rem keeps the title clear of the bar and shows about 80px more of each page on a desktop, 50px on a phone, measured in a browser (the owner's choice, P2) | The gap returns to Streamlit's own; nothing else changes |
+| `[class*="st-key-tiles-"] [data-testid="stHorizontalBlock"] { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }` | Headline tiles (`components.figures`, rows keyed `tiles-`): Streamlit's columns never wrap, so at 1024px five tiles were cut to 103px. As a grid they take as many equal columns as fit and wrap the rest: five across at 1440 and 1366 as before, three and two at 1024, two a row on a phone (the owner's choice, P3) | The tiles are Streamlit's columns, as before P3 |
+| `[class*="st-key-tiles-"] [data-testid="stColumn"] { width: auto; min-width: 0; }` | A column's own width is a share of its row, which inside a grid cell would shrink the tile to that share of the cell | As above |
+| `[class*="st-key-tiles-wide-"] [data-testid="stHorizontalBlock"] { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }` | A row of four tiles or fewer (and `per_row=3`, for long text) has room for wider tiles: at least 14rem, so four stay across a desktop, a 1024px window gives two a row, and a phone one, as before - at 11rem a phone's two a row cut Contract Explorer's tiles | As above |
+
+## 10. Choices and actions (P3)
+
+- **A segmented control is for a few short choices.** On a row of its own it wraps onto a
+  second line in a narrow window (Player Explorer's columns); inside columns or beside other
+  controls it cannot, and its last choices are cut off - at 1024px the simulator's
+  *Regression* could not be reached. A longer set of choices there is a dropdown:
+  Benchmarks' seasons, the Optimizer's budget, the simulator's games missed and development.
+- **What cannot be undone asks first** (the owner's decision): `components.confirmed_button`
+  stays off until its box is ticked, and is never the page's main action - deleting a
+  roster, a workspace, a finding or an experiment proposal, and clearing a workspace's
+  history. A finding's and a proposal's sit in a *Delete* popover beside *Edit*. A test
+  keeps any page from drawing a plain Delete or Clear button.
+- **The open page's group is not named on the page** (decision D7, the owner's): placed
+  above or beside the title it must clear the top bar, which pushes every page down about
+  60px. The open menu marks the page, and the title names it.

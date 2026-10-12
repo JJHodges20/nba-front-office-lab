@@ -51,6 +51,8 @@ used for data.
 
 ## Reading a page
 
+- **Headline figures** sit in tiles across the top of a page; in a narrow window or on a
+  phone they wrap onto more rows.
 - **Tags under the title** say what kinds of number the page holds.
   *Measured*: published by the league and shown unchanged. *Derived*: computed by the
   lab with a stated formula. *Estimate*: estimated by the lab. *Modeled*: produced by a
@@ -178,8 +180,10 @@ strongly they move together. How one metric is spread. The metric glossary.
 **Team Builder.** Rosters you assemble by hand. For each: payroll, share of the cap,
 room under each line, how the roster stands against the roster limits, and what its
 players add up to beside the league. Change a slot or type a salary of your own
-directly in the table. It describes a roster; it does not rank or recommend players, and
-its pooled figures are not a projection of how the players would play together.
+directly in the table. *Manage* renames a roster, changes its seasons and notes, or
+deletes it once you tick the box. It describes a roster; it does not rank or recommend
+players, and its pooled figures are not a projection of how the players would play
+together.
 
 **Roster Fit.** Do these players make sense together? The sidebar's team, or a roster you
 built, described in the roadmap's six areas of fit - offense, defense, the possession
@@ -298,8 +302,9 @@ played are answered from that season's figures.
   change must beat, how seasons are split, what is measured, the leakage to rule out, what
   was tried before, and the steps of the milestone that would build it. *Keep in the
   workspace* puts it in the workspace's *Experiment proposals*, where it can carry your
-  note; *Download* gives it as a document. Nothing is applied: no model, setting or data
-  changes, whatever you keep. The assistant drafts one only when asked.
+  note, and *Delete* removes it once you tick the box; *Download* gives it as a document.
+  Nothing is applied: no model, setting or data changes, whatever you keep. The assistant
+  drafts one only when asked.
 - *Quick or Deep*: Quick for one fact or one comparison, Deep for a longer look - more
   tool calls, more time, the model thinking first. A question under way shows its steps
   as they come, and *Stop* ends it at the next step, keeping what was gathered: whatever the
@@ -333,7 +338,8 @@ played are answered from that season's figures.
   renames it beside itself (never deleting it) and starts a new one. Copies made before
   each upgrade of the file are in `data/assistant/backups/`.
 - *Findings*: *Save as finding* under an answer keeps a copy of it, with your title and
-  note, in the workspace's findings - it stays even if the history is cleared.
+  note, in the workspace's findings - it stays even if the history is cleared. *Edit*
+  changes its title and note; *Delete* removes it once you tick the box.
 - *Old answers*: each answer records the data build and player value model it read. When
   either has changed since, it says so, and *Ask again with today's data* asks the same
   question again beside it; the old answer is never rewritten. An answer that read recent

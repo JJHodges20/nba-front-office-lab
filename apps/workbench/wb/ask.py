@@ -191,10 +191,7 @@ def _answer() -> None:
         return
     st.divider()
     if done.answer is None:
-        components.tagged(
-            ("No answer", ":material/error:", "red"),
-            answers.escaped(done.error or "Nothing came back."),
-        )
+        components.tagged(components.NO_ANSWER, answers.escaped(done.error or "Nothing came back."))
     else:
         answers.outcome(done.answer)
         st.markdown(answers.prose(done.answer.text))

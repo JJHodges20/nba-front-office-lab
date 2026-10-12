@@ -24,8 +24,6 @@ SUBJECTS = ("Team", "Built roster")
 SUBJECT = "fit_subject"
 ROSTER = "fit_roster"
 TEST = "fol fit test --write"
-OUT_OF_DATE = ("Out of date", ":material/schedule:", "orange")
-NOTE = ("Note", ":material/info:", "blue")
 IDENTITY = {
     "player_name": st.column_config.Column("Player", width="medium", pinned=True),
     "team": "Team",
@@ -73,13 +71,13 @@ def render() -> None:
 def _notices(status: FitStatus) -> None:
     if not status.is_gathered:
         components.tagged(
-            NOTE,
+            components.NOTE,
             "No fit evidence has been gathered yet, so the profile is description only. "
             f"To test whether fit adds anything to the sum of the parts: {TEST}",
         )
     elif not status.is_current:
         components.tagged(
-            OUT_OF_DATE,
+            components.OUT_OF_DATE,
             f"The evidence on file was gathered against value model {status.value_model_version} "
             f"and roles {status.archetype_version}; the database was built with "
             f"{status.applied_value_version} and {status.applied_archetype_version}. Run: {TEST}",

@@ -3,6 +3,72 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## UI polish P3 - shared components: tiles that wrap, one look per tag, deletes that ask (2026-10-11)
+
+The pieces every page shares, made once. No number, calculation, model, data source or
+page address changed.
+
+**Found first**, every page measured in a browser at four sizes: 36 places where text was
+cut off. At 1024px the headline tiles on six pages were cut to 103px, and four sets of
+choices ran out of their space - the simulator's *Regression* could not be reached at all;
+on a phone the same four. A segmented control wraps on a row of its own (Player Explorer's
+columns) but not inside columns or beside other controls, where all four stood. Deleting
+was drawn three ways: behind a tick box (a roster), behind a tick box as the green main
+button (a workspace), and on one click (a finding, an experiment proposal). "Note" came in
+three colours, and "Out of date" was written out in four views.
+
+**The owner's decisions** (2026-10-11), from before-and-after screenshots
+(`data/ui-polish/screenshots/p3-options/`): tiles that wrap, with a second set of style
+rules (D8); every delete asks first (D9); Modeled stays green (D3: all seven badge colours
+are taken, and the swap tried left *Your assumption* at 4.29:1 on the dark page); no group
+label on the page (D7: built above and beside the title, it had to clear the top bar and
+pushed every page down about 60px).
+
+**Built**
+
+- **Tiles that wrap.** `components.figures` draws each row in a container keyed `tiles-N`,
+  or `tiles-wide-N` for a row of four or fewer, counted afresh each run from
+  `components.new_page()` in the frame. `wb/style.css` lays such a row out as a grid: as
+  many equal tiles as fit, at least 11rem wide in a row of five and 14rem in a row of four
+  or fewer. Five stay across at 1440 and 1366px, as before; 1024px gives three and two; a
+  phone gives two a row for rows of five and one for the rest. Without the rules the rows
+  are Streamlit's columns, as before.
+- **Choices that fit.** Benchmarks' seasons, the Optimizer's budget, and the simulator's
+  games missed and development are dropdowns.
+- **Deletes that ask.** `components.confirmed_button` stays off until its box is ticked
+  and is never the page's primary button: deleting a roster, a workspace, a finding and an
+  experiment proposal, and clearing a workspace's history. A finding's and a proposal's sit
+  in a *Delete* popover beside *Edit*.
+- **One look per tag.** `NOTE` (blue), `CHECK` (orange), `OUT_OF_DATE` and `NO_ANSWER` are
+  written once in `components.py`. Team Builder's broken rules read *Check*; the optimizer's
+  reasons and an answer's notes are blue *Notes*.
+- **Found on the way:** a note written as a docstring under a constant in `app.py` was drawn
+  above every title by Streamlit's "magic" (a bare string in the main script is put on the
+  page). It became a comment, and a test keeps bare expressions out of `app.py`.
+- **Looked at and kept:** the tiles' number size, the button corners, the table colours and
+  alignment (DESIGN_SYSTEM.md section 4). Section headings are left to the pages, P5 and P6.
+- **Documents:** DESIGN_SYSTEM.md sections 4, 5, 9 (three rules) and 10; CLAUDE.md's rules
+  on tags, `app.py`, deletes, segmented controls and tiles; the user's guide on tiles and
+  deletes; the audit's D3, D7, D8, D9 and F21; this roadmap's phase table.
+
+**Left for later:** two tiles whose note is longer than a tile holds - the simulator's
+*Payroll* and Data Health's *Last build* - trim it at 1366px, as before, and now on a phone
+too (F21, P6); the Analytics Lab's three tiles are not yet drawn by `components.figures`
+(F13, P5).
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New and changed tests | `test_components.py`: tile rows named for the grid, and the same names next run; one icon and one colour per tag word, the shared tags written once; a delete off until its box is ticked; no page with a plain Delete or Clear button. `test_app.py`: a page's tile rows named afresh each run; nothing in `app.py` that Streamlit would draw by itself. `test_style.py`: the three new rules. `test_research_page.py`: a finding's and a proposal's delete off until ticked (changed for the owner's decision) |
+| `tests/ui`, mid-phase | 736 passed |
+| `pytest -n auto`, once at the gate | 3,967 passed (4 min 34 s); at P2, 3,961 |
+| Cut-off text, every page at four sizes | 36 places before, 8 after, all known (F21, F13); no set of choices cut anywhere |
+| The P3 changes in a browser, dark and light | 9 checks in each theme, all passed: Benchmarks' seasons narrow the page (892 to 300 team-seasons); the Optimizer's budget takes *First apron*; a healthy season moves the simulator's projected wins (44 to 45) and *Regression* can be chosen; a roster's delete, a workspace's delete (now a plain button) and clearing its history each off, on once ticked, off again; no error. Nothing was deleted. The copy holds no finding: its delete is held by the page test |
+| The pages in a browser | The P0 set taken again (`data/ui-polish/screenshots/p3/`, 100 shots under the same names, both themes, four sizes), no page with an error. Compared with P2: at 1024px rows of five tiles as three and two with their numbers whole, and on a phone two a row; the four sets of choices that were cut off as dropdowns; Team Builder's broken rules tagged *Check*. Everything else as at P2 |
+| Boundaries and data | `components.py`, the frame, the style rules, nine views, the answers and the dialog: their tiles, tags, choices and deletes; no service, model, chart builder or data touched; the browser pass read the disposable copy |
+
 ## UI polish P2 - the frame: a top bar, the filters in view, one form for messages (2026-10-11)
 
 The frame every page sits in, made to the owner's choices. The pages, their groups,

@@ -42,7 +42,6 @@ EDITS = "sim_edits"
 NAME, SAVE, SAVED = "sim_name", "sim_save", "sim_saved"
 COUNTS = (2_000, 5_000, 10_000, 20_000)
 FIT = "fol simulate fit --write"
-OUT_OF_DATE = ("Out of date", ":material/schedule:", "orange")
 SIDES = {"before": "Before", "after": "After"}
 PLAYOFFS, TITLE = probability_key("made_playoffs"), probability_key("won_championship")
 STATUS_WORDS = {KEPT: "Kept", ADDED: "Added", REMOVED: "Removed"}
@@ -94,7 +93,7 @@ def render() -> None:
 def _notices(status: SimulatorStatus) -> None:
     if not status.is_current:
         components.tagged(
-            OUT_OF_DATE,
+            components.OUT_OF_DATE,
             "The simulator's parameters were measured against value model "
             f"{status.value_model_version}; the database was built with "
             f"{status.applied_value_version}. Run: {FIT}",
@@ -184,22 +183,22 @@ def _changes(
             help="Signings, or the players coming back in a trade: anyone with a projection "
             f"for {status.upcoming}.",
         )
+        # Lists, not rows of buttons: the choices' names do not fit half a narrow window, and
+        # one was out of reach at 1024px (UI polish P3).
         three, four = st.columns(2)
-        availability = three.segmented_control(
+        availability = three.selectbox(
             "Games missed",
             list(AVAILABILITY_TITLES),
             format_func=AVAILABILITY_TITLES.get,
-            default=Availability.AS_PROJECTED.value,
-            required=True,
+            index=list(AVAILABILITY_TITLES).index(Availability.AS_PROJECTED.value),
             key=AVAILABILITY,
             help="\n\n".join(f"**{item.title}**: {item.description}" for item in Availability),
         )
-        development = four.segmented_control(
+        development = four.selectbox(
             "Development",
             list(DEVELOPMENT_TITLES),
             format_func=DEVELOPMENT_TITLES.get,
-            default=Development.EXPECTED.value,
-            required=True,
+            index=list(DEVELOPMENT_TITLES).index(Development.EXPECTED.value),
             key=DEVELOPMENT,
             help="\n\n".join(f"**{item.title}**: {item.description}" for item in Development),
         )

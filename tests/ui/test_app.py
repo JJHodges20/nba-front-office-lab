@@ -2,13 +2,32 @@
 
 from __future__ import annotations
 
+import ast
 from datetime import date
 from pathlib import Path
 
+from streamlit.testing.v1 import AppTest
+
 from front_office.services import Window
 from tests.helpers import BOS, TATUM
-from tests.ui.conftest import figures, texts
+from tests.ui.conftest import APP, figures, texts
 from wb import state
+
+
+def tile_rows(opened: AppTest) -> list[str]:
+    """The keys of a page's rows of headline tiles, in order: a keyed container's id ends with
+    its key ("$$ID-<hash>-<key>")."""
+    found: list[str] = []
+
+    def walk(node) -> None:  # type: ignore[no-untyped-def]
+        for child in getattr(node, "children", {}).values():
+            ident = getattr(getattr(child, "proto", None), "id", "") or ""
+            if "-tiles-" in ident:
+                found.append(ident.split("-", 2)[2])
+            walk(child)
+
+    walk(opened.main)
+    return found
 
 
 class TestFrame:
@@ -52,6 +71,31 @@ class TestFrame:
         opened = app(plain_home)
         links = [link.proto.label for link in opened.sidebar.get("page_link")]
         assert links == ["Data Health"]
+
+    def test_a_page_names_its_rows_of_tiles_afresh_each_run(self, app, plain_home: Path) -> None:
+        """UI polish P3: the frame starts each run's count, so a row of tiles keeps its name -
+        which the grid in wb/style.css hooks - from one run to the next."""
+        opened = app(plain_home)
+        first = tile_rows(opened)
+        assert first and first[0] == "tiles-0"
+        opened.run()
+        assert tile_rows(opened) == first
+
+    def test_the_frame_holds_nothing_streamlit_would_draw_by_itself(self) -> None:
+        """Streamlit draws a bare expression in the main script on the page ("magic"). At P3 a
+        string written as a note under a constant in app.py appeared above every title."""
+        tree = ast.parse(APP.read_text(encoding="utf-8"))
+        scopes = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+        bodies = [tree.body, *(node.body for node in ast.walk(tree) if isinstance(node, scopes))]
+        drawn = [
+            statement.lineno
+            for body in bodies
+            for position, statement in enumerate(body)
+            if isinstance(statement, ast.Expr)
+            and not isinstance(statement.value, ast.Call | ast.Await | ast.Yield | ast.YieldFrom)
+            and not (position == 0 and isinstance(statement.value, ast.Constant))
+        ]
+        assert drawn == []
 
     def test_before_any_data_it_says_how_to_get_some(self, app, project: Path) -> None:
         opened = app(project)

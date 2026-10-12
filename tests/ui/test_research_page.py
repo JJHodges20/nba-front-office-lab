@@ -410,6 +410,8 @@ def test_findings_are_saved_edited_and_deleted(model, page, home: Path) -> None:
     keyed(app.text_input, f"ai_f_title_{finding.finding_id}_").set_value("Renamed")
     app.button(key=f"ai_f_save_{finding.finding_id}").click().run()
     assert "Renamed" in texts(app)
+    assert app.button(key=f"ai_f_delete_{finding.finding_id}").disabled, "ticked first (P3)"
+    app.checkbox(key=f"ai_f_delete_ok_{finding.finding_id}").check().run()
     app.button(key=f"ai_f_delete_{finding.finding_id}").click().run()
     assert any(block.label == "Findings (0)" for block in app.status)
 
@@ -591,6 +593,8 @@ def test_an_experiment_is_drafted_and_kept_only_by_the_users_click(model, page, 
         assert (
             lab.workspaces.experiments(turn.workspace_id)[0].note == "Try it once the season ends."
         )
+    assert app.button(key=f"ai_x_delete_{record.experiment_id}").disabled, "ticked first (P3)"
+    app.checkbox(key=f"ai_x_delete_ok_{record.experiment_id}").check().run()
     app.button(key=f"ai_x_delete_{record.experiment_id}").click().run()
     with Lab(load_settings(home)) as lab:
         assert lab.workspaces.experiments(turn.workspace_id) == ()

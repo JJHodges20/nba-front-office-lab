@@ -78,6 +78,17 @@ STATES = {
     "absent": ("Not supplied", ":material/do_not_disturb_on:", "gray"),
 }
 
+# Tags that more than one page uses, each with one look wherever it appears (UI polish P3):
+# a page takes them from here instead of writing its own.
+NOTE = ("Note", ":material/info:", "blue")
+"""Something to know about what is shown."""
+CHECK = ("Check", ":material/warning:", "orange")
+"""Something to look at before relying on what is shown: a rule a roster breaks, a file's flag."""
+OUT_OF_DATE = ("Out of date", ":material/schedule:", "orange")
+"""A fitted file that no longer matches the data it is read with."""
+NO_ANSWER = ("No answer", ":material/error:", "red")
+"""A question that came back without an answer."""
+
 
 ROW = 34
 """Height of a table row in pixels."""
@@ -152,6 +163,20 @@ def alert(kind: AlertKind, message: str) -> None:
     draw(message, icon=icon)
 
 
+def confirmed_button(
+    label: str,
+    confirm: str,
+    *,
+    key: str,
+    confirm_key: str,
+    icon: str = ":material/delete:",
+) -> bool:
+    """A button for what cannot be undone, the same on every page (UI polish P3): it stays
+    off until its box is ticked, and it is never the page's main action. True when pressed."""
+    ticked = st.checkbox(confirm, key=confirm_key)
+    return st.button(label, key=key, icon=icon, disabled=not ticked)
+
+
 def source_word(source: str, state: str) -> str:
     """How a source's state is worded: a file is supplied, a feed is up to date."""
     if source == "contract_file" and state == "ok":
@@ -184,27 +209,42 @@ class Figure:
     """Recent values, oldest first, drawn as a small line under the figure."""
 
 
+TILE_ROWS = "_tile_rows"
+"""How many rows of tiles the page has drawn in this run, which names each row's container."""
+
+
+def new_page() -> None:
+    """Begin a page's run, so that its rows of tiles take the same names in every run."""
+    st.session_state[TILE_ROWS] = 0
+
+
 def figures(items: Sequence[Figure], *, per_row: int | None = None) -> None:
     """Headline numbers side by side, in rows of ``per_row`` where one row would crowd them.
 
     A tile cuts off text that does not fit, so figures with long values or long context
-    get fewer, wider tiles.
+    get fewer, wider tiles: ``per_row=3``. Each row is a grid (``wb/style.css``, UI polish
+    P3) that wraps its tiles in a narrow window instead of cutting them off: at least 11rem
+    each in a row of five or more, and 14rem in a row of four or fewer, which has the room.
     """
     size = per_row or len(items)
+    wide = "wide-" if size <= 4 else ""
     for start in range(0, len(items), size):
         row = items[start : start + size]
-        for column, item in zip(st.columns(size), row, strict=False):
-            column.metric(
-                item.label,
-                item.value,
-                delta=item.context,
-                delta_color="off",
-                delta_arrow="off",
-                help=item.help,
-                border=True,
-                chart_data=list(item.trend) if item.trend is not None else None,
-                chart_type="line",
-            )
+        count = st.session_state.get(TILE_ROWS, 0)
+        st.session_state[TILE_ROWS] = count + 1
+        with st.container(key=f"tiles-{wide}{count}"):
+            for column, item in zip(st.columns(size), row, strict=False):
+                column.metric(
+                    item.label,
+                    item.value,
+                    delta=item.context,
+                    delta_color="off",
+                    delta_arrow="off",
+                    help=item.help,
+                    border=True,
+                    chart_data=list(item.trend) if item.trend is not None else None,
+                    chart_type="line",
+                )
 
 
 def chart(
