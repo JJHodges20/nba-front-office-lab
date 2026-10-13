@@ -1,0 +1,44 @@
+/*
+ * The workbench's own style rules: what Streamlit's theme (.streamlit/config.toml) cannot
+ * set. Applied once per run by the frame through wb/style.py - never from a page. Each rule
+ * hooks a data-testid, which a Streamlit upgrade may rename; the rule then simply stops
+ * applying and the page looks as Streamlit draws it. docs/ui-polish/DESIGN_SYSTEM.md lists
+ * every rule and why; tests/ui/test_style.py keeps the two in step.
+ */
+
+/* UI polish P2: with the navigation in the top bar, Streamlit leaves 8rem above every page's
+   title (6rem on a phone). 2.5rem keeps the title clear of the bar and brings about 80px
+   more of each page into view on a desktop, about 50px on a phone (measured in a browser). */
+[data-testid="stMainBlockContainer"] {
+    padding-top: 2.5rem;
+}
+
+/* UI polish P3: headline tiles (components.figures, rows keyed "tiles-"). Streamlit's columns
+   never wrap, so in a narrow window five tiles were cut to 103px. As a grid they take as
+   many equal columns as fit, none narrower than 11rem - 14rem in a row of four or fewer
+   ("tiles-wide-") - and wrap the rest. Without these rules they are Streamlit's columns. */
+[class*="st-key-tiles-"] [data-testid="stHorizontalBlock"] {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+
+[class*="st-key-tiles-"] [data-testid="stColumn"] {
+    width: auto;
+    min-width: 0;
+}
+
+[class*="st-key-tiles-wide-"] [data-testid="stHorizontalBlock"] {
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+/* UI polish P8, the owner's decision D14: a focused sidebar link, top-bar menu or menu item
+   showed only a tint - in the light theme barely different from the page - where buttons,
+   boxes and tabs are ringed. CSS cannot tell which theme is on, so the ring is the dark
+   theme's brand green, which reads at 3:1 or more on both themes' pages and sidebars
+   (tests/ui/test_theme.py). Without this rule the tint is Streamlit's own. */
+[data-testid="stPageLink-NavLink"]:focus-visible,
+[data-testid="stTopNavSection"]:focus-visible,
+[data-testid="stTopNavDropdownLink"]:focus-visible {
+    outline: 2px solid #2f8556;
+    outline-offset: 2px;
+}

@@ -4,6 +4,10 @@ Every colour a chart uses comes from here, by role. The categorical order is fix
 is what keeps neighbouring series apart for colour-blind readers, so slots are assigned
 in sequence and never reordered or extended: a chart that needs more series than it can
 carry is the wrong chart. ``tests/ui/test_theme.py`` checks the separation numerically.
+
+The page's brand is a forest green (``brand``, ``link``; UI polish P1,
+``docs/ui-polish/DESIGN_SYSTEM.md``): it marks actions and selection, never data, so the
+charts keep their own accent and their categorical order.
 """
 
 from __future__ import annotations
@@ -43,33 +47,46 @@ class Palette:
     serious: str
     critical: str
     """Status colours. Reserved for state, and always shown with an icon and a label."""
+    brand: str
+    """The page's primary colour: primary buttons under a white label, and the selected tab,
+    toggle, slider and focus drawn straight on the page - so it must hold both, which is why
+    it is a mid forest green rather than a deep one. Never a chart colour."""
+    link: str
+    """Links in text: the brand, light enough to read as text on the page."""
+    wash_opacity: float
+    """How strong a wash is on this surface: enough to see an uncertainty band (UI polish P6
+    - at a tenth, the dark theme's band was all but invisible), weak enough to stay a wash."""
 
     @property
     def accent(self) -> str:
         """The first categorical hue: a single series, or the one that is the subject."""
         return self.series[0]
 
-    def wash(self, color: str, opacity: float = 0.10) -> str:
+    def wash(self, color: str, opacity: float | None = None) -> str:
         """``color`` as a translucent fill: an area under a line, never a solid block."""
         red, green, blue = (int(color[index : index + 2], 16) for index in (1, 3, 5))
-        return f"rgba({red},{green},{blue},{opacity})"
+        strength = self.wash_opacity if opacity is None else opacity
+        return f"rgba({red},{green},{blue},{strength})"
 
 
+# UI polish P4: the green, amber and pink a step darker, so every series reaches 3:1 on the
+# light surface (they were 2.74, 2.11 and 2.62), and the muted ink too, so 12px tick labels
+# reach the 4.5:1 of small text (it was 3.5). Hue kept; every separation still holds.
 LIGHT = Palette(
     mode="light",
     surface="#fcfcfb",
     plane="#f9f9f7",
     ink="#0b0b0b",
     ink_secondary="#52514e",
-    ink_muted="#898781",
+    ink_muted="#74726d",
     grid="#e1e0d9",
     axis="#c3c2b7",
     series=(
         "#2a78d6",
         "#eb6834",
-        "#1baf7a",
-        "#eda100",
-        "#e87ba4",
+        "#19a472",
+        "#c28400",
+        "#e46494",
         "#008300",
         "#4a3aa7",
         "#e34948",
@@ -81,17 +98,22 @@ LIGHT = Palette(
     warning="#fab219",
     serious="#ec835a",
     critical="#d03b3b",
+    brand="#1f6b45",
+    link="#1f6b45",
+    wash_opacity=0.15,
 )
 
+# Near-black with a trace of the forest in every neutral: the page, its cards, its text
+# and its lines. The series, the poles and the states are the same as before P1.
 DARK = Palette(
     mode="dark",
-    surface="#1a1a19",
-    plane="#0d0d0d",
-    ink="#ffffff",
-    ink_secondary="#c3c2b7",
-    ink_muted="#898781",
-    grid="#2c2c2a",
-    axis="#383835",
+    surface="#151b17",
+    plane="#0a0d0b",
+    ink="#f1f5f2",
+    ink_secondary="#a7b4a9",
+    ink_muted="#7f9084",
+    grid="#2a362e",
+    axis="#3a4a40",
     series=(
         "#3987e5",
         "#d95926",
@@ -102,13 +124,16 @@ DARK = Palette(
         "#9085e9",
         "#e66767",
     ),
-    deemphasis="#52514e",
+    deemphasis="#4e5e54",
     positive="#3987e5",
     negative="#e66767",
     good="#0ca30c",
     warning="#fab219",
     serious="#ec835a",
     critical="#d03b3b",
+    brand="#2f8556",
+    link="#79b391",
+    wash_opacity=0.25,
 )
 
 

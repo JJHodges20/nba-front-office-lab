@@ -2,13 +2,51 @@
 
 from __future__ import annotations
 
+import ast
 from datetime import date
 from pathlib import Path
 
+from streamlit.testing.v1 import AppTest
+
 from front_office.services import Window
 from tests.helpers import BOS, TATUM
-from tests.ui.conftest import figures, texts
+from tests.ui.conftest import APP, figures, texts
 from wb import state
+
+GROUPS = ("League", "Explore", "Build", "Forecast", "Ask", "System")
+PAGE_TITLES = (
+    "League Overview",
+    "Winning Benchmarks",
+    "Player Explorer",
+    "Player Value",
+    "Team Explorer",
+    "Contract Explorer",
+    "Analytics Lab",
+    "Team Builder",
+    "Roster Fit",
+    "Roster Optimizer",
+    "Postseason Outlook",
+    "Scenario Simulator",
+    "AI Research",
+    "Data Health",
+)
+"""The navigation's pages in its order: the top bar's, and the sidebar's fold of them."""
+
+
+def tile_rows(opened: AppTest) -> list[str]:
+    """The keys of a page's rows of headline tiles, in order: a keyed container's id ends with
+    its key ("$$ID-<hash>-<key>")."""
+    found: list[str] = []
+
+    def walk(node) -> None:  # type: ignore[no-untyped-def]
+        for child in getattr(node, "children", {}).values():
+            ident = getattr(getattr(child, "proto", None), "id", "") or ""
+            if "-tiles-" in ident:
+                found.append(ident.split("-", 2)[2])
+            walk(child)
+
+    walk(opened.main)
+    return found
 
 
 class TestFrame:
@@ -35,11 +73,59 @@ class TestFrame:
     def test_an_imported_contract_file_is_reported_as_supplied(
         self, app, contract_template: Path
     ) -> None:
+        """UI polish P2: a source that needs nothing done is its state in a word, with what
+        lies behind it - the file's own description - on hover. A source that needs something
+        done keeps its line under the badge (the test above)."""
         opened = app(contract_template)
-        sidebar = "\n".join(element.value for element in opened.sidebar.markdown)
-        assert "Contract file: supplied" in sidebar
+        (badge,) = [
+            element
+            for element in opened.sidebar.markdown
+            if "Contract file: supplied" in element.value
+        ]
+        assert "invented for tests" in badge.proto.help
         captions = "\n".join(caption.value for caption in opened.sidebar.caption)
-        assert "invented for tests" in captions
+        assert "invented for tests" not in captions, "said once, on hover"
+
+    def test_the_data_status_links_to_data_health(self, app, plain_home: Path) -> None:
+        opened = app(plain_home)
+        links = [link.proto.label for link in opened.sidebar.get("page_link")]
+        assert links[0] == "Data Health"
+
+    def test_every_page_is_folded_at_the_foot_of_the_sidebar(self, app, plain_home: Path) -> None:
+        """UI polish P8 (decision D13): Streamlit draws an open top-bar menu after everything
+        on the page, so its pages came last in the keyboard's order. The sidebar folds every
+        page, in the navigation's groups and order, under the data status."""
+        opened = app(plain_home)
+        assert "All pages" in [block.label for block in opened.sidebar.status]
+        links = [link.proto.label for link in opened.sidebar.get("page_link")]
+        assert links == ["Data Health", *PAGE_TITLES]
+        groups = [caption.value for caption in opened.sidebar.caption][-len(GROUPS) :]
+        assert groups == list(GROUPS)
+
+    def test_a_page_names_its_rows_of_tiles_afresh_each_run(self, app, plain_home: Path) -> None:
+        """UI polish P3: the frame starts each run's count, so a row of tiles keeps its name -
+        which the grid in wb/style.css hooks - from one run to the next."""
+        opened = app(plain_home)
+        first = tile_rows(opened)
+        assert first and first[0] == "tiles-0"
+        opened.run()
+        assert tile_rows(opened) == first
+
+    def test_the_frame_holds_nothing_streamlit_would_draw_by_itself(self) -> None:
+        """Streamlit draws a bare expression in the main script on the page ("magic"). At P3 a
+        string written as a note under a constant in app.py appeared above every title."""
+        tree = ast.parse(APP.read_text(encoding="utf-8"))
+        scopes = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+        bodies = [tree.body, *(node.body for node in ast.walk(tree) if isinstance(node, scopes))]
+        drawn = [
+            statement.lineno
+            for body in bodies
+            for position, statement in enumerate(body)
+            if isinstance(statement, ast.Expr)
+            and not isinstance(statement.value, ast.Call | ast.Await | ast.Yield | ast.YieldFrom)
+            and not (position == 0 and isinstance(statement.value, ast.Constant))
+        ]
+        assert drawn == []
 
     def test_before_any_data_it_says_how_to_get_some(self, app, project: Path) -> None:
         opened = app(project)

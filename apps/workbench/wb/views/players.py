@@ -361,14 +361,15 @@ def _percentile_profile(filters: Filters, row, ranks, catalog, palette) -> None:
 def _trend(filters: Filters, row, catalog, palette) -> None:  # type: ignore[no-untyped-def]
     st.markdown("**Form over the season**")
     keys = [key for key in TRENDS if key in catalog]
-    pick, span = st.columns(2, vertical_alignment="bottom")
-    key = pick.selectbox(
+    # One above the other: side by side in this column, at 1024px the choice of 20 games
+    # was cut off (UI polish P5).
+    key = st.selectbox(
         "Metric",
         keys,
         format_func=lambda option: catalog[option].name,
         key="player_trend_metric",
     )
-    games = span.segmented_control(
+    games = st.segmented_control(
         "Trailing games", [5, 10, 20], default=10, required=True, key="player_trend_games"
     )
     rolling = data.player_rolling(

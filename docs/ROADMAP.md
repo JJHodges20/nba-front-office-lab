@@ -85,6 +85,25 @@ Lettered so as not to clash with the milestones above; each passes the same gate
 | A8 | Research proposals | Experiments for the models, written up, never applied | Done (2026-10-11; drafted only when asked, for the four tested models: the assistant's idea in words beside the lab's own test from each model's file and decision; kept by the user's click in the workspace's own list, or downloaded; nothing applied, the model files checked byte for byte; 48/59 end to end, and the experiment questions drafted when and only when asked, 8/8) |
 | A9 | Release audit | Every test, the evaluation, failure and offline runs, documentation | Done (2026-10-11; the suite's rare stall traced to the optimizer's solver called from threads in turn, and every solve put on one thread; *Stop* honoured as soon as a reply comes back; a damaged research file said in plain words and set aside on request, never deleted; questions about meanings or for a verdict sent back to the lab's tools; the network audited against the source register and the suite held to this machine; 49, 49 and 47 of 59 end to end, no unsupported figure shown, calls valid 93% against 98%; a working session of twenty questions timed twice; install, recovery and known limits in the release notes) |
 
+## UI polish: Dark Forest (P0-P8)
+
+The whole workbench made into one near-black, forest-green analytical workspace, its
+navigation, numbers, data and behaviour unchanged. The plan is the user's *Dark Forest UI
+Modernization* roadmap; the record is [ui-polish/BASELINE_AUDIT.md](ui-polish/BASELINE_AUDIT.md)
+and [ui-polish/DESIGN_SYSTEM.md](ui-polish/DESIGN_SYSTEM.md). Each phase stops for review.
+
+| # | Phase | Deliverable | Status |
+| --- | --- | --- | --- |
+| P0 | Audit | Baseline: pages, tests, screenshots, findings, decisions, the P1 plan | Done (2026-10-11; 100 screenshots in both themes at four sizes, 19 findings, nothing changed) |
+| P1 | Tokens | The forest-green brand and the near-black neutrals in the palette and the page theme, with tests | Done (2026-10-11; the owner's decisions: both themes kept, Dark chosen once in the menu; `#2f8556` / `#1f6b45` for actions, never for data) |
+| P2 | Shell | Navigation, filters, headers, empty states | Done (2026-10-11; the owner's choices: the navigation in a top bar, so the filters are always in view - same groups, pages, order and addresses - and one style rule, the space above titles; the sidebar closed on a phone; a quieter data status with a link to Data Health; one form for every message) |
+| P3 | Shared components | Tiles, tags, tables, controls | Done (2026-10-11; the owner's choices: headline tiles that wrap instead of being cut off, every delete asking first, Modeled kept green, no group label; dropdowns where choices were cut off; one look per tag) |
+| P4 | Charts | Chart styling in the new theme, the theme detection | Done (2026-10-12; every chart measured at three widths: cap-line names on three rows and their lines a step above the grid, long axis titles on two lines, names and intervals kept off the edge, dates that slant when crowded; the light theme's three faint series and its tick labels darker; the theme-switch lag and the filled chart panels kept, with reasons) |
+| P5 | League and Explore pages | Page-by-page polish | Done (2026-10-12; the seven pages reviewed whole, with and without a team and a player chosen: Analytics Lab's header and tiles in the common pattern; Benchmarks' column labels on two levels; the form charts' controls stacked; Player Value's player row three a row; two long chart titles shortened; every chart's table view headed in words) |
+| P6 | Build, Forecast and System pages | Page-by-page polish | Done (2026-10-12; the six pages reviewed whole in three states, and the optimizer run and a roster saved on a throwaway copy: the chance curve's uncertainty band drawn at last, and visible in the dark theme; every Roster Fit tab says what it needs; long tile notes moved or given room) |
+| P7 | The assistant's surfaces | AI Research and *Ask AI about this* | Done (2026-10-12; checked live with the local model on a throwaway copy at four sizes: the conversation starts about 200px higher - the shelves one fold, the mode by the question box; a running question shows a spinner, not a tick; evidence names its kinds; each proposed roster says waiting, saved or declined; each figure once in an answer's rows; code out of the state green; folds and popovers that stay open while the page changes; the docked panel left out, decision D12) |
+| P8 | Accessibility and final audit | Keyboard, zoom, every size, the full regression | Done (2026-10-12; nothing cut at six widths, zoom included; no error or empty tab in three states; every check by keyboard works, but the top bar's pages came last in its order (F31) and links showed a faint focus mark (F32); the owner chose both fixes on 2026-10-13 - an *All pages* fold in the sidebar and a green focus ring - and new README screenshots; the final audit and the release checklist written) |
+
 ## Completion gate for every milestone
 
 - Targeted automated tests pass.

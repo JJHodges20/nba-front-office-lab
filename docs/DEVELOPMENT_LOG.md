@@ -3,6 +3,499 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## UI polish P8, the owner's choices - a keyboard path, focus rings, new screenshots (2026-10-13)
+
+At P8's gate the owner chose the two fixes it left open, and new screenshots for the README,
+all before the push (decisions D13 and D14).
+
+**Built**
+
+- **All pages** (D13, finding F31): at the foot of the sidebar, under the data status, a fold
+  - closed, keyed - listing every page in its group from the navigation's own list
+  (`app.all_pages`), so a new page joins it by itself. A keyboard reaches it the stop after
+  *Data Health*, and a page three presses in, on any page; the top bar is unchanged.
+- **Focus rings** (D14, F32): the fifth style rule rings a focused sidebar link, top-bar menu
+  or menu item 2px in `#2f8556`. CSS cannot tell which theme is on (Streamlit sets no theme
+  marker or colour variable), so the ring is the dark theme's brand, which reads at 3:1 or
+  more on both themes' pages and sidebars.
+- **The README's nine screenshots**, the same views in the new dark look, taken from a copy of
+  the data rebuilt without the contract file (`data/ui-polish/workbench-data-readme`; the
+  build's own guard against emptying the contract tables was overridden on that copy only),
+  so no salary or payroll figure is published - none was in the old ones. The AI Research
+  image is a fresh Quick answer from the local model, the second of two asked: the first left
+  out the interval, which the checker noted.
+- **Documents**: DESIGN_SYSTEM.md sections 8, 9 and 11; FINAL_AUDIT.md and the release
+  checklist (D13, D14 and the screenshots decided); the audit's F31, F32, D13 and D14;
+  WORKBENCH.md's keyboard note; CLAUDE.md.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New and changed tests | `test_app.py`: every page folded at the foot of the sidebar, in the navigation's groups and order (new); the data status's link first. `test_style.py`: the fifth rule, and selectors compared with their spaces made single. `test_theme.py`: the ring is the dark brand and reads at 3:1 on both themes' pages and sidebars (new) |
+| `pytest -n auto`, once at the gate | 3,986 passed (4 min 36 s); at P8, 3,983 |
+| In a browser, both themes | *All pages* reached the stop after *Data Health*, opened with Enter, Player Explorer reached three presses in and opened; a green ring on the *Data Health* link, the fold, a link in it, a top-bar menu and a menu item; the fold closed and open at 1440, and on a phone, where it repeats Streamlit's own page list, closed |
+| The README's images | Each of the nine looked at: the same view as before, "Contract file: not supplied" in every sidebar, the simulator's payroll a dash |
+| Boundaries and data | `app.py`, `style.css`, three test files and documents; the rebuild and the two questions ran on throwaway copies, never the lab's data |
+
+## UI polish P8 - accessibility, every size, the final audit (2026-10-12)
+
+The last phase of the polish: the whole workbench measured on the final code, and the
+handoff written. No code changed; two findings and two decisions are left to the owner.
+
+**Found.**
+
+- **The top bar's pages are last in the keyboard's order** (finding F31): Enter opens a menu,
+  but Streamlit draws the open menu after everything else on the page, so its pages came
+  after 16 and 25 presses of Tab on the pages tried; Tab from a menu moves to the next menu,
+  and the arrow keys do nothing there. Before P2 the sidebar's page list came first. Every
+  page can still be reached, and its address typed.
+- **Faint focus marks on links** (F32): a focused button, dropdown, box, tab or download is
+  ringed in green in both themes, but a sidebar link or a menu item shows only a tint - in
+  the light theme barely different from the page - and a top-bar menu a grey outline.
+- **At 150% zoom** (960px wide with the sidebar open) the top bar holds five menus and folds
+  *System* into "1 more", Streamlit's own overflow, which opens it. Nothing else changed
+  between the sizes.
+- Held: nothing cut on any page or tab at six widths; no error and no empty tab in three
+  states; the first run and an unreachable assistant say plainly what to do.
+
+**Decided for the owner, not built**: D13, a short *All pages* list in the sidebar for the
+keyboard (or the guide's note alone); D14, one more style rule ringing a focused link in the
+brand green. A change to the navigation and a new style rule are the owner's to choose
+(decision D4; DESIGN_SYSTEM.md section 9).
+
+**Written**
+
+- `docs/ui-polish/FINAL_AUDIT.md`: what changed from P0 and what did not, every finding's
+  outcome (F1-F32), the decisions, the accessibility measured, the screenshots, the limits.
+- `docs/ui-polish/RELEASE_CHECKLIST.md`: what to decide, look at, test and check before the
+  branch is pushed, and how to undo a phase.
+- DESIGN_SYSTEM.md section 11 (keyboard and zoom); WORKBENCH.md, how to use the workbench by
+  keyboard and reach a page by its address; the README, the top bar and the themes.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| `pytest -n auto`, once at the gate | 3,983 passed (4 min 27 s), as at P7: P8 changed no code |
+| Cut-off text and controls | Every page and tab, a team and a player chosen, at 1440, 1366, 1024 and 390px, and at 1152 and 960 (125% and 150% zoom of a 1440px window): nothing cut. AI Research and its dialog at both zoom sizes: nothing under the question box, nothing too wide |
+| Errors and empty tabs | Every page and tab with nothing chosen, a team and a player chosen, and the oldest season: none |
+| The keyboard, both themes | Tab order, focus marks, a page from the top bar, a team typed into the sidebar, tabs by the arrows, the dialog opened and closed, a download by Enter - all work; F31 and F32 as above |
+| Edge states in a browser | No data at all, and the assistant unreachable (a copy of `configs/` pointed at an empty local port - the owner's Ollama untouched): both say what to do, in both themes and on a phone, with no error |
+| Against P0 | Every page at 1440x900 in both themes beside its P0 screenshot (`data/ui-polish/screenshots/p8-final/compare-*.png`) |
+| Boundaries and data | Documents only; the browser passes read the photo copy and the throwaway copy, never the lab's data |
+
+## UI polish P7 - the assistant's surfaces (2026-10-12)
+
+AI Research and the *Ask AI about this* dialog, photographed before and after at four window
+sizes, and used live with the local model (qwen3:8b through Ollama) on a throwaway copy of
+the test data (`data/ui-polish/workbench-data-p7`): seven questions - five on the page and
+two from the dialog - a roster saved and another declined, the server restarted. No answer,
+tool, model, approval or stored record changed.
+
+**Found.**
+
+- **The conversation started far down the page** (finding F9): seven bands of controls came
+  first, and the first question began 608px down a 1440x900 window - below the fold at
+  1024x768 (803px) and on a phone (1,026px).
+- **A question under way showed a tick** (F27): a fragment draws the box with its steps
+  again each second inside a `with` block, and leaving one marks Streamlit's status box
+  complete - on the page and in the dialog alike.
+- **File paths in an answer's evidence were green** (F26): Streamlit prints code in the green
+  of a good state unless told otherwise, so they read like links.
+- **A comparison's rows showed each figure twice** (F28): "fg_pct, 0.467 ... Field goal
+  percentage ... 46.7%", and percentiles to three decimals.
+- **Folds and popovers closed under the user** (F30): a finding's or an experiment's *Delete*
+  popover closed as its box was ticked whenever the line saying what the last action did had
+  just gone - everything below moves up a place, and an unkeyed popover is then a new one
+  (since P3). And the new shelf, first built with counts in its labels, closed when a roster
+  was declined on it.
+- Held already: nothing sat under the question box at any size, nothing was wider than the
+  window, and one question ran at a time across the page and the dialog.
+
+**Built**
+
+- **AI Research's top**: a two-line subtitle; the three shelves one fold - "In this
+  workspace: Findings (n) · Proposed rosters (n, k waiting) · Experiment proposals (n)" - with
+  a tab for each; the mode, *New conversation*, *Fetch current information* and what a fetch
+  did under the conversation, by the question box. The first question now starts 411px down
+  at 1440x900, 451 at 1366x768, 585 at 1024x768 - above the question box - and 754 on a phone.
+- **What stays open**: the shelf's fold and tabs keyed, the tabs named without counts (on a
+  phone the three names now fit one row); every popover below the line that says what the
+  last action did keyed.
+- **A question under way** (`answers.under_way`, shared by the page and the dialog): a
+  spinner, the box written into without a `with` block.
+- **The answer**: the evidence's fold names the kinds of source ("Evidence: 3 sources · the
+  lab's data, the web") and each source is led by its kind's icon; a result's raw value and a
+  metric's key are left to the CSV where the lab's written form and the metric's name stand
+  beside them; a percentile written as every page writes one.
+- **Rosters to review**: each card leads with *Waiting*, *Saved* ("In the Team Builder as
+  ...") or *Declined*, the last looking as a declined answer does.
+- **The dialog**: the assistant's icon in its title. **The theme**: code is the secondary ink
+  in both themes (`codeTextColor`).
+- **Documents**: DESIGN_SYSTEM.md sections 2 and 7; the audit's F9, F22 and F26-F30 and
+  decision D12; WORKBENCH.md's AI Research; CLAUDE.md.
+
+**Considered and left**: a docked assistant panel beside a page (the roadmap's P7, task 3) -
+Streamlit draws a dialog only as a centred modal, and a panel would need HTML and CSS of the
+lab's own or the sidebar, which holds the filters (decision D12); the result tabs under an
+answer, which a phone scrolls sideways (F22); the avatars' column, which indents a phone's
+messages about 50px - Streamlit's chat layout, with no setting.
+
+**Seen, for the owner** (F29): asked from Team Explorer which team had the best defense, the
+model read only the Celtics' figures and wrote that their defensive rating "ranked 1st in the
+league"; the result said 4th of 30, and held a "1st of 30" for points allowed. The answer
+checker took out another figure and marked the answer *Partly answered*, but the place
+stood. That is the assistant's checking, not the polish: a later milestone, through its
+evaluation.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New and changed tests | `test_research_page.py`: the conversation comes before the mode and its buttons, and the shelves are one fold (new); a question under way is shown running; the evidence's fold names its kinds and each source leads with its icon; each roster card says waiting, saved or declined, under its answer and on the shelf; each figure once in the lab's words, a percentile as the pages write one (new); a shelf counted on the fold's label, with a tab whose name never changes. `test_theme.py`: code is the secondary ink, never green (new) |
+| `pytest -n auto`, once at the gate | 3,983 passed (4 min 39 s); at P6, 3,979 |
+| Live, with the local model, on the throwaway copy | Questions under way and answered at 1440, 1366, 1024 and 390px, nothing under the question box; three rosters proposed, Option B saved and Option C declined - the copy then held A waiting, B saved as roster 2, C declined, the approvals "saved, declined", and in the Team Builder only the saved one besides the copy's own; the history the same after a server restart; two questions from the dialog, at 1440 and 390, kept in the workspace open on AI Research and reached by *Open in AI Research*. Ollama's request log counted 2, 2, 2, 2, 4, 3 and 4 chat requests for the seven questions: for each, the number of model steps it recorded - three were sent back once or twice by the answer checker, as designed - and opening AI Research after the dialog's answer asked nothing more. With the shelf open on *Proposed rosters*, a finding saved under an answer left it open on that tab; on *Findings*, a delete's popover stayed open after its tick, and the delete left the fold open where it was |
+| The pages in a browser | AI Research and the dialog before and after (`data/ui-polish/screenshots/p7-before/`, `p7-after/`): the top, the end and the first 2,600px at 1440x900, 1366x768, 1024x768 and 390x844 in the dark, at 1440 and 390 in the light; answers with their folds open; each live step photographed |
+| Boundaries and data | `answers.py`, `ask.py`, `research.py` and `.streamlit/config.toml`; no service, tool, model or stored record changed; the live questions, the save and the decline ran on the throwaway copy, never the lab's data |
+
+## UI polish P6 - the Build, Forecast and System pages (2026-10-12)
+
+Team Builder, Roster Fit, Roster Optimizer, Postseason Outlook, Scenario Simulator and Data
+Health, reviewed whole in three states - nothing chosen, a team and a player chosen, the
+oldest season - and, on a throwaway copy of the test data
+(`data/ui-polish/workbench-data-p6`), the optimizer run and one of its rosters saved, so a
+full roster could be seen in Team Builder. No figure, model or action changed.
+
+**Found.** Team Builder, the Optimizer and Data Health already kept what you set apart from
+what comes of it. Three things did not hold:
+
+- **The chance curve's uncertainty band was never drawn** (finding F25). Postseason Outlook
+  says "the band is the 95% interval" under it; its SVG, read in a browser, held an empty
+  fill. The band's edges were traces with no line, so Plotly placed the lower edge nowhere
+  and filled to nothing. The tests had checked the figure's settings, which were right.
+  And a 10% wash would have been all but invisible on the dark chart besides.
+- **Roster Fit, with no team chosen, drew three empty tabs** under one note above them
+  (F14). Postseason Outlook already said it inside its tab.
+- **Long tile notes** (F21): the simulator's payroll ("was $205.1M, 5 unpriced") and its
+  evidence row, and Data Health's last build, cut at 1366px and below.
+
+**Built**
+
+- `charts.band_line`: the band's edges are lines of no width; the wash is a palette role,
+  `wash_opacity`, 0.15 light and 0.25 dark. The band now shows in both themes.
+- Roster Fit: `_subject` returns the report or why there is none (`Absent`), and each tab
+  that needs a subject says so in itself; *The evidence* needs none.
+- The simulator says under its tiles how many players the payroll leaves out; its evidence
+  row and Data Health's row three a row.
+- **Kept**: Data Health without provenance tags - they say where basketball figures come
+  from, and its figures are the lab's own build's (F13).
+- **Documents**: DESIGN_SYSTEM.md section 6; the audit's F13, F14, F21 and F25; this
+  roadmap's phase table.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New and changed tests | `test_theme.py`: an uncertainty band can be seen in both themes and stays a wash; the wash's strength per theme. `test_charts.py`: the band's edges are lines of no width (they had been "none"); the house rule that drawn lines are 2px leaves out those undrawn edges. `test_fit_page.py`: each tab that needs a subject says what is missing |
+| `pytest -n auto`, once at the gate | 3,979 passed (4 min 29 s); at P5, 3,976 |
+| Cut-off text and empty tabs | A scan of the six pages at 1440, 1366, 1024 and 390px, a team and a player chosen, found nothing cut but the phone tab rows (F22); every tab opened with nothing chosen and in the oldest season drew with no error and no empty tab |
+| The pages in a browser | Every tab of the six pages photographed whole before and after (`data/ui-polish/screenshots/p6-before/`, `p6-after/`), dark at 1440px with a team and a player chosen, Roster Fit and Postseason Outlook with nothing chosen too, and Postseason Outlook in light; the chance curve's band read before and after in both themes; on the throwaway copy, the optimizer run and its first roster saved and opened in Team Builder |
+| Boundaries and data | `charts.py`, `theme.py` and three views; no service, model or data touched; the optimizer and the roster save ran on a throwaway copy, never the lab's data |
+
+## UI polish P5 - the League and Explore pages, one by one (2026-10-12)
+
+League Overview, Winning Benchmarks, Player Explorer, Player Value, Team Explorer, Contract
+Explorer and Analytics Lab, reviewed whole, every tab, in a window tall enough to hold
+each page, and measured at four widths with a team and a player chosen as well as without.
+No figure, calculation, page address or action changed. The owner granted P5 to P8 in one
+run, each stage committed when its gate passes and nothing pushed without asking.
+
+**Found.** League Overview, Player Explorer and Contract Explorer needed nothing at 1440. A
+scan with a team and a player chosen - every earlier scan had neither - found what only
+they bring: on Team Explorer and Player Explorer the form chart's *Trailing games* cut off
+the choice of 20 at 1024px, and Player Value's row for the chosen player cut "Wins above
+replacement" at every width, 1440 included (finding F24). Analytics Lab put its tags under
+its Study control and its three numbers in a fifth of the page, where at 1024px they were
+cut (F13). Benchmarks' fourteen column labels ran together at 1024px, and two axis titles
+of over fifty characters ran past a phone's chart (F23). Every chart's table view headed
+its columns with their own names, such as `team_name`, and in a narrow column its
+"Interactive chart (HTML)" button was cut.
+
+**Built**
+
+- **Analytics Lab**: the study is read before its control is drawn, so the kinds of number
+  stand under the title, as on every page; the three numbers are a row of tiles above a
+  chart that now takes the page's width.
+- **Benchmarks**: from nine columns, a column chart's labels take turns on two levels
+  (`charts.STAGGER_FROM`), the band and its count kept; *What separates them* titled "How
+  often it had the better value" (the caption says who "it" is).
+- **Team and Player Explorer**: the form chart's *Metric* and *Trailing games* one above
+  the other.
+- **Player Value**: the chosen player's tiles three a row; the model's chart titled
+  "Model's miss less the method's, in points", the page's own word for its error.
+- **Every chart's table view** (`components.chart`): columns headed in words - a metric by
+  its stat-sheet label with its meaning on hover, the rest from `components.heading` - and
+  the HTML export labelled *Chart (HTML)*, with a tooltip. The CSV keeps the columns' names.
+- **Documents**: DESIGN_SYSTEM.md sections 6 and 10; CLAUDE.md on looking with a team and a
+  player chosen; the audit's F13, F23 and F24; this roadmap's phase table.
+
+**Considered and left**: marking the sidebar's team in League Overview's standings - the
+table's Styler would have to carry a row style the data grid may not draw; the 3:2 split of
+the explorers' profile row, which at 1024px leaves the form chart narrow but now whole.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New and changed tests | `test_charts.py`: from nine columns the labels take two levels, fewer keep one. `test_components.py`: a chart's table view headed in words, a metric by its label; the two export buttons; `heading` |
+| `pytest -n auto`, once at the gate | 3,976 passed (4 min 45 s); at P4, 3,974 |
+| Cut-off text, every page and tab, team and player chosen | Before: at 1024px both form charts' *Trailing games*, Analytics Lab's three tiles and the HTML export in narrow columns; Player Value's player row at every width. After: nothing on the seven pages at 1440, 1024 or 390px - left only the simulator's and Data Health's long tile notes (P6) and the phone tab rows (F22) |
+| The pages in a browser | Every tab of the seven pages photographed whole before and after (`data/ui-polish/screenshots/p5-before/`, `p5-after/`), a team and a player chosen, dark at 1440 and 1024px, the two most changed in light too; and every tab opened in three states - nothing chosen, a team and a player chosen, the oldest season (1996-97) - each drawn with no error and no empty tab |
+| Boundaries and data | Five views, `components.py`, `charts.py`; no service, model or data touched; the browser pass read the disposable copy |
+
+## UI polish P4 - the charts: read on any screen, in either theme (2026-10-12)
+
+The chart builders in `wb/charts.py` and the light palette, polished once for every chart.
+No chart's data, scale, colour order or table view changed, and no number moved.
+
+**Found first.** All 42 charts on the pages - every tab, with a team and a player chosen -
+were photographed in both themes at 1440px, and in the dark at 1024 and 390, and the text
+of each was measured against the chart's own box. At 1440 they held the house rules. On a
+phone six axis titles and one line's name ran past the chart's edge, and *Tax* sat on *2nd
+apron* above all four cap-line charts; at 1024 three dates on Team Explorer's form chart
+printed on top of each other; at every width the histogram's first value label touched the
+count axis's "0". In the dark the cap lines were drawn in nearly the gridlines' own shade.
+The light theme's green, amber and pink stood at 2.74, 2.11 and 2.62:1 on its charts, and
+its 12px tick labels at 3.5:1 - a theme test had allowed 3:1, calling them large text.
+
+**Built**
+
+- **Cap lines**: names on three rows, not two; lines in `deemphasis`, a step above the grid
+  (unchanged in the light theme, where that is the colour they had); the meter keeps room
+  for the third row.
+- **Long axis titles** (over 32 characters) take two balanced lines.
+- **Names kept on the chart**: a reference line's name, and the value a histogram marks,
+  run away from the end of the axis they sit near.
+- **Intervals kept off the edge**: interval rows leave room either side of the widest.
+- **Dates** slant where they would not fit level; the histogram's value labels sit lower.
+- **Stacked bars** refuse a ninth part (finding F19), as the other builders refuse theirs.
+- **The light palette** (finding F16): green `#19a472`, amber `#c28400` and pink `#e46494`,
+  each just past 3:1; muted ink `#74726d`, 4.68:1. Every colour-blind separation still
+  holds - neighbours 18.8 and 9.0, the first three 22.6 and 9.7 - and a fourth scatter
+  series is still unsafe. `config.toml` says the same.
+- **Tried and put back**: Benchmarks' *How far teams went* with its column labels free to
+  tilt. Each label carries a second line (how many teams), and tilted they garbled.
+- **Kept, with reasons** (DESIGN_SYSTEM.md section 6; audit D10, D11): the moment after a
+  theme switch when a chart keeps its old colours (F2) - Streamlit does not run the page
+  again on a switch and only a script in the page could; the next click redraws it, the
+  choice is remembered, and the user's guide now says so. And the filled chart panel
+  (F10): an outlined card, like the tiles, needs a see-through chart, whose text would be
+  dark on dark in that same moment. The owner accepted both with P4 (D10).
+- **Documents**: DESIGN_SYSTEM.md sections 2, 3 and 6; CLAUDE.md on charts on a phone and
+  the contrast floors; the user's guide on the theme switch; the audit's F22, F23, D10 and
+  D11; this roadmap's phase table.
+
+**Left for later**: Benchmarks' column labels run together below about 1100px, and two
+axis titles of more than fifty characters still run past a phone's chart (F23, P5: shorter
+wording); on a phone the tab rows of five pages scroll sideways, as Streamlit draws them
+(F22). A correction to the P3 report: its check on tab rows matched nothing in this
+Streamlit's markup, so "no tab row is cut" was unchecked; checked now, only phones are
+affected, and every tab can be reached.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| `tests/ui/test_theme.py`, `test_charts.py` | Passed. New: every series 3:1 on its chart in both themes; a line's name away from the edge; cap lines a step above the grid; a ninth stacked part refused; a histogram's end value and its labels; long axis titles on two lines. Changed, for the fixes: muted ink 4.5:1 on surface and page (was 3:1); cap-line names on three rows; dates left to slant; the plain interval axis padded. Kept: level labels for interval columns |
+| `pytest -n auto`, once at the gate | 3,974 passed (4 min 31 s); at P3, 3,967 |
+| Chart text, every chart at three widths | Before: on a phone 6 titles and 1 name past the edge, 4 cap-line collisions; at 1024 crowded dates; at every width the histogram's corner. After: none at 1440; at 1024 and on a phone only Benchmarks' column labels and, on a phone, two long titles (F23) |
+| The charts in a browser | 42 charts photographed before and after (`data/ui-polish/screenshots/p4-charts-before/`, `-after/`), dark at 1440, 1024 and 390, light at 1440 |
+| The pages in a browser | The P0 set taken again (`data/ui-polish/screenshots/p4/`, 100 shots under the same names, both themes, four sizes), no page with an error. Compared with P3: the cap lines' names on three rows above Contract Explorer's and the payroll meters; the light theme's tick labels a shade darker; everything else as at P3 |
+| Boundaries and data | `wb/charts.py`, `wb/theme.py`, `config.toml`; no view, service, model or data touched; the browser pass read the disposable copy |
+
+## UI polish P3 - shared components: tiles that wrap, one look per tag, deletes that ask (2026-10-11)
+
+The pieces every page shares, made once. No number, calculation, model, data source or
+page address changed.
+
+**Found first**, every page measured in a browser at four sizes: 36 places where text was
+cut off. At 1024px the headline tiles on six pages were cut to 103px, and four sets of
+choices ran out of their space - the simulator's *Regression* could not be reached at all;
+on a phone the same four. A segmented control wraps on a row of its own (Player Explorer's
+columns) but not inside columns or beside other controls, where all four stood. Deleting
+was drawn three ways: behind a tick box (a roster), behind a tick box as the green main
+button (a workspace), and on one click (a finding, an experiment proposal). "Note" came in
+three colours, and "Out of date" was written out in four views.
+
+**The owner's decisions** (2026-10-11), from before-and-after screenshots
+(`data/ui-polish/screenshots/p3-options/`): tiles that wrap, with a second set of style
+rules (D8); every delete asks first (D9); Modeled stays green (D3: all seven badge colours
+are taken, and the swap tried left *Your assumption* at 4.29:1 on the dark page); no group
+label on the page (D7: built above and beside the title, it had to clear the top bar and
+pushed every page down about 60px).
+
+**Built**
+
+- **Tiles that wrap.** `components.figures` draws each row in a container keyed `tiles-N`,
+  or `tiles-wide-N` for a row of four or fewer, counted afresh each run from
+  `components.new_page()` in the frame. `wb/style.css` lays such a row out as a grid: as
+  many equal tiles as fit, at least 11rem wide in a row of five and 14rem in a row of four
+  or fewer. Five stay across at 1440 and 1366px, as before; 1024px gives three and two; a
+  phone gives two a row for rows of five and one for the rest. Without the rules the rows
+  are Streamlit's columns, as before.
+- **Choices that fit.** Benchmarks' seasons, the Optimizer's budget, and the simulator's
+  games missed and development are dropdowns.
+- **Deletes that ask.** `components.confirmed_button` stays off until its box is ticked
+  and is never the page's primary button: deleting a roster, a workspace, a finding and an
+  experiment proposal, and clearing a workspace's history. A finding's and a proposal's sit
+  in a *Delete* popover beside *Edit*.
+- **One look per tag.** `NOTE` (blue), `CHECK` (orange), `OUT_OF_DATE` and `NO_ANSWER` are
+  written once in `components.py`. Team Builder's broken rules read *Check*; the optimizer's
+  reasons and an answer's notes are blue *Notes*.
+- **Found on the way:** a note written as a docstring under a constant in `app.py` was drawn
+  above every title by Streamlit's "magic" (a bare string in the main script is put on the
+  page). It became a comment, and a test keeps bare expressions out of `app.py`.
+- **Looked at and kept:** the tiles' number size, the button corners, the table colours and
+  alignment (DESIGN_SYSTEM.md section 4). Section headings are left to the pages, P5 and P6.
+- **Documents:** DESIGN_SYSTEM.md sections 4, 5, 9 (three rules) and 10; CLAUDE.md's rules
+  on tags, `app.py`, deletes, segmented controls and tiles; the user's guide on tiles and
+  deletes; the audit's D3, D7, D8, D9 and F21; this roadmap's phase table.
+
+**Left for later:** two tiles whose note is longer than a tile holds - the simulator's
+*Payroll* and Data Health's *Last build* - trim it at 1366px, as before, and now on a phone
+too (F21, P6); the Analytics Lab's three tiles are not yet drawn by `components.figures`
+(F13, P5).
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New and changed tests | `test_components.py`: tile rows named for the grid, and the same names next run; one icon and one colour per tag word, the shared tags written once; a delete off until its box is ticked; no page with a plain Delete or Clear button. `test_app.py`: a page's tile rows named afresh each run; nothing in `app.py` that Streamlit would draw by itself. `test_style.py`: the three new rules. `test_research_page.py`: a finding's and a proposal's delete off until ticked (changed for the owner's decision) |
+| `tests/ui`, mid-phase | 736 passed |
+| `pytest -n auto`, once at the gate | 3,967 passed (4 min 34 s); at P2, 3,961 |
+| Cut-off text, every page at four sizes | 36 places before, 8 after, all known (F21, F13); no set of choices cut anywhere |
+| The P3 changes in a browser, dark and light | 9 checks in each theme, all passed: Benchmarks' seasons narrow the page (892 to 300 team-seasons); the Optimizer's budget takes *First apron*; a healthy season moves the simulator's projected wins (44 to 45) and *Regression* can be chosen; a roster's delete, a workspace's delete (now a plain button) and clearing its history each off, on once ticked, off again; no error. Nothing was deleted. The copy holds no finding: its delete is held by the page test |
+| The pages in a browser | The P0 set taken again (`data/ui-polish/screenshots/p3/`, 100 shots under the same names, both themes, four sizes), no page with an error. Compared with P2: at 1024px rows of five tiles as three and two with their numbers whole, and on a phone two a row; the four sets of choices that were cut off as dropdowns; Team Builder's broken rules tagged *Check*. Everything else as at P2 |
+| Boundaries and data | `components.py`, the frame, the style rules, nine views, the answers and the dialog: their tiles, tags, choices and deletes; no service, model, chart builder or data touched; the browser pass read the disposable copy |
+
+## UI polish P2 - the frame: a top bar, the filters in view, one form for messages (2026-10-11)
+
+The frame every page sits in, made to the owner's choices. The pages, their groups,
+names, order and addresses, the filters and what they do, the numbers and the data are
+as they were.
+
+**The owner's decisions** (2026-10-11), from prototype screenshots of both layouts
+(`data/ui-polish/screenshots/p2-options/`): the navigation in a top bar (D4), and one small
+style rule, the space above the titles (D5).
+
+**Built**
+
+- **The navigation in a top bar** (`st.navigation(..., position="top")`): the six groups
+  are menus across the top, each with its pages in the same order, names and addresses; on
+  a phone they fold into the sidebar. The sidebar holds the filters and the data status
+  alone, so season, phase, team, player and the comparison window are in view on every
+  page at every size (finding F4).
+- **The sidebar starts closed on a phone** and open on a desktop
+  (`initial_sidebar_state="auto"`; F5).
+- **A quieter data status**: each source in a word and an icon, its details on hover
+  (`components.state_badge(..., help=...)`), a line under it only when something needs
+  doing, the build, and a link to Data Health.
+- **One style rule** (`wb/style.css`, applied once per run by `wb/style.py` from `app.py`):
+  the space above every title, from Streamlit's 8rem with a top bar (6rem on a phone) to
+  2.5rem. Pages start about 50px higher than at P1 at every size (F8). A test holds the
+  file to the rules listed in DESIGN_SYSTEM.md section 9 and keeps every page from
+  styling itself.
+- **One form for every message**: `components.alert(kind, message)` draws the 20 errors,
+  warnings, successes and notes in six files, one icon for each kind. Three had differed:
+  the simulator's "Give the roster a name first." had no icon, its save used `check` where
+  the others use `check_circle`, and Contract Explorer's "Choose a file..." warning had the
+  note's icon.
+- **Documents**: DESIGN_SYSTEM.md sections 8 (the frame) and 9 (the style rules);
+  CLAUDE.md's new rule that styling is the theme's; the user's guide on the frame; the
+  audit's D4 and D5; this roadmap's phase table.
+
+**Found in the browser**, for the owner (finding F20, decision D7): the top bar does not
+mark the open page's group. An opened menu marks the page, and the title names it, but a
+menu exists in the page only while it is open, so no style rule can mark its group. A
+small label with the group's name above each title, from the shared header, could (P3).
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New and changed tests | `test_style.py` (3 new: the stylesheet holds the agreed rule and nothing else, each rule is listed in DESIGN_SYSTEM.md, only the frame applies it and no page injects HTML or CSS); one icon for each kind of message; the contract file's details in the badge's hover, not a caption; the Data Health link |
+| `pytest -n auto` | 3,961 passed (5 min 35 s); at P1, 3,956 |
+| The frame in a browser, dark and light | 24 checks in each theme, all passed: every page opened from its menu, at its own address, with its heading and no error; the title's box at 38px; no page list in the desktop sidebar; a team chosen on Team Explorer kept through Player Explorer and back; the contract file's details on hover; the Data Health link; a warning drawn as a warning; on a phone the sidebar closed at first and, opened, holding the pages and the filters |
+| The pages in a browser | The P0 set taken again (`data/ui-polish/screenshots/p2/`, 100 shots under the same names, both themes, four sizes), no page with an error. Compared with P1: the menus across the top; the filters at the head of the sidebar, all in view at 1366x768 and 1024x768; every page about 50px higher; at phone width the page in view at first, not the sidebar. Colours, charts, tables and tiles as at P1 |
+| Boundaries and data | The frame, two components and the message calls of six views; no service, model, chart builder or data touched; the browser pass read the disposable copy |
+
+## UI polish P0 and P1 - the audit and the Dark Forest tokens (2026-10-11)
+
+The first two phases of the user's *Dark Forest UI Modernization* roadmap: a near-black,
+forest-green workbench, with navigation, numbers, data and behaviour unchanged. Nothing
+about the analytics, the models, the data or the assistant changed.
+
+**P0, the audit** ([ui-polish/BASELINE_AUDIT.md](ui-polish/BASELINE_AUDIT.md)), read-only:
+the 14 pages and both assistant surfaces inventoried; the design as built (no custom CSS
+anywhere, one palette in two places); the theme tests' arithmetic run on the roadmap's
+colours; four throwaway Streamlit apps to learn how 1.64 picks a theme; and 100
+screenshots of a disposable copy of the real data, every page in both themes and the key
+pages at 1440x900, 1366x768, 1024x768 and 390x844, none with an error. Nineteen findings,
+among them: the app follows the computer's theme (light here); white on the old blue
+primary button was 3.64:1; the filters sit below the fold of the sidebar; at phone width
+the sidebar covers the page; at tablet width the headline tiles cut off their own numbers;
+the research page puts about 660px of controls before the first answer.
+
+**The owner's decisions** (2026-10-11): keep both themes, the computer's setting followed
+until Dark or Light is chosen in the app's menu - checked to survive closing the browser,
+restarting the app and a change of colours, kept per browser and per port; and the forest
+greens `#2f8556` (dark) and `#1f6b45` (light) for actions, never for data.
+
+**P1, built**
+
+- **Two new roles** in `wb/theme.py`: `brand` (Streamlit's `primaryColor`: primary
+  buttons under a white label, selected tabs and toggles, sliders, focus) and `link`. The
+  roadmap's deeper `#244f38` would have left the selected controls at 2.1:1 on black.
+- **The dark neutrals moved toward the forest**: page `#0a0d0b`, cards `#151b17`, text
+  `#f1f5f2`, secondary and muted text, gridlines `#2a362e`, axes, de-emphasis. The eight
+  chart colours, the diverging poles and the four state colours are as they were, so every
+  chart is unchanged in colour; it sits on the new card colour.
+- **`.streamlit/config.toml`** states the same in `[theme.dark]` and `[theme.light]`.
+- **Tests** (`tests/ui/test_theme.py`): the primary colour's parity moved from the chart
+  accent to the brand; parity added for links, table borders and headers, gray and the
+  sidebar's second colour; new checks that a white label on the brand is at least 4.5:1,
+  the brand at least 3:1 on page and card, links at least 4.5:1, and the brand no chart or
+  state colour and at least 15 from the chart accent. No threshold was loosened.
+- **Documents**: [ui-polish/DESIGN_SYSTEM.md](ui-polish/DESIGN_SYSTEM.md) (colours in effect,
+  the rest still proposals), the user's guide on choosing Dark or Light, this roadmap's
+  phase table.
+
+**Found in the browser and left for P4** (finding F2): just after Dark is chosen in the
+menu, a Plotly chart keeps the light palette - a white panel on the dark page - until the
+next click redraws the page; after a click or a reload it is right. The charts read the
+theme when they are drawn, and Streamlit does not run the page again on a theme change.
+Once chosen, the theme is remembered, so this is seen once.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| `tests/ui/test_theme.py` | 31 passed, six of them new |
+| `test_charts.py`, `test_components.py`, `test_formats.py` | 282 passed, unchanged |
+| `pytest -n auto` | 3,956 passed (5 min 13 s); at P0, 3,950 |
+| The pages in a browser | The P0 set taken again on the same data copy (`data/ui-polish/screenshots/p1/`, 100 shots, both themes, four sizes), no page with an error; compared with P0, only colours changed: the near-black, the forest-tinted cards, sidebar and borders, green on the selected tab, segment, slider and the primary buttons, every chart's colours as before |
+| Boundaries and data | Three files of code and configuration; no view, component, chart builder, service or data touched; the browser pass read a disposable copy |
+
 ## Milestone A9 - AI Research Assistant: the release audit (2026-10-11)
 
 Every check of the release, run and written down: the test suite, the live model's tests,

@@ -41,7 +41,16 @@ REFERENCE_MARGIN = 92
 LABEL_GAP = "  "
 """Space between a category label and the start of its bar."""
 THRESHOLD_ROW = 14
-"""Pixels between the two rows that threshold names alternate on."""
+"""Pixels between the rows that threshold names take turns on."""
+THRESHOLD_ROWS = 3
+"""Rows of threshold names: with two, a phone's narrow chart set "Tax" on "2nd apron"."""
+STAGGER_FROM = 9
+"""Columns from which a column chart's labels take turns on two levels."""
+LABEL_LEVEL = 32
+"""Pixels between those two levels: a two-line label and a little air."""
+LONG_TITLE = 32
+"""Characters an axis title takes on one line. A longer one is set on two balanced lines:
+centred under a phone's narrow plot, a long title ran past the chart's edge."""
 TIME_TICKS = 4
 """The most date labels a time axis writes."""
 COLUMN_PLOT_WIDTH = 900
@@ -112,10 +121,15 @@ def _base(palette: Palette, *, height: int, legend: bool = False) -> go.Figure:
 
 
 def _reference_line(
-    figure: go.Figure, palette: Palette, *, x: float | None = None, y: float | None = None
+    figure: go.Figure,
+    palette: Palette,
+    *,
+    x: float | None = None,
+    y: float | None = None,
+    color: str | None = None,
 ) -> None:
     """A solid hairline marking a reference value, drawn beneath the data."""
-    line = {"color": palette.axis, "width": HAIRLINE}
+    line = {"color": color or palette.axis, "width": HAIRLINE}
     if x is not None:
         figure.add_vline(x=x, line=line, layer="below")
     if y is not None:
@@ -125,16 +139,35 @@ def _reference_line(
 def _thresholds(figure: go.Figure, palette: Palette, thresholds: Mapping[str, float]) -> None:
     """Hairlines at named values on the x-axis, each with its name above the plot.
 
-    Names alternate between two rows in order of value, so lines that sit close
-    together - a tax line and an apron - keep their names apart.
+    Names take turns on three rows in order of value, so lines that sit close together -
+    a tax line and the aprons, closer still on a phone - keep their names apart. The
+    lines are a step stronger than the gridlines they stand among (UI polish P4).
     """
     ordered = sorted(thresholds.items(), key=lambda item: item[1])
     for position, (title, amount) in enumerate(ordered):
-        _reference_line(figure, palette, x=amount)
+        _reference_line(figure, palette, x=amount, color=palette.deemphasis)
         _note(
             figure, palette, title, x=amount, y=1, yref="paper", yanchor="bottom",
-            xanchor="center", yshift=4 + THRESHOLD_ROW * (position % 2),
+            xanchor="center", yshift=4 + THRESHOLD_ROW * (position % THRESHOLD_ROWS),
         )  # fmt: skip
+
+
+def _axis_title(text: str) -> str:
+    """An axis title as it is set: on one line, or on two balanced lines past ``LONG_TITLE``
+    characters (UI polish P4)."""
+    if len(text) <= LONG_TITLE or " " not in text:
+        return text
+    spaces = [place for place, letter in enumerate(text) if letter == " "]
+    split = min(spaces, key=lambda place: abs(place - len(text) / 2))
+    return f"{text[:split]}<br>{text[split + 1 :]}"
+
+
+def _side(value: float, axis_range: Sequence[float]) -> str:
+    """Which way a note at ``value`` runs so that it stays on the chart: away from the end of
+    the axis it sits near (an axis given high-to-low runs the other way)."""
+    start, end = axis_range
+    share = (value - start) / ((end - start) or 1.0)
+    return "right" if share > 0.8 else "left" if share < 0.2 else "center"
 
 
 def _note(figure: go.Figure, palette: Palette, text: str, *, x: float, y: float, **place) -> None:
@@ -306,7 +339,7 @@ def scatter(
                     trace(frame[members & subject], color, "", emphasised=True, legend=False)
                 )
 
-    figure.update_xaxes(title_text=x_title, tickformat=x_tickformat)
+    figure.update_xaxes(title_text=_axis_title(x_title), tickformat=x_tickformat)
     figure.update_yaxes(title_text=y_title, tickformat=y_tickformat)
     if reverse_y:
         figure.update_yaxes(autorange="reversed")
@@ -363,7 +396,7 @@ def diverging_bars(
         )
     )
     _reference_line(figure, palette, x=0)
-    figure.update_xaxes(title_text=value_title, tickformat=tickformat)
+    figure.update_xaxes(title_text=_axis_title(value_title), tickformat=tickformat)
     if len(frame):
         # Room beyond the longest bar on each side for its value label.
         low, high = min(frame[value].min(), 0), max(frame[value].max(), 0)
@@ -486,7 +519,7 @@ def percentile_bars(
         # Past 100 there is only room for the value written at the tip of a full bar.
         range=[0, 100 * (1 + LABEL_ROOM)],
         tickvals=[0, 25, 50, 75, 100],
-        title_text=axis_title,
+        title_text=_axis_title(axis_title),
     )
     figure.update_yaxes(
         autorange="reversed",
@@ -513,8 +546,10 @@ def _ordered_axis(figure: go.Figure, palette: Palette, *, categories: int | None
         spikedash="solid",
     )
     if categories is None:
-        # A few dates written level read better than many written at a slant.
-        figure.update_xaxes(tickangle=0, nticks=TIME_TICKS)
+        # A few dates read better than many. Plotly sets them level where they fit and at a
+        # slant where they would not: held level, three dates on Team Explorer's form chart
+        # printed on top of each other at 1024px (UI polish P4).
+        figure.update_xaxes(nticks=TIME_TICKS)
     else:
         figure.update_xaxes(type="category", nticks=8, range=[-0.6, categories - 0.4])
 
@@ -628,7 +663,7 @@ def lines(
     _ordered_axis(figure, palette, categories=len(frame) if categorical_x else None)
     figure.update_yaxes(title_text=y_title, tickformat=tickformat)
     if x_title:
-        figure.update_xaxes(title_text=x_title)
+        figure.update_xaxes(title_text=_axis_title(x_title))
     if x_dtick is not None:
         figure.update_xaxes(dtick=x_dtick)
     return figure
@@ -653,6 +688,8 @@ def stacked_bars(
     parts of a bar. ``thresholds`` maps a name to a value on the axis and draws a
     hairline there with the name above it.
     """
+    if len(parts) > len(palette.series):
+        raise ValueError(f"a bar stacks {len(palette.series)} parts, not {len(parts)}")
     figure = _base(palette, height=ROW_HEIGHT * len(frame) + 96, legend=len(parts) > 1)
     chosen = frame.index.isin(list(highlight))
     names = [
@@ -679,7 +716,9 @@ def stacked_bars(
         margin={"t": 64, "r": 28},
         legend={"traceorder": "normal"},
     )
-    figure.update_xaxes(title_text=value_title, tickformat=tickformat, rangemode="tozero")
+    figure.update_xaxes(
+        title_text=_axis_title(value_title), tickformat=tickformat, rangemode="tozero"
+    )
     figure.update_yaxes(
         autorange="reversed",
         showgrid=False,
@@ -712,12 +751,19 @@ def histogram(
     )
     if marker is not None and marker == marker:
         figure.add_vline(x=marker, line={"color": palette.ink, "width": LINE_WIDTH})
+        spread = values.dropna()
+        span = (spread.min(), spread.max()) if len(spread) else (marker, marker)
         _note(
             figure, palette, marker_label, x=marker, y=1, yref="paper", yanchor="bottom",
-            xanchor="center",
+            xanchor=_side(marker, span),
         )  # fmt: skip
     figure.update_layout(bargap=0.04, margin={"t": 28})
-    figure.update_xaxes(title_text=x_title, tickformat=tickformat, showgrid=False)
+    # The value labels sit a little lower than the house's, clear of the count axis's "0" in
+    # the corner they share (UI polish P4).
+    figure.update_xaxes(
+        title_text=_axis_title(x_title), tickformat=tickformat, showgrid=False,
+        ticklabelstandoff=10,
+    )  # fmt: skip
     figure.update_yaxes(title_text="Count")
     return figure
 
@@ -780,7 +826,7 @@ def comparison_dots(
         range=list(axis_range),
         tickvals=None if tickvals is None else list(tickvals),
         tickformat=tickformat,
-        title_text=axis_title,
+        title_text=_axis_title(axis_title),
     )
     figure.update_yaxes(
         type="category",
@@ -841,7 +887,20 @@ def interval_columns(
     # Columns no thicker than the house allows, on a plot of typical width.
     crowded = MAX_BAR_THICKNESS * max(len(frame), 1) / COLUMN_PLOT_WIDTH
     figure.update_layout(bargap=min(max(1 - crowded, 0.3), 0.9))
+    # Level labels: a label carries a second line (how many cases), and tilted, two-line
+    # labels garble into each other (tried at UI polish P4).
     figure.update_xaxes(type="category", showgrid=False, tickangle=0)
+    if len(frame) >= STAGGER_FROM:
+        # Many columns: the labels take turns on two levels, each with two columns' room,
+        # so they stay apart in a narrower window - at 1024px fourteen ran together (P5).
+        figure.update_xaxes(showticklabels=False)
+        for position, name in enumerate(frame[label]):
+            figure.add_annotation(
+                text=str(name), x=name, y=0, xref="x", yref="paper", yanchor="top",
+                showarrow=False, font={"color": palette.ink_muted, "size": 12},
+                yshift=-6 - LABEL_LEVEL * (position % 2),
+            )  # fmt: skip
+        figure.update_layout(margin={"b": 8 + 2 * LABEL_LEVEL})
     figure.update_yaxes(title_text=value_title, tickformat=tickformat, rangemode="tozero")
     return figure
 
@@ -875,22 +934,26 @@ def interval_rows(
     """
     labels = list(frame[label])
     figure = _base(palette, height=ROW_HEIGHT * len(frame) + 76)
+    if axis_range is None and len(frame) and frame[low].notna().any():
+        # Dots mark positions, so the axis need not start at zero. It fits the intervals and
+        # the line the dots are read against, with room either side so that no interval
+        # ends on the chart's edge (UI polish P4).
+        left, right = frame[low].min(), frame[high].max()
+        if reference is not None:
+            left, right = min(left, reference), max(right, reference)
+        room = (right - left) * LABEL_ROOM / 2 or 1.0
+        axis_range = (left - room, right + room)
     if reference is not None:
         _reference_line(figure, palette, x=reference)
         if reference_label:
-            # Room above the plot for the name of the line.
+            # Room above the plot for the name of the line, which runs away from the edge
+            # it sits near so that it stays on the chart.
             figure.update_layout(margin={"t": 30})
+            side = _side(reference, axis_range) if axis_range is not None else "center"
             _note(
                 figure, palette, reference_label, x=reference, y=1, yref="paper",
-                yanchor="bottom", xanchor="center", yshift=4,
+                yanchor="bottom", xanchor=side, yshift=4,
             )  # fmt: skip
-        if axis_range is None and len(frame):
-            # Dots mark positions, so the axis need not start at zero - but it must
-            # show the line the dots are read against.
-            left = min(frame[low].min(), reference)
-            right = max(frame[high].max(), reference)
-            room = (right - left) * LABEL_ROOM / 2 or 1.0
-            axis_range = (left - room, right + room)
     across: list[object] = []
     down: list[object] = []
     for name, left, right in zip(labels, frame[low], frame[high], strict=True):
@@ -930,7 +993,7 @@ def interval_rows(
             cliponaxis=False,
         )
     )
-    figure.update_xaxes(title_text=value_title, tickformat=tickformat)
+    figure.update_xaxes(title_text=_axis_title(value_title), tickformat=tickformat)
     if axis_range is not None:
         figure.update_xaxes(range=list(axis_range))
     if tickvals is not None:
@@ -962,7 +1025,7 @@ def meter(
     takes the accent, or the de-emphasis gray when ``estimated`` says the amount is
     incomplete.
     """
-    figure = _base(palette, height=132)
+    figure = _base(palette, height=132 + THRESHOLD_ROW)
     figure.add_trace(
         go.Bar(
             x=[value],
@@ -979,7 +1042,7 @@ def meter(
     )
     _thresholds(figure, palette, thresholds)
     upper = max([value, *thresholds.values()]) * 1.04 if thresholds else None
-    figure.update_layout(margin={"t": 44, "b": 8, "r": 28})
+    figure.update_layout(margin={"t": 44 + THRESHOLD_ROW, "b": 8, "r": 28})
     figure.update_xaxes(tickformat=tickformat, range=[0, upper] if upper else None)
     figure.update_yaxes(showgrid=False, showticklabels=False)
     return figure
@@ -1021,11 +1084,15 @@ def band_line(
                 xanchor="left", yanchor="middle", xshift=6, align="left",
             )  # fmt: skip
     for column, fill in ((low, None), (high, "tonexty")):
+        # Each edge is a line of no width: with no line at all, Plotly drew the lower edge
+        # nowhere and the band filled to nothing - it was missing in both themes until UI
+        # polish P6 looked at the chart in a browser.
         figure.add_trace(
             go.Scatter(
                 x=frame[x],
                 y=frame[column],
-                mode="none",
+                mode="lines",
+                line={"width": 0},
                 fill=fill,
                 fillcolor=palette.wash(palette.accent) if fill else None,
                 hoverinfo="skip",
@@ -1061,7 +1128,7 @@ def band_line(
     )
     figure.update_layout(hovermode="x unified")
     figure.update_xaxes(
-        title_text=x_title,
+        title_text=_axis_title(x_title),
         tickformat=x_tickformat,
         showgrid=False,
         showspikes=True,

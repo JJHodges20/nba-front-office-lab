@@ -42,7 +42,6 @@ EDITS = "sim_edits"
 NAME, SAVE, SAVED = "sim_name", "sim_save", "sim_saved"
 COUNTS = (2_000, 5_000, 10_000, 20_000)
 FIT = "fol simulate fit --write"
-OUT_OF_DATE = ("Out of date", ":material/schedule:", "orange")
 SIDES = {"before": "Before", "after": "After"}
 PLAYOFFS, TITLE = probability_key("made_playoffs"), probability_key("won_championship")
 STATUS_WORDS = {KEPT: "Kept", ADDED: "Added", REMOVED: "Removed"}
@@ -94,7 +93,7 @@ def render() -> None:
 def _notices(status: SimulatorStatus) -> None:
     if not status.is_current:
         components.tagged(
-            OUT_OF_DATE,
+            components.OUT_OF_DATE,
             "The simulator's parameters were measured against value model "
             f"{status.value_model_version}; the database was built with "
             f"{status.applied_value_version}. Run: {FIT}",
@@ -184,22 +183,22 @@ def _changes(
             help="Signings, or the players coming back in a trade: anyone with a projection "
             f"for {status.upcoming}.",
         )
+        # Lists, not rows of buttons: the choices' names do not fit half a narrow window, and
+        # one was out of reach at 1024px (UI polish P3).
         three, four = st.columns(2)
-        availability = three.segmented_control(
+        availability = three.selectbox(
             "Games missed",
             list(AVAILABILITY_TITLES),
             format_func=AVAILABILITY_TITLES.get,
-            default=Availability.AS_PROJECTED.value,
-            required=True,
+            index=list(AVAILABILITY_TITLES).index(Availability.AS_PROJECTED.value),
             key=AVAILABILITY,
             help="\n\n".join(f"**{item.title}**: {item.description}" for item in Availability),
         )
-        development = four.segmented_control(
+        development = four.selectbox(
             "Development",
             list(DEVELOPMENT_TITLES),
             format_func=DEVELOPMENT_TITLES.get,
-            default=Development.EXPECTED.value,
-            required=True,
+            index=list(DEVELOPMENT_TITLES).index(Development.EXPECTED.value),
             key=DEVELOPMENT,
             help="\n\n".join(f"**{item.title}**: {item.description}" for item in Development),
         )
@@ -289,8 +288,9 @@ def _before_and_after(report: ScenarioReport, model: SimulatorModel) -> None:
             Figure(
                 "Payroll",
                 formats.money_compact(after.payroll),
-                _was(formats.money_compact(before.payroll))
-                + (f", {after.unpriced} unpriced" if after.unpriced else ""),
+                # How many are unpriced is said under the tiles: in the tile it was cut off
+                # at 1366px (UI polish P6, audit finding F21).
+                _was(formats.money_compact(before.payroll)),
                 help="The salaries on file for the season ahead and any you assumed; "
                 "understated while any player is unpriced.",
             ),
@@ -323,16 +323,25 @@ def _before_and_after(report: ScenarioReport, model: SimulatorModel) -> None:
             ),
         ]
     )
+    unpriced = (
+        f" The payroll leaves out {after.unpriced} player{'s' if after.unpriced != 1 else ''} "
+        "with no salary on file, so it is understated."
+        if after.unpriced
+        else ""
+    )
     if not report.is_changed:
         st.caption(
             f"**{report.name}** as it stands for {report.season}, drawn {after.seasons:,} "
             "times. Nothing is changed yet: remove or add players, or set the presets, and "
-            "the figures above show before and after."
+            "the figures above show before and after." + unpriced
         )
     else:
         st.caption(
             f"**{report.name}** for {report.season}, drawn {after.seasons:,} times as it "
-            f"stands and {after.seasons:,} times with your changes" + _changes_said(report) + "."
+            f"stands and {after.seasons:,} times with your changes"
+            + _changes_said(report)
+            + "."
+            + unpriced
         )
     _comparison_table(report)
     _stages_chart(report)
@@ -623,15 +632,13 @@ def _save(scenario: Scenario, name: str) -> None:
         )  # fmt: skip
         if st.button("Save", key=SAVE, icon=":material/save:"):
             if not roster_name.strip():
-                st.error("Give the roster a name first.")
+                components.alert("error", "Give the roster a name first.")
             else:
                 roster_id = data.simulator_save(scenario, roster_name.strip())
                 st.session_state[SAVED] = roster_id
     saved = st.session_state.get(SAVED)
     if saved is not None:
-        st.success(
-            f"Saved as roster {saved}. Open it in the Team Builder.", icon=":material/check:"
-        )
+        components.alert("success", f"Saved as roster {saved}. Open it in the Team Builder.")
 
 
 # --- the profile -----------------------------------------------------------------------------
@@ -810,7 +817,9 @@ def _evidence(model: SimulatorModel) -> None:
                 "around the rating",
                 help="How far wins per 82 stray from what a season's net rating gives.",
             ),
-        ]
+        ],
+        # Three a row: five across cut "what no season could fix" short (UI polish P6).
+        per_row=3,
     )
     st.markdown("**The wins test**")
     coverage = pd.DataFrame(

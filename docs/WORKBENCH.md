@@ -13,9 +13,10 @@ no data yet it says so and tells you to run `fol refresh`. Stop it with Ctrl+C.
 
 ## The frame
 
-**Navigation** is at the top of the sidebar, in six groups: League, Explore, Build,
-Forecast, Ask and System. **Filters** are below it, and a choice you make on one page still
-holds on the next. Each page reads the filters it can use: the League Overview, the
+**Navigation** is the bar across the top, in six groups: League, Explore, Build,
+Forecast, Ask and System - open a group to see its pages. On a phone the groups are in
+the sidebar instead. **Filters** are in the sidebar, always in view, and a choice you make
+on one page still holds on the next. Each page reads the filters it can use: the League Overview, the
 explorers and the Analytics Lab read them all; Player Value reads the season, the team
 and the player; the Contract Explorer and the Scenario Simulator read the team; Roster
 Fit and Postseason Outlook read the season and the team; Winning Benchmarks chooses its
@@ -34,11 +35,36 @@ the left of the row. The tick clears again once the choice is made; the sidebar 
 who is chosen, and is where to change or clear it. In the Player Explorer a newly
 chosen player opens the Profile tab.
 
-**Data status** is at the foot of the sidebar on every page: when the league data was
-last fetched, whether a contract file has been supplied, and which build is on screen.
+**Data status** is at the foot of the sidebar on every page: whether the league data is up
+to date and whether a contract file has been supplied - hover over either for the
+details, and a line under it says what to do when something needs doing - which build is
+on screen, and a link to Data Health, where all of it is in full. Under it, **All pages**
+lists every page in its group, folded until you open it. On a phone the sidebar starts
+closed: the arrows at the top left open it.
+
+**Dark or light.** The workbench is designed dark - near-black with a forest-green accent
+for buttons, selected tabs and links - and has a matching light theme. It starts in your
+computer's own setting. To choose, open the menu at the top right (the three dots) and
+pick *Dark*, *Light* or *System*: your browser remembers the choice, through restarts, until
+its site data is cleared. Another browser, a private window or another port starts from
+the computer's setting again. Charts keep their own colours in both themes; green is never
+used for data. Just after you switch, a chart may keep the old theme's colours until your
+next click on the page.
+
+**With the keyboard.** Tab moves through the sidebar, then the top bar, then the page, and
+the control in focus is ringed in green. Type in a dropdown to narrow it and press Enter
+to choose; the arrow keys move between tabs; Space ticks a box; Enter presses a button or
+downloads a file; Escape closes the *Ask AI about this* dialog. To go to another page, Tab
+to **All pages** at the foot of the sidebar, press Enter to open it, Tab to the page and press
+Enter. (Enter also opens a group in the top bar, but its pages come last in the order - after
+everything on the page.) A page's address works too - `/players`, `/teams`, `/research` and
+so on, as the address bar shows each page - and opens it afresh, with the sidebar's choices
+cleared.
 
 ## Reading a page
 
+- **Headline figures** sit in tiles across the top of a page; in a narrow window or on a
+  phone they wrap onto more rows.
 - **Tags under the title** say what kinds of number the page holds.
   *Measured*: published by the league and shown unchanged. *Derived*: computed by the
   lab with a stated formula. *Estimate*: estimated by the lab. *Modeled*: produced by a
@@ -166,8 +192,10 @@ strongly they move together. How one metric is spread. The metric glossary.
 **Team Builder.** Rosters you assemble by hand. For each: payroll, share of the cap,
 room under each line, how the roster stands against the roster limits, and what its
 players add up to beside the league. Change a slot or type a salary of your own
-directly in the table. It describes a roster; it does not rank or recommend players, and
-its pooled figures are not a projection of how the players would play together.
+directly in the table. *Manage* renames a roster, changes its seasons and notes, or
+deletes it once you tick the box. It describes a roster; it does not rank or recommend
+players, and its pooled figures are not a projection of how the players would play
+together.
 
 **Roster Fit.** Do these players make sense together? The sidebar's team, or a roster you
 built, described in the roadmap's six areas of fit - offense, defense, the possession
@@ -270,8 +298,11 @@ played are answered from that season's figures.
 
 - *Above the conversation*: whether the assistant can answer (and, when it cannot, what to
   do: start Ollama, or pull the model), whether web search is set up, and how fresh each
-  current source is, the news feeds included. *Fetch current information* fetches what is
-  due by hand; a question fetches what it needs anyway.
+  current source is, the news feeds included; then the workspace, and one fold, *In this
+  workspace*, that counts its findings, proposed rosters and experiment proposals, with a
+  tab for each. *Below the conversation*, by the question box: Quick or Deep, *New
+  conversation*, and *Fetch current information*, which fetches what is due by hand - a
+  question fetches what it needs anyway. The page opens at its end, by the question box.
 - *News and contracts*: recent reporting comes from Hoops Rumors' feeds - the one news site
   the lab reads directly, since the others it checked turn AI agents away or forbid
   automated reading - each headline with its date and how long ago it was; web search
@@ -286,8 +317,9 @@ played are answered from that season's figures.
   change must beat, how seasons are split, what is measured, the leakage to rule out, what
   was tried before, and the steps of the milestone that would build it. *Keep in the
   workspace* puts it in the workspace's *Experiment proposals*, where it can carry your
-  note; *Download* gives it as a document. Nothing is applied: no model, setting or data
-  changes, whatever you keep. The assistant drafts one only when asked.
+  note, and *Delete* removes it once you tick the box; *Download* gives it as a document.
+  Nothing is applied: no model, setting or data changes, whatever you keep. The assistant
+  drafts one only when asked.
 - *Quick or Deep*: Quick for one fact or one comparison, Deep for a longer look - more
   tool calls, more time, the model thinking first. A question under way shows its steps
   as they come, and *Stop* ends it at the next step, keeping what was gathered: whatever the
@@ -300,8 +332,9 @@ played are answered from that season's figures.
   result's rows with the chart its tool chose and a CSV (an article or web page the answer
   names as "s2" is the row marked s2 under *Source*; times are UTC), the evidence (every
   source with its address and its dates: published, effective, fetched; each model file
-  with its revision; each section of the lab's documents by file and heading), and how it
-  was answered (each step, the model, the rules' version, the time).
+  with its revision; each section of the lab's documents by file and heading - its fold
+  names the kinds of source, the web included, and each source is led by an icon for its
+  kind), and how it was answered (each step, the model, the rules' version, the time).
 - *Names and sidebar*: names, seasons and teams are read from the question; where it names
   none, the workspace's focus stands in, then the sidebar's season and team. A "he" or
   "they" with nothing to point to is asked about. A link pasted into a question can be read.
@@ -321,7 +354,8 @@ played are answered from that season's figures.
   renames it beside itself (never deleting it) and starts a new one. Copies made before
   each upgrade of the file are in `data/assistant/backups/`.
 - *Findings*: *Save as finding* under an answer keeps a copy of it, with your title and
-  note, in the workspace's findings - it stays even if the history is cleared.
+  note, in the workspace's findings - it stays even if the history is cleared. *Edit*
+  changes its title and note; *Delete* removes it once you tick the box.
 - *Old answers*: each answer records the data build and player value model it read. When
   either has changed since, it says so, and *Ask again with today's data* asks the same
   question again beside it; the old answer is never rewritten. An answer that read recent
@@ -336,7 +370,8 @@ played are answered from that season's figures.
   was asked for, the contract file's date, and its players with where each would start,
   their salaries and their forecasts. They are examples that fit the budget - options to
   compare, not a recommendation - and nobody has checked that the trades or signings to
-  get them are allowed. The assistant cannot
+  get them are allowed. Each option says first what has become of it: waiting, saved (and
+  under what name) or declined. The assistant cannot
   save one. *Save approved roster* under an option saves it for the Team Builder - only
   if the data, the player value model and the salaries are the same as when it was
   proposed; otherwise it says what changed and saves nothing. A saved option says so, and

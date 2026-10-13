@@ -107,13 +107,14 @@ def _controls(build, seasons, stages) -> tuple[str, str | None, str | None, str]
     names = {era.key: era.name for era in eras} | {CUSTOM: "Other seasons"}
     labels = {key: stage.label for key, stage in stages.items()}
     with st.container(horizontal=True, vertical_alignment="bottom", gap="medium"):
-        era = st.segmented_control(
+        # A list, not a row of buttons: five long names do not fit a narrow window (UI polish P3).
+        era = st.selectbox(
             "Seasons",
             list(names),
             format_func=names.get,
-            default=eras[0].key,
-            required=True,
+            index=0,
             key=ERA,
+            width=260,
             help="Which seasons the page describes. The eras are set in configs/eras.yaml.",
         )
         stage = st.selectbox(
@@ -442,7 +443,7 @@ def _separation(era_args, stage, stages) -> None:  # type: ignore[no-untyped-def
         high="high",
         text="text",
         palette=components.colors(),
-        value_title="How often the team that got there had the better value",
+        value_title="How often it had the better value",
         tickformat=".0%",
         reference=0.5,
         reference_label="Coin flip",

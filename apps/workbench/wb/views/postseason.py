@@ -28,7 +28,6 @@ ROSTER = "ps_roster"
 NET, TOP, TYPICAL, ERROR = "ps_net", "ps_top", "ps_typical", "ps_error"
 CURVE_STAGE, ODDS_STAGE = "ps_curve_stage", "ps_odds_stage"
 FIT = "fol playoffs fit --write"
-OUT_OF_DATE = ("Out of date", ":material/schedule:", "orange")
 PLAYOFFS = probability_key("made_playoffs")
 TITLE = probability_key("won_championship")
 ROUNDS = {1: "R1", 2: "R2", 3: "CF", 4: "Finals"}
@@ -83,7 +82,7 @@ def render() -> None:
 def _notices(status: PostseasonStatus) -> None:
     if not status.is_current:
         components.tagged(
-            OUT_OF_DATE,
+            components.OUT_OF_DATE,
             "The model was fitted with top-player quality from value model "
             f"{status.value_model_version}; the database was built with "
             f"{status.applied_value_version}. Run: {FIT}",

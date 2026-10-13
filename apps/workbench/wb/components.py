@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any, Literal
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -77,6 +78,17 @@ STATES = {
     "absent": ("Not supplied", ":material/do_not_disturb_on:", "gray"),
 }
 
+# Tags that more than one page uses, each with one look wherever it appears (UI polish P3):
+# a page takes them from here instead of writing its own.
+NOTE = ("Note", ":material/info:", "blue")
+"""Something to know about what is shown."""
+CHECK = ("Check", ":material/warning:", "orange")
+"""Something to look at before relying on what is shown: a rule a roster breaks, a file's flag."""
+OUT_OF_DATE = ("Out of date", ":material/schedule:", "orange")
+"""A fitted file that no longer matches the data it is read with."""
+NO_ANSWER = ("No answer", ":material/error:", "red")
+"""A question that came back without an answer."""
+
 
 ROW = 34
 """Height of a table row in pixels."""
@@ -126,10 +138,43 @@ def tagged(tag: tuple[str, str, str], text: str) -> None:
     st.markdown(f":{color}-badge[{icon} {word}] {text}")
 
 
-def state_badge(state: str, label: str | None = None) -> None:
-    """A status with its icon and its word, so the colour is never the only signal."""
+def state_badge(state: str, label: str | None = None, *, help: str | None = None) -> None:
+    """A status with its icon and its word, so the colour is never the only signal; ``help``
+    is what lies behind it, on hover."""
     text, icon, color = STATES[state]
-    st.badge(label or text, icon=icon, color=color)
+    st.badge(label or text, icon=icon, color=color, help=help)
+
+
+AlertKind = Literal["error", "warning", "success", "info"]
+ALERTS: dict[str, tuple[Callable[..., Any], str]] = {
+    "error": (st.error, ":material/error:"),
+    "warning": (st.warning, ":material/warning:"),
+    "success": (st.success, ":material/check_circle:"),
+    "info": (st.info, ":material/info:"),
+}
+"""One icon for each kind of message, the same on every page (UI polish P2)."""
+
+
+def alert(kind: AlertKind, message: str) -> None:
+    """A message about what just happened - something refused, something to check, something
+    done, something to know - in one form on every page. ``message`` is markdown: text from
+    outside the lab is escaped by the caller."""
+    draw, icon = ALERTS[kind]
+    draw(message, icon=icon)
+
+
+def confirmed_button(
+    label: str,
+    confirm: str,
+    *,
+    key: str,
+    confirm_key: str,
+    icon: str = ":material/delete:",
+) -> bool:
+    """A button for what cannot be undone, the same on every page (UI polish P3): it stays
+    off until its box is ticked, and it is never the page's main action. True when pressed."""
+    ticked = st.checkbox(confirm, key=confirm_key)
+    return st.button(label, key=key, icon=icon, disabled=not ticked)
 
 
 def source_word(source: str, state: str) -> str:
@@ -164,27 +209,42 @@ class Figure:
     """Recent values, oldest first, drawn as a small line under the figure."""
 
 
+TILE_ROWS = "_tile_rows"
+"""How many rows of tiles the page has drawn in this run, which names each row's container."""
+
+
+def new_page() -> None:
+    """Begin a page's run, so that its rows of tiles take the same names in every run."""
+    st.session_state[TILE_ROWS] = 0
+
+
 def figures(items: Sequence[Figure], *, per_row: int | None = None) -> None:
     """Headline numbers side by side, in rows of ``per_row`` where one row would crowd them.
 
     A tile cuts off text that does not fit, so figures with long values or long context
-    get fewer, wider tiles.
+    get fewer, wider tiles: ``per_row=3``. Each row is a grid (``wb/style.css``, UI polish
+    P3) that wraps its tiles in a narrow window instead of cutting them off: at least 11rem
+    each in a row of five or more, and 14rem in a row of four or fewer, which has the room.
     """
     size = per_row or len(items)
+    wide = "wide-" if size <= 4 else ""
     for start in range(0, len(items), size):
         row = items[start : start + size]
-        for column, item in zip(st.columns(size), row, strict=False):
-            column.metric(
-                item.label,
-                item.value,
-                delta=item.context,
-                delta_color="off",
-                delta_arrow="off",
-                help=item.help,
-                border=True,
-                chart_data=list(item.trend) if item.trend is not None else None,
-                chart_type="line",
-            )
+        count = st.session_state.get(TILE_ROWS, 0)
+        st.session_state[TILE_ROWS] = count + 1
+        with st.container(key=f"tiles-{wide}{count}"):
+            for column, item in zip(st.columns(size), row, strict=False):
+                column.metric(
+                    item.label,
+                    item.value,
+                    delta=item.context,
+                    delta_color="off",
+                    delta_arrow="off",
+                    help=item.help,
+                    border=True,
+                    chart_data=list(item.trend) if item.trend is not None else None,
+                    chart_type="line",
+                )
 
 
 def chart(
@@ -208,19 +268,52 @@ def chart(
     with st.expander("Table view and export", icon=":material/table_view:"):
         plain = catalog is None and not formats
         shown = table if plain else _styled(table, catalog, formats)
-        st.dataframe(shown, hide_index=True, placeholder="—", key=f"{key}_table")
+        headings: dict = {column: heading(str(column)) for column in table.columns}
+        if catalog is not None:
+            headings |= metric_columns(
+                catalog, [column for column in table.columns if column in catalog]
+            )
+        st.dataframe(
+            shown, hide_index=True, placeholder="—", key=f"{key}_table", column_config=headings
+        )
         with st.container(horizontal=True, gap="small"):
             export(table, filename, key=f"{key}_csv")
             st.download_button(
-                "Interactive chart (HTML)",
+                # Short, like "Data (CSV)": the longer label was cut in a narrow column (P5).
+                "Chart (HTML)",
                 figure.to_html(include_plotlyjs="cdn", full_html=True),
                 file_name=f"{filename}.html",
                 mime="text/html",
                 key=f"{key}_html",
                 icon=":material/download:",
                 on_click="ignore",
+                help="The chart as a page to open in a browser, where it can still be hovered "
+                "and zoomed.",
             )
         st.caption("For a static image, use the camera button at the top right of the chart.")
+
+
+HEADINGS = {
+    "name": "Name",
+    "team_name": "Team",
+    "player_name": "Player",
+    "team": "Team",
+    "season": "Season",
+    "season_type": "Phase",
+    "conference": "Conference",
+    "game_date": "Date",
+    "games_played": "Games",
+}
+"""Words for the columns a chart's table view shows most often, where no metric names them."""
+
+
+def heading(column: str) -> str:
+    """A column's heading in a chart's table view: its word, or its name in plain case. The CSV
+    keeps the column's own name (UI polish P5: the table views showed "team_name")."""
+    if column in HEADINGS:
+        return HEADINGS[column]
+    words = column.replace("_", " ").strip()
+    return words[:1].upper() + words[1:]
 
 
 def export(table: pd.DataFrame, filename: str, *, key: str, label: str = "Data (CSV)") -> None:

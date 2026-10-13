@@ -91,11 +91,12 @@ def _form(
         st.markdown("**Payroll**")
         left, right = st.columns([2, 1])
         with left:
-            title = st.segmented_control(
+            # A list, not a row of buttons: five lines do not fit a narrow window (UI polish P3).
+            titles = [mode.title for mode in modes]
+            title = st.selectbox(
                 "Budget",
-                [mode.title for mode in modes],
-                default=defaults.budget_mode.title,
-                required=True,
+                titles,
+                index=titles.index(defaults.budget_mode.title),
                 key="opt_mode",
                 help="The line the payroll may not exceed. The lines are the season's cap rules.",
             )
@@ -215,7 +216,7 @@ def _form(
             )
             st.session_state.pop(SAVED, None)
         except ValidationError as error:
-            st.error("; ".join(item["msg"] for item in error.errors()), icon=":material/error:")
+            components.alert("error", "; ".join(item["msg"] for item in error.errors()))
             return None
     return st.session_state.get(REQUEST)
 
@@ -252,7 +253,7 @@ def _results(filters, status: OptimizerStatus, request: OptimizerRequest) -> Non
         said += " The solver ran out of time on at least one roster, which may not be the best."
     st.caption(said)
     for reason in report.outcome.reasons:
-        components.tagged(("Note", ":material/info:", "orange"), reason[0].upper() + reason[1:])
+        components.tagged(components.NOTE, reason[0].upper() + reason[1:])
 
     _comparison(report)
     tabs = st.tabs(
@@ -400,14 +401,12 @@ def _plan(report: OptimizerReport, plan: RosterPlan) -> None:
                 try:
                     roster = data.optimizer_save(shown.index.tolist(), name, report.request)
                 except (OptimizerError, RosterError) as error:  # what the lab refuses is shown
-                    st.error(str(error), icon=":material/error:")
+                    components.alert("error", str(error))
                 else:
                     st.session_state[SAVED] = (plan.number, name, roster)
     saved = st.session_state.get(SAVED)
     if saved and saved[0] == plan.number:
-        st.success(
-            f"Saved as “{saved[1]}”. The Team Builder has it.", icon=":material/check_circle:"
-        )
+        components.alert("success", f"Saved as “{saved[1]}”. The Team Builder has it.")
 
 
 def _listed(names) -> str:  # type: ignore[no-untyped-def]

@@ -139,9 +139,7 @@ def _review() -> None:
         asked = st.form_submit_button("Compare with the file in use", type="primary")
     if asked:
         if upload is None or not source.strip():
-            st.warning(
-                "Choose a file, and say where its figures came from.", icon=":material/info:"
-            )
+            components.alert("warning", "Choose a file, and say where its figures came from.")
         else:
             try:
                 st.session_state[REVIEW] = api.review_contract_file(
@@ -149,7 +147,7 @@ def _review() -> None:
                 )
             except api.ContractReviewError as error:
                 st.session_state.pop(REVIEW, None)
-                st.error(f"Not read: {error}", icon=":material/error:")
+                components.alert("error", f"Not read: {error}")
     preview: ContractPreview | None = st.session_state.get(REVIEW)
     if preview is not None:
         _preview(preview)
@@ -180,7 +178,7 @@ def _preview(preview: ContractPreview) -> None:
         )
     )
     for flag in preview.flags:
-        components.tagged(("Check", ":material/warning:", "orange"), flag)
+        components.tagged(components.CHECK, flag)
     if preview.changes:
         rows = pd.DataFrame(
             [

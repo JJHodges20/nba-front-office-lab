@@ -20,7 +20,6 @@ from wb.state import Filters
 SELECTED = "builder_roster"
 CREATED = "builder_roster_created"
 IN_ORDER = ("In order", ":material/check_circle:", "green")
-NOTE = ("Note", ":material/info:", "orange")
 BENCH = ROSTER_SLOTS[-1]
 SOURCES = {"contract": "Contract file", "assumed": "Your assumption"}
 NO_SALARY = "No salary"
@@ -136,7 +135,7 @@ def _create_form(filters: Filters, *, key: str) -> None:
                     name, stats_season=stats_season, payroll_season=payroll_season
                 )
             except RosterError as error:
-                st.error(str(error), icon=":material/error:")
+                components.alert("error", str(error))
             else:
                 st.session_state[CREATED] = created
                 st.rerun()
@@ -172,16 +171,15 @@ def _manage(filters: Filters, roster: pd.Series) -> None:
                     notes=notes,
                 )
             except RosterError as error:
-                st.error(str(error), icon=":material/error:")
+                components.alert("error", str(error))
             else:
                 st.rerun()
     st.divider()
-    confirmed = st.checkbox("I want to delete this roster", key=f"confirm_delete_{roster_id}")
-    if st.button(
+    if components.confirmed_button(
         "Delete roster",
-        icon=":material/delete:",
-        disabled=not confirmed,
+        "I want to delete this roster",
         key=f"delete_{roster_id}",
+        confirm_key=f"confirm_delete_{roster_id}",
     ):
         data.lab().builder.delete(roster_id)
         st.session_state.pop(SELECTED, None)
@@ -285,7 +283,7 @@ def _payroll(summary: RosterSummary) -> None:
 
 def _checks(summary: RosterSummary) -> None:
     for check in summary.checks:
-        components.tagged(IN_ORDER if check.passed else NOTE, check.message)
+        components.tagged(IN_ORDER if check.passed else components.CHECK, check.message)
 
 
 # --- the players ------------------------------------------------------------------------------
@@ -318,7 +316,7 @@ def _add_player(filters: Filters, summary: RosterSummary) -> None:
         )
         if button.form_submit_button("Add", type="primary", icon=":material/person_add:"):
             if player_id is None:
-                st.error("Choose a player first.", icon=":material/error:")
+                components.alert("error", "Choose a player first.")
             else:
                 _apply(
                     lambda: data.lab().builder.add_player(
@@ -335,7 +333,7 @@ def _apply(change) -> None:  # type: ignore[no-untyped-def]
     try:
         change()
     except RosterError as error:
-        st.error(str(error), icon=":material/error:")
+        components.alert("error", str(error))
     else:
         st.rerun()
 

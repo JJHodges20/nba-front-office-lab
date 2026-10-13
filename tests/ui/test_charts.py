@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
+from tests.ui.color_math import contrast
 from wb import charts
 from wb.theme import DARK, LIGHT, Palette
 
@@ -211,6 +212,8 @@ class TestHouseRules:
     def test_lines_are_thin(self, build) -> None:
         for trace in build(LIGHT).data:
             if trace.type == "scatter" and "lines" in (trace.mode or ""):
+                if trace.line.width == 0 and trace.hoverinfo == "skip":
+                    continue  # a band's edge: not drawn, it holds the band's fill (P6)
                 assert trace.line.width == charts.LINE_WIDTH == 2
 
     @EVERY_CHART
@@ -477,7 +480,8 @@ class TestLine:
     def test_an_area_is_a_wash_never_a_block(self) -> None:
         line = BUILDERS["line"](LIGHT).data[0]
         assert line.fill == "tozeroy"
-        assert line.fillcolor == LIGHT.wash(LIGHT.accent) and line.fillcolor.endswith(",0.1)")
+        assert line.fillcolor == LIGHT.wash(LIGHT.accent)
+        assert line.fillcolor.endswith(f",{LIGHT.wash_opacity})")
         plain = charts.line(FRAME, x="x", y="y", text="text", palette=LIGHT).data[0]
         assert plain.fill is None
 
@@ -493,7 +497,7 @@ class TestLine:
         assert list(figure.layout.xaxis.range) == [-0.6, 3.6]
         assert figure.layout.xaxis.tickangle is None  # labels may tilt when seasons crowd
 
-    def test_dates_are_written_level_and_few(self) -> None:
+    def test_dates_are_few_and_slant_only_when_crowded(self) -> None:
         days = FRAME.assign(day=pd.date_range("2026-01-01", periods=len(FRAME), freq="7D"))
         single = charts.line(days, x="day", y="y", text="text", palette=LIGHT)
         several = charts.lines(
@@ -501,7 +505,8 @@ class TestLine:
             palette=LIGHT,
         )  # fmt: skip
         for figure in (single, several):
-            assert figure.layout.xaxis.tickangle == 0
+            # Left to Plotly: level where they fit, slanted on a narrow chart (UI polish P4).
+            assert figure.layout.xaxis.tickangle is None
             assert figure.layout.xaxis.nticks == charts.TIME_TICKS
             assert figure.layout.xaxis.type is None  # left to the data: a span of time
 
@@ -539,6 +544,8 @@ class TestStackedBars:
         assert [note.text for note in figure.layout.annotations] == ["Cap", "Tax"]
 
     def test_neighbouring_threshold_names_sit_on_different_rows(self) -> None:
+        """Three rows (UI polish P4): with two, a phone's narrow chart set "Tax" on "2nd
+        apron", which sit two lines apart."""
         figure = charts.meter(
             value=10.0, value_text="10", palette=LIGHT,
             thresholds={"Tax": 80.0, "Cap": 50.0, "1st apron": 85.0, "2nd apron": 90.0},
@@ -546,7 +553,28 @@ class TestStackedBars:
         notes = figure.layout.annotations
         assert [note.text for note in notes] == ["Cap", "Tax", "1st apron", "2nd apron"]
         shifts = [note.yshift for note in notes]
-        assert shifts[0] == shifts[2] != shifts[1] == shifts[3]
+        assert len(set(shifts[:3])) == charts.THRESHOLD_ROWS == 3 and shifts[3] == shifts[0]
+        # The meter keeps room above its plot for the third row.
+        assert figure.layout.margin.t >= max(shifts) + charts.THRESHOLD_ROW
+
+    def test_threshold_lines_stand_a_step_above_the_gridlines(self) -> None:
+        """Among the gridlines, cap lines in the gridlines' own shade were hard to pick out."""
+        for palette in (LIGHT, DARK):
+            figure = BUILDERS["stacked_bars"](palette)
+            assert {shape.line.color for shape in figure.layout.shapes} == {palette.deemphasis}
+            assert contrast(palette.deemphasis, palette.surface) > contrast(
+                palette.grid, palette.surface
+            )
+
+    def test_more_parts_than_the_palette_has_slots_is_an_error(self) -> None:
+        """Parts past the eighth were dropped without a word (audit finding F19)."""
+        parts = {f"p{n}": f"Part {n}" for n in range(9)}
+        frame = pd.DataFrame({"name": ["a"], **{key: [1.0] for key in parts}, "text": ["t"]})
+        with pytest.raises(ValueError, match="stacks 8 parts, not 9"):
+            charts.stacked_bars(
+                frame, label="name", parts=parts, text=dict.fromkeys(parts, "text"),
+                palette=LIGHT, value_title="Salary",
+            )  # fmt: skip
 
     def test_one_part_needs_no_legend(self) -> None:
         figure = charts.stacked_bars(
@@ -561,6 +589,34 @@ class TestHistogram:
         bars = BUILDERS["histogram"](LIGHT).data[0]
         assert bars.type == "histogram"
         assert (bars.marker.color, bars.marker.line.color) == (LIGHT.accent, LIGHT.surface)
+
+    def test_an_end_value_is_named_away_from_the_edge_and_labels_clear_the_corner(self) -> None:
+        """UI polish P4: the first value label sat on the count axis's "0"."""
+        values = pd.Series([1.0, 2.0, 3.0, 4.0])
+        figure = charts.histogram(
+            values, palette=LIGHT, x_title="X", marker=4.0, marker_label="The player"
+        )
+        (note,) = figure.layout.annotations
+        assert note.xanchor == "right"
+        assert figure.layout.xaxis.ticklabelstandoff == 10
+
+
+class TestAxisTitles:
+    def test_a_long_title_takes_two_balanced_lines_and_a_short_one_one(self) -> None:
+        """UI polish P4: centred under a phone's narrow plot, a long title ran off the chart."""
+        long = "Chance of the title before the playoffs, with its 95% interval"
+
+        def title(text: str) -> str:
+            figure = charts.interval_rows(
+                RATES, label="band", value="rate", low="low", high="high", text="text",
+                palette=LIGHT, value_title=text,
+            )  # fmt: skip
+            return figure.layout.xaxis.title.text
+
+        first, second = title(long).split("<br>")
+        assert f"{first} {second}" == long
+        assert abs(len(first) - len(second)) <= 12
+        assert title("Net rating") == "Net rating"
 
     def test_the_marked_value_is_a_line_with_its_name(self) -> None:
         figure = BUILDERS["histogram"](LIGHT)
@@ -622,6 +678,7 @@ class TestIntervalColumns:
         assert figure.layout.yaxis.tickformat == ".0%"
         assert figure.layout.yaxis.rangemode == "tozero"
         assert figure.layout.yaxis.title.text == "Share of teams"
+        # Level: tilted, two-line labels garble into each other (tried at UI polish P4).
         assert figure.layout.xaxis.type == "category" and figure.layout.xaxis.tickangle == 0
 
     def test_few_columns_stay_thin_and_many_still_have_air(self) -> None:
@@ -640,6 +697,33 @@ class TestIntervalColumns:
         # On the width the chart is laid out for, a column is no thicker than a bar may be.
         band = charts.COLUMN_PLOT_WIDTH / 14
         assert band * (1 - gap(14)) <= charts.MAX_BAR_THICKNESS + 1e-9
+
+    def test_many_columns_take_turns_on_two_levels_of_labels(self) -> None:
+        """UI polish P5: at 1024px fourteen level labels ran together; staggered, each label
+        has two columns' room. A few columns keep their labels on one level."""
+
+        def columns(count: int) -> go.Figure:
+            frame = pd.DataFrame(
+                {"band": [f"{n} to {n + 5}<br>n = {n}" for n in range(count)], "rate": 0.5,
+                 "low": 0.4, "high": 0.6, "text": "t"}
+            )  # fmt: skip
+            return charts.interval_columns(
+                frame, label="band", value="rate", low="low", high="high", text="text",
+                palette=LIGHT,
+            )  # fmt: skip
+
+        few = columns(charts.STAGGER_FROM - 1)
+        assert few.layout.xaxis.showticklabels is None and not few.layout.annotations
+        many = columns(14)
+        assert many.layout.xaxis.showticklabels is False
+        notes = many.layout.annotations
+        assert [note.text for note in notes] == list(many.data[0].x)
+        assert [note.x for note in notes] == list(many.data[0].x)
+        levels = [note.yshift for note in notes]
+        assert levels[0::2] == [levels[0]] * 7 and levels[1::2] == [levels[1]] * 7
+        assert levels[0] != levels[1]
+        assert {note.font.color for note in notes} == {LIGHT.ink_muted}
+        assert many.layout.margin.b >= 2 * charts.LABEL_LEVEL
 
     def test_nothing_to_show_is_an_empty_chart_not_an_error(self) -> None:
         figure = charts.interval_columns(
@@ -728,7 +812,27 @@ class TestIntervalRows:
         plain = charts.interval_rows(
             RATES, label="band", value="rate", low="low", high="high", text="text", palette=LIGHT
         )
-        assert plain.layout.xaxis.range is None and plain.layout.margin.t == 12
+        # Without a line, room either side too: no interval ends on the edge (UI polish P4).
+        left, right = plain.layout.xaxis.range
+        low, high = RATES["low"].min(), RATES["high"].max()
+        room = (high - low) * charts.LABEL_ROOM / 2
+        assert (left, right) == pytest.approx((low - room, high + room))
+        assert plain.layout.margin.t == 12
+
+    def test_a_line_near_an_end_of_the_axis_is_named_away_from_the_edge(self) -> None:
+        """At the right end, a centred name ran past the chart on a phone (UI polish P4)."""
+
+        def side(reference: float) -> str:
+            figure = charts.interval_rows(
+                RATES, label="band", value="rate", low="low", high="high", text="text",
+                palette=LIGHT, reference=reference, reference_label="Line",
+            )  # fmt: skip
+            (note,) = figure.layout.annotations
+            return note.xanchor
+
+        low, high = RATES["low"].min(), RATES["high"].max()
+        assert side(high) == "right" and side(low) == "left"
+        assert side((low + high) / 2) == "center"
 
     def test_the_chart_grows_with_its_rows(self) -> None:
         three = BUILDERS["interval_rows"](LIGHT).layout.height
@@ -763,9 +867,15 @@ class TestMeter:
 class TestBandLine:
     def test_the_band_is_a_wash_from_low_to_high_behind_the_line(self) -> None:
         lower, upper, line, dots = BUILDERS["band_line"](LIGHT).data
-        assert lower.mode == upper.mode == "none"
+        # Edges drawn as lines of no width: with mode "none" Plotly placed the lower edge
+        # nowhere and the band filled to nothing - unseen in a browser until UI polish P6.
+        assert lower.mode == upper.mode == "lines"
+        assert lower.line.width == upper.line.width == 0
         assert lower.fill is None and upper.fill == "tonexty"
         assert upper.fillcolor == LIGHT.wash(LIGHT.accent)
+        # The dark theme's wash is stronger: at a tenth its band could not be seen (P6).
+        dark_upper = BUILDERS["band_line"](DARK).data[1]
+        assert dark_upper.fillcolor == DARK.wash(DARK.accent) and DARK.wash_opacity > 0.1
         assert list(lower.y) == [0.0, 0.1, 0.4] and list(upper.y) == [0.2, 0.5, 0.8]
         assert lower.hoverinfo == upper.hoverinfo == "skip"
         assert line.mode == "lines" and line.line.color == LIGHT.accent

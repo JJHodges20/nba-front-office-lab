@@ -9,10 +9,11 @@ from front_office.domain.metrics import MetricCatalog
 from front_office.services import DEFAULT_QUALIFICATION, METRIC_CATALOGS
 from front_office.services.players import SPAN_QUALIFICATION
 from wb import charts, components, data, formats, state
-from wb.components import DERIVED, EMPTY_CELL, ESTIMATE, MEASURED
+from wb.components import DERIVED, EMPTY_CELL, ESTIMATE, MEASURED, Figure
 from wb.state import Filters
 
 PLAYERS, TEAMS = "Players", "Teams"
+SUBJECT = "lab_subject"
 PLAYER_AXES = ("usage_pct", "ts_pct")
 TEAM_AXES = ("efg_pct", "off_rating")
 BETTER = {True: "Higher", False: "Lower", None: "Neither"}
@@ -20,9 +21,25 @@ BETTER = {True: "Higher", False: "Lower", None: "Neither"}
 
 def render() -> None:
     filters = state.current()
-    components.header("Analytics Lab", filters.scope)
-    subject, frame, catalog, estimated = _population(filters)
-    components.provenance([MEASURED, DERIVED, *([ESTIMATE] if estimated else [])])
+    subjects = [PLAYERS, TEAMS] if filters.has_players else [TEAMS]
+    # The study is read before its control is drawn, so that the kinds of number it shows
+    # stand under the title, where every other page has them (UI polish P5).
+    stored = st.session_state.get(SUBJECT)
+    subject = stored if stored in subjects else subjects[0]
+    frame, catalog, estimated = _population(filters, subject)
+    components.header(
+        "Analytics Lab",
+        filters.scope,
+        kinds=[MEASURED, DERIVED, *([ESTIMATE] if estimated else [])],
+    )
+    st.segmented_control(
+        "Study",
+        subjects,
+        default=subjects[0],
+        required=True,
+        key=SUBJECT,
+        help="Who the Relationships and Distributions tabs describe.",
+    )
 
     relationships, distribution, glossary = st.tabs(
         ["Relationships", "Distributions", "Metric glossary"]
@@ -35,27 +52,20 @@ def render() -> None:
         _glossary()
 
 
-def _population(filters: Filters) -> tuple[str, pd.DataFrame, MetricCatalog, tuple[str, ...]]:
+def _population(
+    filters: Filters, subject: str
+) -> tuple[pd.DataFrame, MetricCatalog, tuple[str, ...]]:
     """Who is being studied: the season's qualified players, or its teams."""
-    subjects = [PLAYERS, TEAMS] if filters.has_players else [TEAMS]
-    subject = st.segmented_control(
-        "Study",
-        subjects,
-        default=subjects[0],
-        required=True,
-        key="lab_subject",
-        help="Who the Relationships and Distributions tabs describe.",
-    )
     if subject == TEAMS:
         table = data.team_table(filters.build, filters.season, filters.season_type, filters.window)
         frame = table.teams.assign(name=table.teams["team_name"])
-        return subject, frame, table.metrics, table.estimated
+        return frame, table.metrics, table.estimated
     qualification = DEFAULT_QUALIFICATION if filters.window.is_full_season else SPAN_QUALIFICATION
     table = data.player_table(
         filters.build, filters.season, filters.season_type, filters.window, qualification, None
     )
     players = table.players[table.players["is_qualified"]]
-    return subject, players.assign(name=players["player_name"]), table.metrics, ()
+    return players.assign(name=players["player_name"]), table.metrics, ()
 
 
 def _metric_picker(
@@ -123,36 +133,36 @@ def _relationships(filters, subject, frame, catalog, estimated) -> None:  # type
         height=520,
     )
     association = data.association(plotted, x, y)
-    chart, numbers = st.columns([4, 1], gap="large")
-    with chart:
-        columns = ["name", *([group] if group else []), x, y]
-        components.chart(
-            figure,
-            plotted[list(dict.fromkeys(columns))].sort_values(x, ascending=False),
-            key="lab_scatter",
-            filename=f"{subject.lower()}_{x}_vs_{y}_{filters.season}",
-            catalog=catalog,
-        )
-    with numbers:
-        st.metric(
-            subject,
-            formats.number(association.sample),
-            border=True,
-            help="Rows with a value for both metrics.",
-        )
-        st.metric(
-            "Linear correlation",
-            _correlation(association.pearson),
-            border=True,
-            help="Pearson's r, from -1 to +1: how closely the points follow a straight line.",
-        )
-        st.metric(
-            "Rank correlation",
-            _correlation(association.spearman),
-            border=True,
-            help="Spearman's rho, from -1 to +1: whether one rises with the other, "
-            "straight line or not.",
-        )
+    # The three numbers lead, as tiles do on every page, and the chart takes the page's
+    # width: in a fifth of it beside the chart, the tiles were cut at 1024px (UI polish P5).
+    components.figures(
+        [
+            Figure(
+                subject,
+                formats.number(association.sample),
+                help="Rows with a value for both metrics.",
+            ),
+            Figure(
+                "Linear correlation",
+                _correlation(association.pearson),
+                help="Pearson's r, from -1 to +1: how closely the points follow a straight line.",
+            ),
+            Figure(
+                "Rank correlation",
+                _correlation(association.spearman),
+                help="Spearman's rho, from -1 to +1: whether one rises with the other, "
+                "straight line or not.",
+            ),
+        ]
+    )
+    columns = ["name", *([group] if group else []), x, y]
+    components.chart(
+        figure,
+        plotted[list(dict.fromkeys(columns))].sort_values(x, ascending=False),
+        key="lab_scatter",
+        filename=f"{subject.lower()}_{x}_vs_{y}_{filters.season}",
+        catalog=catalog,
+    )
     st.caption(
         "A correlation describes these rows and nothing more. It does not show that one "
         "thing causes the other, and on a few dozen rows it moves a good deal by chance."

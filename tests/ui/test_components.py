@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import re
+from pathlib import Path
+
 from streamlit.testing.v1 import AppTest
 
 from front_office.domain.metrics import MetricCatalog, MetricFormat, MetricSpec
@@ -17,6 +21,9 @@ CATALOG = MetricCatalog(
                    "Shooting", MetricFormat.PERCENT),
     )
 )  # fmt: skip
+APPS = Path(__file__).resolve().parents[2] / "apps" / "workbench"
+TAG = re.compile(r'\(\s*"([^"]+)",\s*":material/([a-z_]+):",\s*"([a-z]+)"')
+"""A tag written out in the code: its word, its icon and its colour."""
 
 
 def drawn(script) -> AppTest:  # type: ignore[no-untyped-def]
@@ -109,6 +116,88 @@ def test_figures_sit_in_one_row_unless_told_to_wrap() -> None:
     assert list(figures(rows)) == list(expected)
 
 
+def test_each_row_of_tiles_is_named_for_the_grid_that_wraps_it() -> None:
+    """UI polish P3: wb/style.css lays out a container keyed "tiles-" as a grid that wraps in
+    a narrow window, and one keyed "tiles-wide-" - a row of four tiles or fewer, which has the
+    room - with wider tiles. A page's rows are counted from the start of each run, so they
+    keep their names."""
+
+    def script() -> None:
+        from wb import components
+        from wb.components import Figure
+
+        components.new_page()
+        components.figures([Figure(f"Figure {n}", str(n)) for n in range(5)])
+        components.figures([Figure(f"Long {n}", str(n)) for n in range(4)], per_row=3)
+        components.figures([Figure(f"Four {n}", str(n)) for n in range(4)])
+
+    def names(opened: AppTest) -> list[str]:
+        # A keyed container's id ends with its key: "$$ID-<hash>-<key>".
+        return [block.proto.id.split("-", 2)[2] for block in opened.main.children.values()]
+
+    expected = ["tiles-0", "tiles-wide-1", "tiles-wide-2", "tiles-wide-3"]
+    opened = drawn(script)
+    assert names(opened) == expected
+    assert len(figures(opened)) == 13
+    opened.run()
+    assert names(opened) == expected, "the same names in the next run"
+
+
+def test_a_tag_word_looks_the_same_wherever_it_appears() -> None:
+    """UI polish P3 (audit F12): "Note" was blue on two pages, orange on two and gray in the
+    answers, and "Out of date" was written out in four views. A word has one icon and one
+    colour everywhere, and a tag that several pages use is written once, in components."""
+    looks: dict[str, set[tuple[str, str]]] = {}
+    for path in APPS.rglob("*.py"):
+        for word, icon, color in TAG.findall(path.read_text(encoding="utf-8")):
+            looks.setdefault(word, set()).add((icon, color))
+    assert {word: found for word, found in looks.items() if len(found) > 1} == {}
+    for word, _, _ in (components.NOTE, components.CHECK, components.OUT_OF_DATE):
+        writers = [
+            path.name
+            for path in APPS.rglob("*.py")
+            if any(found == word for found, _, _ in TAG.findall(path.read_text(encoding="utf-8")))
+        ]
+        assert writers == ["components.py"], word
+    assert components.NO_ANSWER[0] == "No answer"
+
+
+def test_what_cannot_be_undone_waits_for_its_box() -> None:
+    """UI polish P3, the owner's decision: every delete asks first, the same way."""
+
+    def script() -> None:
+        import streamlit as st
+
+        from wb import components
+
+        if components.confirmed_button(
+            "Delete it", "I want to delete it", key="gone", confirm_key="gone_ok"
+        ):
+            st.markdown("Deleted.")
+
+    opened = drawn(script)
+    button = opened.button(key="gone")
+    assert button.label == "Delete it" and button.disabled
+    assert button.proto.type != "primary", "never drawn as the page's main action"
+    assert "Deleted." not in [element.value for element in opened.markdown]
+    opened.checkbox(key="gone_ok").check().run()
+    assert not opened.button(key="gone").disabled
+    opened.button(key="gone").click().run()
+    assert "Deleted." in [element.value for element in opened.markdown]
+
+
+def test_every_delete_asks_first() -> None:
+    """No page draws a plain button that deletes or clears: they go through
+    ``components.confirmed_button``, which waits for its box to be ticked."""
+    pressed = re.compile(r'st\.(?:form_submit_)?button\(\s*f?"(?:Delete|Clear)')
+    found = [
+        path.relative_to(APPS).as_posix()
+        for path in APPS.rglob("*.py")
+        if pressed.search(path.read_text(encoding="utf-8"))
+    ]
+    assert found == []
+
+
 def test_a_chart_comes_with_its_table_and_says_how_to_save_an_image() -> None:
     def script() -> None:
         import pandas as pd
@@ -135,8 +224,22 @@ def test_a_chart_comes_with_its_table_and_says_how_to_save_an_image() -> None:
     table = opened.dataframe[0].value
     assert table["season"].tolist() == ["2024-25", "2025-26"]
     assert table["efg_pct"].iloc[0] == 0.543  # numbers underneath, so the table sorts
+    # Headings in words, a metric by its stat-sheet label (UI polish P5: they were the
+    # columns' own names, such as "team_name"); the data keeps its names, and so the CSV.
+    settings = json.loads(opened.dataframe[0].proto.columns)
+    headings = {column: shown["label"] for column, shown in settings.items() if "label" in shown}
+    assert headings == {"season": "Season", "efg_pct": "eFG%"}
+    downloads = [button.proto.label for button in opened.get("download_button")]
+    assert downloads == ["Data (CSV)", "Chart (HTML)"]
     captions = [caption.value for caption in opened.caption]
     assert "For a static image, use the camera button at the top right of the chart." in captions
+
+
+def test_a_table_view_names_its_columns_in_words() -> None:
+    assert components.heading("team_name") == "Team"
+    assert components.heading("player_name") == "Player"
+    assert components.heading("wins_low") == "Wins low"
+    assert components.heading("p10") == "P10"
 
 
 def test_an_empty_section_says_what_is_missing_and_why() -> None:
@@ -159,3 +262,29 @@ def test_too_few_games_names_the_span_it_could_not_draw() -> None:
     assert components.TOO_FEW_GAMES.format(games=20).startswith(
         "Form over 20 games needs 20 games played"
     )
+
+
+def test_every_kind_of_message_has_its_one_icon() -> None:
+    """UI polish P2: errors, warnings, successes and notes are drawn one way on every page."""
+
+    def script() -> None:
+        from wb import components
+
+        components.alert("error", "Refused.")
+        components.alert("warning", "Check this.")
+        components.alert("success", "Saved.")
+        components.alert("info", "Already saved.")
+
+    opened = drawn(script)
+    drawn_as = {
+        "error": [(e.value, e.icon) for e in opened.error],
+        "warning": [(e.value, e.icon) for e in opened.warning],
+        "success": [(e.value, e.icon) for e in opened.success],
+        "info": [(e.value, e.icon) for e in opened.info],
+    }
+    assert drawn_as == {
+        "error": [("Refused.", ":material/error:")],
+        "warning": [("Check this.", ":material/warning:")],
+        "success": [("Saved.", ":material/check_circle:")],
+        "info": [("Already saved.", ":material/info:")],
+    }

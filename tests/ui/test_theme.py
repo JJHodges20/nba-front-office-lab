@@ -8,6 +8,7 @@ are also readable as text, which every chart's table view guarantees.
 
 from __future__ import annotations
 
+import re
 import tomllib
 from pathlib import Path
 
@@ -78,8 +79,17 @@ def test_the_subject_stands_out_from_its_context(colors: Palette) -> None:
 def test_text_is_readable_on_the_surface(colors: Palette) -> None:
     assert contrast(colors.ink, colors.surface) >= 7
     assert contrast(colors.ink_secondary, colors.surface) >= TEXT_CONTRAST
-    # Axis labels are large enough for the 3:1 that applies to large text.
-    assert contrast(colors.ink_muted, colors.surface) >= MARK_CONTRAST
+    # Tick labels are 12px, small text, so 4.5:1 - not the 3:1 of large text, which this
+    # test once allowed and the light theme's muted ink (3.5:1) met (UI polish P4).
+    assert contrast(colors.ink_muted, colors.surface) >= TEXT_CONTRAST
+    assert contrast(colors.ink_muted, colors.plane) >= TEXT_CONTRAST
+
+
+@PALETTES
+def test_every_series_stands_out_from_the_surface(colors: Palette) -> None:
+    """A mark needs 3:1 against its chart (UI polish P4: three light series were under it)."""
+    for color in colors.series:
+        assert contrast(color, colors.surface) >= MARK_CONTRAST, color
 
 
 @PALETTES
@@ -103,6 +113,39 @@ def test_status_colours_are_not_series_colours(colors: Palette) -> None:
     assert not status & set(colors.series)
 
 
+@PALETTES
+def test_the_brand_holds_a_white_label_and_shows_on_the_page(colors: Palette) -> None:
+    """Streamlit has one primary colour: the fill under a primary button's white label, and
+    the selected tab, toggle, slider and focus drawn straight on the page (UI polish P1).
+    The roadmap's deeper forest green, #244f38, would have failed the second line (2.1:1)."""
+    assert contrast("#ffffff", colors.brand) >= TEXT_CONTRAST
+    assert contrast(colors.brand, colors.plane) >= MARK_CONTRAST
+    assert contrast(colors.brand, colors.surface) >= MARK_CONTRAST
+    assert contrast(colors.link, colors.plane) >= TEXT_CONTRAST
+    assert contrast(colors.link, colors.surface) >= TEXT_CONTRAST
+
+
+@PALETTES
+def test_the_focus_ring_on_links_reads_on_either_theme(colors: Palette) -> None:
+    """UI polish P8 (decision D14): the style rule that rings a focused link or menu item
+    cannot tell which theme is on, so it holds one colour - the dark theme's brand - which
+    must stand at 3:1 on the page and the sidebar of both themes."""
+    sheet = Path(__file__).resolve().parents[2] / "apps" / "workbench" / "wb" / "style.css"
+    rings = re.findall(r"outline:\s*2px solid (#[0-9a-fA-F]{6})", sheet.read_text(encoding="utf-8"))
+    assert rings and {ring.lower() for ring in rings} == {DARK.brand}
+    assert contrast(DARK.brand, colors.plane) >= MARK_CONTRAST
+    assert contrast(DARK.brand, colors.surface) >= MARK_CONTRAST
+
+
+@PALETTES
+def test_the_brand_is_not_a_chart_colour(colors: Palette) -> None:
+    """Actions and selection are green; data keeps its own colours, so a chart never takes
+    a series for a button, nor a loss for a success."""
+    assert colors.brand not in colors.series and colors.link not in colors.series
+    assert difference(colors.brand, colors.accent) >= NORMAL_FLOOR
+    assert colors.brand not in {colors.good, colors.warning, colors.serious, colors.critical}
+
+
 def test_the_palette_follows_the_theme_type() -> None:
     assert palette("dark") is DARK
     assert palette("light") is LIGHT
@@ -110,9 +153,26 @@ def test_the_palette_follows_the_theme_type() -> None:
 
 
 def test_wash_is_a_translucent_version_of_the_colour() -> None:
-    assert LIGHT.wash("#2a78d6") == "rgba(42,120,214,0.1)"
+    assert LIGHT.wash("#2a78d6") == "rgba(42,120,214,0.15)"
+    assert DARK.wash("#2a78d6") == "rgba(42,120,214,0.25)"
     assert LIGHT.wash("#ffffff", 0.25) == "rgba(255,255,255,0.25)"
     assert LIGHT.accent == LIGHT.series[0]
+
+
+@PALETTES
+def test_an_uncertainty_band_can_be_seen_and_stays_a_wash(colors: Palette) -> None:
+    """UI polish P6: at a tenth, the dark theme's band - a chance curve's 95% interval, 30
+    points wide - could not be seen. The wash must stand off the chart's surface, leave the
+    line it sits behind readable, and stay translucent."""
+    red, green, blue = (int(colors.accent[index : index + 2], 16) for index in (1, 3, 5))
+    under = [int(colors.surface[index : index + 2], 16) for index in (1, 3, 5)]
+    washed = "#" + "".join(
+        f"{round(base + colors.wash_opacity * (top - base)):02x}"
+        for base, top in zip(under, (red, green, blue), strict=True)
+    )
+    assert difference(washed, colors.surface) >= 6
+    assert contrast(colors.accent, washed) >= MARK_CONTRAST
+    assert colors.wash_opacity <= 0.3
 
 
 @pytest.fixture(scope="module")
@@ -131,9 +191,32 @@ class TestPageThemeMatchesTheCharts:
         assert page["backgroundColor"] == colors.plane
         assert page["secondaryBackgroundColor"] == colors.surface
         assert page["textColor"] == colors.ink
-        assert page["primaryColor"] == colors.accent
         assert page["borderColor"] == colors.grid
+        assert page["dataframeBorderColor"] == colors.grid
+        assert page["dataframeHeaderBackgroundColor"] == colors.surface
+        assert page["grayColor"] == colors.ink_muted
         assert page["sidebar"]["backgroundColor"] == colors.surface
+        assert page["sidebar"]["secondaryBackgroundColor"] == colors.plane
+
+    @pytest.mark.parametrize(("mode", "colors"), [("light", LIGHT), ("dark", DARK)])
+    def test_the_brand_marks_actions_and_links(
+        self, config: dict, mode: str, colors: Palette
+    ) -> None:
+        """UI polish P1: the primary colour is the brand, no longer the chart accent, which
+        keeps the charts exactly as they were."""
+        page = config[mode]
+        assert page["primaryColor"] == colors.brand
+        assert page["linkColor"] == colors.link
+        assert page["primaryColor"] != colors.accent
+
+    @pytest.mark.parametrize(("mode", "colors"), [("light", LIGHT), ("dark", DARK)])
+    def test_code_is_quiet_text_not_green(self, config: dict, mode: str, colors: Palette) -> None:
+        """UI polish P7: left unset, code takes the green of a good state, and a file path in
+        an answer's evidence read as a link beside the real ones. Code is the secondary ink,
+        which reads at 4.5:1 on the cards (``test_text_is_readable_on_the_surface``)."""
+        page = config[mode]
+        assert page["codeTextColor"] == colors.ink_secondary
+        assert page["codeTextColor"] not in (colors.good, colors.brand, colors.link)
 
     @pytest.mark.parametrize(("mode", "colors"), [("light", LIGHT), ("dark", DARK)])
     def test_categorical_order_and_status_colours(
