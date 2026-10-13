@@ -9,10 +9,10 @@ bar and one style rule, both the owner's choice. **The tiles, tags and controls 
 choices were cut off, and every delete asking first. **The charts (section 6, and the light
 palette's changes in sections 2-3) are in effect since P4**, with P5's and P6's additions to
 sections 6 and 10. **The assistant's surfaces (section 7) are in effect since P7**, with code
-text in the secondary ink (section 2). **P8 measured the whole** (section 11): two choices
-are left to the owner, a keyboard path to the pages (D13) and a clearer focus mark on links
-(D14). The evidence behind each value is in [BASELINE_AUDIT.md](BASELINE_AUDIT.md) and
-[FINAL_AUDIT.md](FINAL_AUDIT.md).
+text in the secondary ink (section 2). **P8 measured the whole** (section 11), and the owner
+chose its two fixes: a keyboard path to the pages (D13, section 8) and a green ring on a
+focused link (D14, section 9). The evidence behind each value is in
+[BASELINE_AUDIT.md](BASELINE_AUDIT.md) and [FINAL_AUDIT.md](FINAL_AUDIT.md).
 
 The roadmap's direction: a near-black canvas, a dark forest-green accent, balanced
 density, the whole workbench in scope, navigation and behaviour unchanged. This proposal
@@ -293,6 +293,11 @@ indents each message by about 50px - it is Streamlit's chat layout, and no setti
 - **Data status**: each source's state in a word and an icon; what lies behind it on hover;
   a line under it only when something needs doing (stale, failing, not supplied); the
   build; and a link to Data Health, where everything is in full.
+- **All pages** (P8, the owner's decision D13): under the data status, a fold, closed, that
+  lists every page in its group - the same pages, groups and order as the top bar. Streamlit
+  draws an open top-bar menu after everything on the page, so its pages came last in the
+  keyboard's order; from the fold they are a few presses away. Keyed (`all_pages`), it stays
+  open as the user moves between pages.
 - **Messages**: `components.alert(kind, message)` draws every error, warning, success and
   note, one icon per kind - error `error`, warning `warning`, success `check_circle`,
   note `info` - on every page.
@@ -310,6 +315,7 @@ the frame applies it, and that no page injects HTML or CSS of its own.
 | `[class*="st-key-tiles-"] [data-testid="stHorizontalBlock"] { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }` | Headline tiles (`components.figures`, rows keyed `tiles-`): Streamlit's columns never wrap, so at 1024px five tiles were cut to 103px. As a grid they take as many equal columns as fit and wrap the rest: five across at 1440 and 1366 as before, three and two at 1024, two a row on a phone (the owner's choice, P3) | The tiles are Streamlit's columns, as before P3 |
 | `[class*="st-key-tiles-"] [data-testid="stColumn"] { width: auto; min-width: 0; }` | A column's own width is a share of its row, which inside a grid cell would shrink the tile to that share of the cell | As above |
 | `[class*="st-key-tiles-wide-"] [data-testid="stHorizontalBlock"] { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }` | A row of four tiles or fewer (and `per_row=3`, for long text) has room for wider tiles: at least 14rem, so four stay across a desktop, a 1024px window gives two a row, and a phone one, as before - at 11rem a phone's two a row cut Contract Explorer's tiles | As above |
+| `[data-testid="stPageLink-NavLink"]:focus-visible, [data-testid="stTopNavSection"]:focus-visible, [data-testid="stTopNavDropdownLink"]:focus-visible { outline: 2px solid #2f8556; outline-offset: 2px; }` | A focused sidebar link, top-bar menu or menu item showed only a tint - in the light theme barely different from the page - where buttons, boxes and tabs are ringed (finding F32). CSS cannot tell which theme is on, so the ring is the dark theme's brand, which reads at 3:1 or more on both themes' pages and sidebars, held by `tests/ui/test_theme.py` (the owner's decision D14, P8) | Streamlit's tint returns; the keyboard still works |
 
 ## 10. Choices and actions (P3)
 
@@ -333,13 +339,14 @@ the frame applies it, and that no page injects HTML or CSS of its own.
 ## 11. Keyboard and zoom (P8)
 
 - **Focus.** The control in focus is ringed in the brand green - buttons, dropdowns, boxes,
-  tabs, downloads - in both themes, by Streamlit's own focus styles. A focused sidebar link
-  or top-bar menu item shows only a background tint, and a top-bar menu a grey outline
-  (finding F32): one more style rule would ring them too (decision D14, the owner's).
+  tabs, downloads - in both themes, by Streamlit's own focus styles. A focused sidebar link,
+  top-bar menu or menu item had shown only a tint or a grey outline (finding F32); the fifth
+  style rule rings them too (section 9, the owner's decision D14).
 - **Order.** Tab moves through the sidebar - collapse, filters, the data status and its
-  link - then the top bar's six menus, then the page. Enter opens a menu, but its pages come
-  last in the order, after everything on the page (F31); decision D13 proposes a short list
-  of the pages in the sidebar. The user's guide says how to reach a page by its address.
+  link, *All pages* - then the top bar's six menus, then the page. Enter opens a menu, but
+  its pages come last in the order, after everything on the page (F31); *All pages* is the
+  short way (section 8, D13). The user's guide says both, and how to reach a page by its
+  address.
 - **Keys that work**: typing in a dropdown narrows it and Enter chooses; the arrow keys
   move between tabs; Space ticks a box; Enter presses a button and starts a download;
   Escape closes the *Ask AI about this* dialog, which takes the focus when it opens.

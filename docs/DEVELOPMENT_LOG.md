@@ -3,6 +3,42 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## UI polish P8, the owner's choices - a keyboard path, focus rings, new screenshots (2026-10-13)
+
+At P8's gate the owner chose the two fixes it left open, and new screenshots for the README,
+all before the push (decisions D13 and D14).
+
+**Built**
+
+- **All pages** (D13, finding F31): at the foot of the sidebar, under the data status, a fold
+  - closed, keyed - listing every page in its group from the navigation's own list
+  (`app.all_pages`), so a new page joins it by itself. A keyboard reaches it the stop after
+  *Data Health*, and a page three presses in, on any page; the top bar is unchanged.
+- **Focus rings** (D14, F32): the fifth style rule rings a focused sidebar link, top-bar menu
+  or menu item 2px in `#2f8556`. CSS cannot tell which theme is on (Streamlit sets no theme
+  marker or colour variable), so the ring is the dark theme's brand, which reads at 3:1 or
+  more on both themes' pages and sidebars.
+- **The README's nine screenshots**, the same views in the new dark look, taken from a copy of
+  the data rebuilt without the contract file (`data/ui-polish/workbench-data-readme`; the
+  build's own guard against emptying the contract tables was overridden on that copy only),
+  so no salary or payroll figure is published - none was in the old ones. The AI Research
+  image is a fresh Quick answer from the local model, the second of two asked: the first left
+  out the interval, which the checker noted.
+- **Documents**: DESIGN_SYSTEM.md sections 8, 9 and 11; FINAL_AUDIT.md and the release
+  checklist (D13, D14 and the screenshots decided); the audit's F31, F32, D13 and D14;
+  WORKBENCH.md's keyboard note; CLAUDE.md.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New and changed tests | `test_app.py`: every page folded at the foot of the sidebar, in the navigation's groups and order (new); the data status's link first. `test_style.py`: the fifth rule, and selectors compared with their spaces made single. `test_theme.py`: the ring is the dark brand and reads at 3:1 on both themes' pages and sidebars (new) |
+| `pytest -n auto`, once at the gate | 3,986 passed (4 min 36 s); at P8, 3,983 |
+| In a browser, both themes | *All pages* reached the stop after *Data Health*, opened with Enter, Player Explorer reached three presses in and opened; a green ring on the *Data Health* link, the fold, a link in it, a top-bar menu and a menu item; the fold closed and open at 1440, and on a phone, where it repeats Streamlit's own page list, closed |
+| The README's images | Each of the nine looked at: the same view as before, "Contract file: not supplied" in every sidebar, the simulator's payroll a dash |
+| Boundaries and data | `app.py`, `style.css`, three test files and documents; the rebuild and the two questions ran on throwaway copies, never the lab's data |
+
 ## UI polish P8 - accessibility, every size, the final audit (2026-10-12)
 
 The last phase of the polish: the whole workbench measured on the final code, and the

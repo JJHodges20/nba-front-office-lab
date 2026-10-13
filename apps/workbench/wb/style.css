@@ -30,3 +30,15 @@
 [class*="st-key-tiles-wide-"] [data-testid="stHorizontalBlock"] {
     grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
 }
+
+/* UI polish P8, the owner's decision D14: a focused sidebar link, top-bar menu or menu item
+   showed only a tint - in the light theme barely different from the page - where buttons,
+   boxes and tabs are ringed. CSS cannot tell which theme is on, so the ring is the dark
+   theme's brand green, which reads at 3:1 or more on both themes' pages and sidebars
+   (tests/ui/test_theme.py). Without this rule the tint is Streamlit's own. */
+[data-testid="stPageLink-NavLink"]:focus-visible,
+[data-testid="stTopNavSection"]:focus-visible,
+[data-testid="stTopNavDropdownLink"]:focus-visible {
+    outline: 2px solid #2f8556;
+    outline-offset: 2px;
+}

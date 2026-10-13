@@ -163,6 +163,19 @@ def data_status(build: int | None, built_at: datetime | None) -> None:
         st.page_link(HEALTH_PAGE, label="Data Health", icon=":material/monitor_heart:")
 
 
+def all_pages() -> None:
+    """Every page in its group, folded at the foot of the sidebar (UI polish P8, the owner's
+    decision D13). Streamlit draws an open top-bar menu after everything on the page, so its
+    pages came last in the keyboard's order; from here a keyboard reaches any page in a few
+    steps. Closed, the fold is one stop, and the top bar is as it was."""
+    with st.sidebar:
+        with st.expander("All pages", icon=":material/menu:", key="all_pages"):
+            for group, pages in PAGES.items():
+                st.caption(group)
+                for each in pages:
+                    st.page_link(each, label=each.title, icon=each.icon)
+
+
 status = data.status()
 if not status.is_built:
     not_built()
@@ -173,3 +186,4 @@ state.sidebar(status)
 components.new_page()
 page.run()
 data_status(status.build_id, status.built_at)
+all_pages()

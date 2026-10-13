@@ -6,11 +6,13 @@ run or to approve: nothing here is done for them. The evidence for each phase is
 
 ## 1. Decide
 
-- [ ] **D13**, a keyboard path to the pages (finding F31): an *All pages* fold in the sidebar,
-      or leave it.
-- [ ] **D14**, focus marks on links and menu items (F32): one more style rule, or leave it.
+- [x] **D13**, a keyboard path to the pages (finding F31): the *All pages* fold in the
+      sidebar - the owner's choice, 2026-10-13, built at P8.
+- [x] **D14**, focus marks on links and menu items (F32): one more style rule - the owner's
+      choice, built at P8.
+- [x] **The README's screenshots**: taken again in the new look, without salaries - the
+      owner's choice.
 - [ ] **F29**, the answer checker: whether to open an assistant milestone for it.
-- [ ] **The README's screenshots**: new ones in the new look, or keep the old ones.
 - [ ] **D6**, the assistant's context: unchanged by the polish; a separate proposal if wanted.
 
 ## 2. Look
@@ -35,7 +37,7 @@ app's menu (top right) once: the browser remembers it.
 .\.venv\Scripts\python.exe -m pytest -n auto    # every test but the live ones; about 5 minutes
 ```
 
-- [ ] Ruff clean; every test passes (3,983 or more at P8).
+- [ ] Ruff clean; every test passes (3,986 at the last gate).
 - [ ] Optional, with Ollama running: `.\.venv\Scripts\python.exe -m pytest -m ollama`.
 
 ## 4. Push

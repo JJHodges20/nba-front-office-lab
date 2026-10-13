@@ -13,6 +13,25 @@ from tests.helpers import BOS, TATUM
 from tests.ui.conftest import APP, figures, texts
 from wb import state
 
+GROUPS = ("League", "Explore", "Build", "Forecast", "Ask", "System")
+PAGE_TITLES = (
+    "League Overview",
+    "Winning Benchmarks",
+    "Player Explorer",
+    "Player Value",
+    "Team Explorer",
+    "Contract Explorer",
+    "Analytics Lab",
+    "Team Builder",
+    "Roster Fit",
+    "Roster Optimizer",
+    "Postseason Outlook",
+    "Scenario Simulator",
+    "AI Research",
+    "Data Health",
+)
+"""The navigation's pages in its order: the top bar's, and the sidebar's fold of them."""
+
 
 def tile_rows(opened: AppTest) -> list[str]:
     """The keys of a page's rows of headline tiles, in order: a keyed container's id ends with
@@ -70,7 +89,18 @@ class TestFrame:
     def test_the_data_status_links_to_data_health(self, app, plain_home: Path) -> None:
         opened = app(plain_home)
         links = [link.proto.label for link in opened.sidebar.get("page_link")]
-        assert links == ["Data Health"]
+        assert links[0] == "Data Health"
+
+    def test_every_page_is_folded_at_the_foot_of_the_sidebar(self, app, plain_home: Path) -> None:
+        """UI polish P8 (decision D13): Streamlit draws an open top-bar menu after everything
+        on the page, so its pages came last in the keyboard's order. The sidebar folds every
+        page, in the navigation's groups and order, under the data status."""
+        opened = app(plain_home)
+        assert "All pages" in [block.label for block in opened.sidebar.status]
+        links = [link.proto.label for link in opened.sidebar.get("page_link")]
+        assert links == ["Data Health", *PAGE_TITLES]
+        groups = [caption.value for caption in opened.sidebar.caption][-len(GROUPS) :]
+        assert groups == list(GROUPS)
 
     def test_a_page_names_its_rows_of_tiles_afresh_each_run(self, app, plain_home: Path) -> None:
         """UI polish P3: the frame starts each run's count, so a row of tiles keeps its name -

@@ -1,6 +1,6 @@
 # UI polish: final audit (P8)
 
-**Status: 2026-10-12, branch `ui-polish`.** The Dark Forest polish of the workbench, phases
+**Status: 2026-10-13, branch `ui-polish`.** The Dark Forest polish of the workbench, phases
 P0 to P8, measured against the baseline in [BASELINE_AUDIT.md](BASELINE_AUDIT.md). The design
 as it now stands is [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md); what to check before the branch is
 merged is [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
@@ -11,12 +11,14 @@ merged is [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 | P2 the frame | `5a7fb0c` | pushed |
 | P3 shared components | `8354d68` | pushed |
 | P4 charts | `9fb68fe` | pushed |
-| P5 League and Explore pages | `4b4d40e` | committed on this computer |
-| P6 Build, Forecast and System pages | `fd3a1cb` | committed on this computer |
-| P7 the assistant's surfaces | `37bde33` | committed on this computer |
-| P8 accessibility and this audit | the commit that adds this file | committed on this computer |
+| P5 League and Explore pages | `4b4d40e` | pushed |
+| P6 Build, Forecast and System pages | `fd3a1cb` | pushed |
+| P7 the assistant's surfaces | `37bde33` | pushed |
+| P8 accessibility and this audit | `946190a` | pushed |
+| P8, the owner's choices (D13, D14, the README's screenshots) | the commit after it | pushed |
 
-Nothing has been pushed past P4, and nothing goes to `main` without the owner.
+Pushed to `origin/ui-polish` with the owner's approval of 2026-10-13; nothing goes to `main`
+without the owner.
 
 ## 1. What changed, from P0
 
@@ -44,7 +46,9 @@ Nothing has been pushed past P4, and nothing goes to `main` without the owner.
   roster says waiting, saved or declined; a figure appears once in an answer's rows; code
   is no longer the green of a good state; folds and popovers stay open while the page
   changes around them.
-- **Accessibility** (P8): measured in section 5; two findings for the owner (F31, F32).
+- **Accessibility** (P8): measured in section 5. Two findings (F31, F32) went to the owner,
+  who chose both fixes: an *All pages* list in the sidebar for the keyboard, and a green
+  ring on a focused link. The README's screenshots are taken again in the new look.
 
 ## 2. What did not change
 
@@ -59,7 +63,7 @@ Nothing has been pushed past P4, and nothing goes to `main` without the owner.
 - **The tests**: none weakened, none removed. The suite grew from 3,950 at P0 to 3,983 at P7
   as each phase added its own (see the development log).
 - **The rules of the code**: no page writes CSS or HTML; the style rules live in one file
-  (`wb/style.css`, four rules, each the owner's choice) and a test holds it to that list.
+  (`wb/style.css`, five rules, each the owner's choice) and a test holds it to that list.
 
 ## 3. Every finding
 
@@ -95,28 +99,34 @@ Nothing has been pushed past P4, and nothing goes to `main` without the owner.
 | F28 | Figures shown twice in an answer's rows | Fixed in P7 |
 | F29 | The answer checker keeps a place from another measure | Open: for a later assistant milestone (the owner's call) |
 | F30 | Popovers and folds closed under the user | Fixed in P7 |
-| F31 | The top bar's pages are last in the keyboard's order | Open: decision D13 |
-| F32 | Faint focus marks on links and menu items | Open: decision D14 |
+| F31 | The top bar's pages are last in the keyboard's order | Fixed in P8: *All pages* in the sidebar (D13, the owner's) |
+| F32 | Faint focus marks on links and menu items | Fixed in P8: a green ring (D14, the owner's) |
 
 **F31** (P8, the keyboard pass): Enter opens a top-bar menu, but its pages come at the end of
 the tab order - Streamlit draws an open menu after everything else on the page - so a
 keyboard user tabs through the whole page to reach them: 16 to 25 presses on the pages
 tried, more on a long page. Tab from a menu moves to the next menu, and the arrow keys do
 nothing. Every page can still be reached, and its address typed. Before P2 the sidebar's
-page list came first.
+page list came first. **Fixed** (D13): *All pages*, folded at the foot of the sidebar, is the
+stop after *Data Health*; Enter opens it, and a page is a few presses in - the same on
+every page, however long. The top bar is as it was.
 
 **F32** (P8): a focused button, dropdown, box, tab or download shows a clear green ring in
 both themes; a focused sidebar link (*Data Health*) or menu item shows only a background
 tint, in the light theme barely different from the page, and a top-bar menu a grey outline.
+**Fixed** (D14): one style rule rings them 2px in the dark theme's brand green, which reads
+at 3:1 or more on both themes' pages and sidebars (CSS cannot tell which theme is on).
 
 ## 4. Decisions
 
-D1 to D12 are in the baseline audit, with their outcomes. Two more, from P8:
+D1 to D12 are in the baseline audit, with their outcomes. Three more, from P8, each decided
+by the owner on 2026-10-13 as recommended:
 
-| # | Decision | Recommendation |
+| # | Decision | Outcome |
 | --- | --- | --- |
-| D13 | A keyboard path to the pages (F31) | **Add a short list of the pages for the keyboard**: a fold, *All pages*, at the foot of the sidebar under the data status, closed by default - one Tab stop until opened, the fourteen pages in their groups after. The top bar stays as it is. Or leave it, and say in the user's guide that a page can be reached by its address |
-| D14 | Focus marks on links and menu items (F32) | **One more style rule**: a 2px brand-green outline on a focused link or menu item (`:focus-visible`), as buttons already have; listed in DESIGN_SYSTEM.md section 9 and held by its test. Or leave Streamlit's tint |
+| D13 | A keyboard path to the pages (F31) | **A short list of the pages for the keyboard**: a fold, *All pages*, at the foot of the sidebar under the data status, closed by default - one Tab stop until opened, the fourteen pages in their groups after. The top bar is unchanged. On a phone, where Streamlit already lists the pages at the top of the sidebar, the fold repeats them, closed |
+| D14 | Focus marks on links and menu items (F32) | **One more style rule**: a 2px green outline on a focused sidebar link, top-bar menu or menu item (`:focus-visible`), as buttons already have; listed in DESIGN_SYSTEM.md section 9 and held by its tests |
+| - | The README's screenshots | **Taken again in the new look**, the same nine views, from a copy of the data rebuilt without the contract file: no salary or payroll figure appears in them, as none did in the old ones |
 
 Still open from before: **D6** (what the assistant knows of the page it is asked from, F17)
 and **F29** (the answer checker), both outside a cosmetic polish.
@@ -136,8 +146,9 @@ No state or provenance is shown by colour alone: every tag is a word and an icon
 | Check | Result |
 | --- | --- |
 | Tab order | The sidebar (collapse, the filters, the data status and its link), the top bar's six menus, then the page |
-| Focus marks | A green ring on buttons, dropdowns, boxes, tabs and downloads; a background tint only on a sidebar link or menu item, a grey outline on a top-bar menu (F32) |
+| Focus marks | A green ring on buttons, dropdowns, boxes, tabs and downloads; at first a tint only on a sidebar link or menu item and a grey outline on a top-bar menu (F32) - after D14, a 2px green ring on each, in both themes |
 | A page from the top bar | Enter opens the menu; its pages come after everything on the page: 16 and 25 presses of Tab on the pages tried (F31) |
+| A page from *All pages* (D13) | The stop after *Data Health*; Enter opens it; Player Explorer three presses in, and Enter goes there - in both themes |
 | A team in the sidebar | Typed and chosen with Enter |
 | Tabs | The arrow keys move between them |
 | *Ask AI about this* | Enter opens it, the focus moves into it, Escape closes it |
@@ -170,21 +181,23 @@ All in `data/ui-polish/screenshots/` (git-ignored, from disposable copies of the
 | `p1/` to `p4/`, `p2-options/`, `p3-options/` | Each phase's checks and the options the owner chose from |
 | `p5-before/`, `p5-after/`, `p6-before/`, `p6-after/` | Every tab of every page, whole, before and after |
 | `p7-before/`, `p7-after/` | AI Research and the dialog at four sizes, and each live step |
-| `p8-keyboard/`, `p8-zoom/`, `p8-states/`, `p8-final/` | The keyboard's focus marks, the zoom widths, the edge states, and every page as it ends, beside P0 |
+| `p8-keyboard/`, `p8-zoom/`, `p8-states/`, `p8-final/` | The keyboard's focus marks (before and after D14) and *All pages*, the zoom widths, the edge states, and every page as it ends, beside P0 |
+| `readme-new/` | The README's nine images as taken, before they were copied to `docs/images/` |
 
 ## 7. Limitations and what is left
 
 - **Streamlit sets the limits.** No page writes CSS or HTML, so what Streamlit cannot be told
   stays as it draws it: the avatars' indent on a phone, a dialog that is only a centred
   modal (D12), tab rows that scroll sideways on a phone (F22), a menu's place in the tab
-  order (F31), the sixth menu under "1 more" at 150% zoom, a chart's colours for a moment
+  order (F31, eased by *All pages*), the sixth menu under "1 more" at 150% zoom, a chart's colours for a moment
   after a theme switch (D11). A Streamlit
   upgrade can change any `data-testid` the four style rules hook; each rule then falls back
   to Streamlit's own look, as DESIGN_SYSTEM.md section 9 says.
 - **Checked by eye, not by a tool.** Contrast and colour-blind separation are tested; the
   rest of section 5 is a browser pass on this computer (Chromium), not a screen reader or
   an automated WCAG audit.
-- **The README's screenshots** (`docs/images/`) show the look before the polish. New ones
-  would publish fresh views of the data when pushed: the owner's call.
-- **For later milestones, not the polish**: D6 (the assistant's context), F29 (the answer
-  checker), D13 and D14 if taken.
+- **The README's screenshots** (`docs/images/`) are the new look, taken at P8 from a copy
+  rebuilt without the contract file (`data/ui-polish/workbench-data-readme`), so that no
+  salary is published with them. Take them the same way when they are next refreshed.
+- **For later milestones, not the polish**: D6 (the assistant's context) and F29 (the answer
+  checker).

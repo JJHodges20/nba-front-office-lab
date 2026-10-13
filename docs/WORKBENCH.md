@@ -38,8 +38,9 @@ chosen player opens the Profile tab.
 **Data status** is at the foot of the sidebar on every page: whether the league data is up
 to date and whether a contract file has been supplied - hover over either for the
 details, and a line under it says what to do when something needs doing - which build is
-on screen, and a link to Data Health, where all of it is in full. On a phone the sidebar
-starts closed: the arrows at the top left open it.
+on screen, and a link to Data Health, where all of it is in full. Under it, **All pages**
+lists every page in its group, folded until you open it. On a phone the sidebar starts
+closed: the arrows at the top left open it.
 
 **Dark or light.** The workbench is designed dark - near-black with a forest-green accent
 for buttons, selected tabs and links - and has a matching light theme. It starts in your
@@ -53,11 +54,12 @@ next click on the page.
 **With the keyboard.** Tab moves through the sidebar, then the top bar, then the page, and
 the control in focus is ringed in green. Type in a dropdown to narrow it and press Enter
 to choose; the arrow keys move between tabs; Space ticks a box; Enter presses a button or
-downloads a file; Escape closes the *Ask AI about this* dialog. Enter opens a group in the
-top bar, but its pages come last in the order - after everything on the page. To go
-straight to a page, type its address after the workbench's own - `/players`, `/teams`,
-`/research` and so on, as the address bar shows each page - which opens it afresh, with the
-sidebar's choices cleared.
+downloads a file; Escape closes the *Ask AI about this* dialog. To go to another page, Tab
+to **All pages** at the foot of the sidebar, press Enter to open it, Tab to the page and press
+Enter. (Enter also opens a group in the top bar, but its pages come last in the order - after
+everything on the page.) A page's address works too - `/players`, `/teams`, `/research` and
+so on, as the address bar shows each page - and opens it afresh, with the sidebar's choices
+cleared.
 
 ## Reading a page
 

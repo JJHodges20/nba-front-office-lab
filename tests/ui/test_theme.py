@@ -8,6 +8,7 @@ are also readable as text, which every chart's table view guarantees.
 
 from __future__ import annotations
 
+import re
 import tomllib
 from pathlib import Path
 
@@ -122,6 +123,18 @@ def test_the_brand_holds_a_white_label_and_shows_on_the_page(colors: Palette) ->
     assert contrast(colors.brand, colors.surface) >= MARK_CONTRAST
     assert contrast(colors.link, colors.plane) >= TEXT_CONTRAST
     assert contrast(colors.link, colors.surface) >= TEXT_CONTRAST
+
+
+@PALETTES
+def test_the_focus_ring_on_links_reads_on_either_theme(colors: Palette) -> None:
+    """UI polish P8 (decision D14): the style rule that rings a focused link or menu item
+    cannot tell which theme is on, so it holds one colour - the dark theme's brand - which
+    must stand at 3:1 on the page and the sidebar of both themes."""
+    sheet = Path(__file__).resolve().parents[2] / "apps" / "workbench" / "wb" / "style.css"
+    rings = re.findall(r"outline:\s*2px solid (#[0-9a-fA-F]{6})", sheet.read_text(encoding="utf-8"))
+    assert rings and {ring.lower() for ring in rings} == {DARK.brand}
+    assert contrast(DARK.brand, colors.plane) >= MARK_CONTRAST
+    assert contrast(DARK.brand, colors.surface) >= MARK_CONTRAST
 
 
 @PALETTES

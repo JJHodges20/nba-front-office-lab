@@ -348,7 +348,14 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   rule is the owner's decision. Errors, warnings, successes and notes go through
   `components.alert`, one icon per kind (UI polish P2). A tag that several pages use -
   `components.NOTE`, `CHECK`, `OUT_OF_DATE`, `NO_ANSWER` - is written once; a test holds
-  every tag word to one icon and one colour (P3).
+  every tag word to one icon and one colour (P3). Streamlit gives CSS no theme marker and no
+  colour variable, so a rule's colour must read on both themes: the focus ring on links
+  (P8) is the dark brand, at 3:1 or more on either.
+- **The frame lists every page twice**: as the top bar's menus and, for the keyboard, as
+  *All pages* at the foot of the sidebar (`app.all_pages`, UI polish P8). Both read `PAGES`,
+  so a new page goes there once.
+- **README screenshots are taken from a copy rebuilt without the contract file**, so no
+  salary is published (UI polish P8; `docs/ui-polish/FINAL_AUDIT.md` section 7).
 - **Nothing in `app.py` may stand alone as an expression.** Streamlit's "magic" draws a bare
   string or name in the main script on the page: write a note there as a `#` comment, never
   a docstring under a constant (at P3 one appeared above every title). A test checks.

@@ -14,6 +14,11 @@ from wb import style
 
 APPS = Path(__file__).resolve().parents[2] / "apps" / "workbench"
 DESIGN_SYSTEM = Path(__file__).resolve().parents[2] / "docs" / "ui-polish" / "DESIGN_SYSTEM.md"
+FOCUS = (
+    '[data-testid="stPageLink-NavLink"]:focus-visible, '
+    '[data-testid="stTopNavSection"]:focus-visible, '
+    '[data-testid="stTopNavDropdownLink"]:focus-visible'
+)
 RULES = {
     # P2: the space above every title.
     '[data-testid="stMainBlockContainer"]': {"padding-top": "2.5rem"},
@@ -26,16 +31,21 @@ RULES = {
     '[class*="st-key-tiles-wide-"] [data-testid="stHorizontalBlock"]': {
         "grid-template-columns": "repeat(auto-fit, minmax(14rem, 1fr))",
     },
+    # P8 (decision D14): a focused link or menu ringed, as buttons are.
+    FOCUS: {"outline": "2px solid #2f8556", "outline-offset": "2px"},
 }
 """Every rule the stylesheet may hold: its selector and its declarations."""
 
 
 def parsed(css: str) -> dict[str, dict[str, str]]:
+    """Each rule's selector, its spaces and line breaks made single spaces, and declarations."""
     css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
     found: dict[str, dict[str, str]] = {}
     for selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
         declarations = (part.split(":", 1) for part in body.split(";") if part.strip())
-        found[selector.strip()] = {name.strip(): value.strip() for name, value in declarations}
+        found[" ".join(selector.split())] = {
+            name.strip(): value.strip() for name, value in declarations
+        }
     return found
 
 
