@@ -413,7 +413,9 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
 - **Look at it, and click through it.** A running server keeps old modules loaded:
   restart `fol ui` after a code change, then check the page in the light and the dark
   theme and use every control you touched. Passing tests say nothing about clipped
-  labels, collisions, or a click that does the wrong thing. A browser pass cannot share
+  labels, collisions, or a click that does the wrong thing - nor about a chart whose
+  settings are right and which draws nothing: the chance curve's uncertainty band was
+  never on screen until UI polish P6 read the chart in a browser. A browser pass cannot share
   the machine with a parallel test run: Streamlit's connection-error dialog appears under
   load and intercepts every click. Look with a team and a player chosen as well as without:
   some charts and controls appear only then, and at P5 two of them were cut at 1024px.

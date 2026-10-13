@@ -288,8 +288,9 @@ def _before_and_after(report: ScenarioReport, model: SimulatorModel) -> None:
             Figure(
                 "Payroll",
                 formats.money_compact(after.payroll),
-                _was(formats.money_compact(before.payroll))
-                + (f", {after.unpriced} unpriced" if after.unpriced else ""),
+                # How many are unpriced is said under the tiles: in the tile it was cut off
+                # at 1366px (UI polish P6, audit finding F21).
+                _was(formats.money_compact(before.payroll)),
                 help="The salaries on file for the season ahead and any you assumed; "
                 "understated while any player is unpriced.",
             ),
@@ -322,16 +323,25 @@ def _before_and_after(report: ScenarioReport, model: SimulatorModel) -> None:
             ),
         ]
     )
+    unpriced = (
+        f" The payroll leaves out {after.unpriced} player{'s' if after.unpriced != 1 else ''} "
+        "with no salary on file, so it is understated."
+        if after.unpriced
+        else ""
+    )
     if not report.is_changed:
         st.caption(
             f"**{report.name}** as it stands for {report.season}, drawn {after.seasons:,} "
             "times. Nothing is changed yet: remove or add players, or set the presets, and "
-            "the figures above show before and after."
+            "the figures above show before and after." + unpriced
         )
     else:
         st.caption(
             f"**{report.name}** for {report.season}, drawn {after.seasons:,} times as it "
-            f"stands and {after.seasons:,} times with your changes" + _changes_said(report) + "."
+            f"stands and {after.seasons:,} times with your changes"
+            + _changes_said(report)
+            + "."
+            + unpriced
         )
     _comparison_table(report)
     _stages_chart(report)
@@ -807,7 +817,9 @@ def _evidence(model: SimulatorModel) -> None:
                 "around the rating",
                 help="How far wins per 82 stray from what a season's net rating gives.",
             ),
-        ]
+        ],
+        # Three a row: five across cut "what no season could fix" short (UI polish P6).
+        per_row=3,
     )
     st.markdown("**The wins test**")
     coverage = pd.DataFrame(

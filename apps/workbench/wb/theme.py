@@ -53,16 +53,20 @@ class Palette:
     it is a mid forest green rather than a deep one. Never a chart colour."""
     link: str
     """Links in text: the brand, light enough to read as text on the page."""
+    wash_opacity: float
+    """How strong a wash is on this surface: enough to see an uncertainty band (UI polish P6
+    - at a tenth, the dark theme's band was all but invisible), weak enough to stay a wash."""
 
     @property
     def accent(self) -> str:
         """The first categorical hue: a single series, or the one that is the subject."""
         return self.series[0]
 
-    def wash(self, color: str, opacity: float = 0.10) -> str:
+    def wash(self, color: str, opacity: float | None = None) -> str:
         """``color`` as a translucent fill: an area under a line, never a solid block."""
         red, green, blue = (int(color[index : index + 2], 16) for index in (1, 3, 5))
-        return f"rgba({red},{green},{blue},{opacity})"
+        strength = self.wash_opacity if opacity is None else opacity
+        return f"rgba({red},{green},{blue},{strength})"
 
 
 # UI polish P4: the green, amber and pink a step darker, so every series reaches 3:1 on the
@@ -96,6 +100,7 @@ LIGHT = Palette(
     critical="#d03b3b",
     brand="#1f6b45",
     link="#1f6b45",
+    wash_opacity=0.15,
 )
 
 # Near-black with a trace of the forest in every neutral: the page, its cards, its text
@@ -128,6 +133,7 @@ DARK = Palette(
     critical="#d03b3b",
     brand="#2f8556",
     link="#79b391",
+    wash_opacity=0.25,
 )
 
 

@@ -140,9 +140,26 @@ def test_the_palette_follows_the_theme_type() -> None:
 
 
 def test_wash_is_a_translucent_version_of_the_colour() -> None:
-    assert LIGHT.wash("#2a78d6") == "rgba(42,120,214,0.1)"
+    assert LIGHT.wash("#2a78d6") == "rgba(42,120,214,0.15)"
+    assert DARK.wash("#2a78d6") == "rgba(42,120,214,0.25)"
     assert LIGHT.wash("#ffffff", 0.25) == "rgba(255,255,255,0.25)"
     assert LIGHT.accent == LIGHT.series[0]
+
+
+@PALETTES
+def test_an_uncertainty_band_can_be_seen_and_stays_a_wash(colors: Palette) -> None:
+    """UI polish P6: at a tenth, the dark theme's band - a chance curve's 95% interval, 30
+    points wide - could not be seen. The wash must stand off the chart's surface, leave the
+    line it sits behind readable, and stay translucent."""
+    red, green, blue = (int(colors.accent[index : index + 2], 16) for index in (1, 3, 5))
+    under = [int(colors.surface[index : index + 2], 16) for index in (1, 3, 5)]
+    washed = "#" + "".join(
+        f"{round(base + colors.wash_opacity * (top - base)):02x}"
+        for base, top in zip(under, (red, green, blue), strict=True)
+    )
+    assert difference(washed, colors.surface) >= 6
+    assert contrast(colors.accent, washed) >= MARK_CONTRAST
+    assert colors.wash_opacity <= 0.3
 
 
 @pytest.fixture(scope="module")

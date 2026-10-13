@@ -48,6 +48,19 @@ class TestThePage:
         assert [tab.label for tab in opened.tabs][:4] == list(TABS)
         assert "**Choose a team**" in said and "Out of date" not in said
 
+    def test_each_tab_that_needs_a_subject_says_what_is_missing(
+        self, page, plain_home: Path
+    ) -> None:
+        """UI polish P6 (audit finding F14): the note stood once above the tabs and three tabs
+        under it were empty. Each now says it; the evidence needs no subject."""
+        opened = page(plain_home, "fit")
+        tabs = {tab.label: tab for tab in opened.tabs}
+        for label in list(TABS)[:3]:
+            said = [element.value for element in tabs[label].markdown]
+            assert any("**Choose a team**" in text for text in said), label
+        evidence = [element.value for element in tabs[list(TABS)[3]].markdown]
+        assert evidence and not any("**Choose a team**" in text for text in evidence)
+
     def test_with_a_team_chosen_it_says_who_and_how_weighted(self, boston, report) -> None:
         said = texts(boston)
         assert f"**Boston Celtics, {SEASON}**: {len(report.members)} players, each weighted" in said

@@ -65,7 +65,10 @@ def render() -> None:
                 "Slices failing now",
                 help="Dataset slices whose most recent fetch failed.",
             ),
-        ]
+        ],
+        # Three a row: five across cut the last build's date and time short at 1366px
+        # (UI polish P6, audit finding F21).
+        per_row=3,
     )
 
     st.subheader("Sources")

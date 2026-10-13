@@ -9,6 +9,8 @@ impacts are a model's estimates: everything here is modeled or derived.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import pandas as pd
 import streamlit as st
 
@@ -53,19 +55,42 @@ def render() -> None:
         )
         return
     _notices(status)
-    report = _subject(filters, status)
+    subject = _subject(filters, status)
     catalog = data.lab().fit.metrics
     evidence = data.fit_evidence(filters.build, status.revision)
 
+    # A tab that needs a subject says what is missing in itself, rather than standing empty
+    # under one note above the tabs (UI polish P6, audit finding F14).
     coverage, profile, parts, tested = st.tabs(list(TABS), key=TAB, on_change="rerun")
     with coverage:
-        _coverage(report, catalog)
+        if isinstance(subject, Absent):
+            subject.draw()
+        else:
+            _coverage(subject, catalog)
     with profile:
-        _profile(report, catalog)
+        if isinstance(subject, Absent):
+            subject.draw()
+        else:
+            _profile(subject, catalog)
     with parts:
-        _parts(report, status, evidence)
+        if isinstance(subject, Absent):
+            subject.draw()
+        else:
+            _parts(subject, status, evidence)
     with tested:
         _evidence(filters, status, evidence)
+
+
+@dataclass(frozen=True, slots=True)
+class Absent:
+    """Why there is nothing to profile, said in each tab that needs something."""
+
+    title: str
+    body: str
+    icon: str = ":material/inbox:"
+
+    def draw(self) -> None:
+        components.empty(self.title, self.body, icon=self.icon)
 
 
 def _notices(status: FitStatus) -> None:
@@ -87,8 +112,8 @@ def _notices(status: FitStatus) -> None:
 # --- the subject ---------------------------------------------------------------------------
 
 
-def _subject(filters: Filters, status: FitStatus) -> FitReport | None:
-    """What is profiled: the sidebar's team, or a roster the user built."""
+def _subject(filters: Filters, status: FitStatus) -> FitReport | Absent:
+    """What is profiled: the sidebar's team, or a roster the user built - or why nothing is."""
     rosters = data.rosters()
     options = list(SUBJECTS) if not rosters.empty else [SUBJECTS[0]]
     subject = st.segmented_control(
@@ -96,28 +121,25 @@ def _subject(filters: Filters, status: FitStatus) -> FitReport | None:
     )
     if subject == SUBJECTS[0]:
         if filters.team_id is None:
-            components.empty(
+            return Absent(
                 "Choose a team",
                 "Pick a team in the sidebar to see how its players fit together"
                 + (", or switch to a roster you built." if not rosters.empty else "."),
                 icon=":material/groups:",
             )
-            return None
         if filters.season not in status.seasons:
-            components.empty(
+            return Absent(
                 f"No profiles for {filters.season}",
                 f"Teams are profiled for seasons with player statistics: {status.seasons[-1]} "
                 f"to {status.seasons[0]}. Pick one in the sidebar.",
                 icon=":material/groups:",
             )
-            return None
         report = data.fit_team(filters.build, filters.team_id, filters.season)
         if report.is_empty:
-            components.empty(
+            return Absent(
                 "No players on record",
                 f"{report.name} has no player minutes on record in {filters.season}.",
             )
-            return None
         st.caption(
             f"**{report.name}, {report.season}**: {len(report.members)} players, each weighted "
             "by the minutes played for the team. Roles are counted in the rotation, the ten "
@@ -132,12 +154,11 @@ def _subject(filters: Filters, status: FitStatus) -> FitReport | None:
     )
     report = data.fit_roster(int(roster_id))
     if report.is_empty:
-        components.empty(
+        return Absent(
             "Nothing to profile",
             f"No player on {report.name} has minutes in {report.season}, its statistics "
             "season. Add players in the Team Builder, or give the roster another season.",
         )
-        return None
     said = (
         f"**{report.name}**: {len(report.members)} players, each weighted by the minutes "
         f"played in {report.season}, the roster's statistics season, and placed among that "
@@ -155,9 +176,7 @@ def _subject(filters: Filters, status: FitStatus) -> FitReport | None:
 # --- coverage --------------------------------------------------------------------------------
 
 
-def _coverage(report: FitReport | None, catalog) -> None:  # type: ignore[no-untyped-def]
-    if report is None:
-        return
+def _coverage(report: FitReport, catalog) -> None:  # type: ignore[no-untyped-def]
     st.caption(
         "Who fills each role, by the rules on the Player Value page: a rule, not a "
         "measurement. Counted among the rotation; the bench is the sixth to tenth player "
@@ -242,9 +261,7 @@ def _coverage(report: FitReport | None, catalog) -> None:  # type: ignore[no-unt
 # --- the profile ------------------------------------------------------------------------------
 
 
-def _profile(report: FitReport | None, catalog) -> None:  # type: ignore[no-untyped-def]
-    if report is None:
-        return
+def _profile(report: FitReport, catalog) -> None:  # type: ignore[no-untyped-def]
     placed = report.placed.copy()
     placed["shown"] = [
         formats.MISSING if formats.is_missing(value) else catalog[key].format_value(value)
@@ -312,9 +329,7 @@ def _profile(report: FitReport | None, catalog) -> None:  # type: ignore[no-unty
 # --- the sum of parts ---------------------------------------------------------------------------
 
 
-def _parts(report: FitReport | None, status: FitStatus, evidence: FitEvidence | None) -> None:
-    if report is None:
-        return
+def _parts(report: FitReport, status: FitStatus, evidence: FitEvidence | None) -> None:
     parts = report.parts
     placed = report.placed.set_index("key")
     error = formats.MISSING if parts.error is None else f"±{parts.error:.1f} (RMSE)"

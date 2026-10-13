@@ -3,6 +3,51 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## UI polish P6 - the Build, Forecast and System pages (2026-10-12)
+
+Team Builder, Roster Fit, Roster Optimizer, Postseason Outlook, Scenario Simulator and Data
+Health, reviewed whole in three states - nothing chosen, a team and a player chosen, the
+oldest season - and, on a throwaway copy of the test data
+(`data/ui-polish/workbench-data-p6`), the optimizer run and one of its rosters saved, so a
+full roster could be seen in Team Builder. No figure, model or action changed.
+
+**Found.** Team Builder, the Optimizer and Data Health already kept what you set apart from
+what comes of it. Three things did not hold:
+
+- **The chance curve's uncertainty band was never drawn** (finding F25). Postseason Outlook
+  says "the band is the 95% interval" under it; its SVG, read in a browser, held an empty
+  fill. The band's edges were traces with no line, so Plotly placed the lower edge nowhere
+  and filled to nothing. The tests had checked the figure's settings, which were right.
+  And a 10% wash would have been all but invisible on the dark chart besides.
+- **Roster Fit, with no team chosen, drew three empty tabs** under one note above them
+  (F14). Postseason Outlook already said it inside its tab.
+- **Long tile notes** (F21): the simulator's payroll ("was $205.1M, 5 unpriced") and its
+  evidence row, and Data Health's last build, cut at 1366px and below.
+
+**Built**
+
+- `charts.band_line`: the band's edges are lines of no width; the wash is a palette role,
+  `wash_opacity`, 0.15 light and 0.25 dark. The band now shows in both themes.
+- Roster Fit: `_subject` returns the report or why there is none (`Absent`), and each tab
+  that needs a subject says so in itself; *The evidence* needs none.
+- The simulator says under its tiles how many players the payroll leaves out; its evidence
+  row and Data Health's row three a row.
+- **Kept**: Data Health without provenance tags - they say where basketball figures come
+  from, and its figures are the lab's own build's (F13).
+- **Documents**: DESIGN_SYSTEM.md section 6; the audit's F13, F14, F21 and F25; this
+  roadmap's phase table.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New and changed tests | `test_theme.py`: an uncertainty band can be seen in both themes and stays a wash; the wash's strength per theme. `test_charts.py`: the band's edges are lines of no width (they had been "none"); the house rule that drawn lines are 2px leaves out those undrawn edges. `test_fit_page.py`: each tab that needs a subject says what is missing |
+| `pytest -n auto`, once at the gate | 3,979 passed (4 min 29 s); at P5, 3,976 |
+| Cut-off text and empty tabs | A scan of the six pages at 1440, 1366, 1024 and 390px, a team and a player chosen, found nothing cut but the phone tab rows (F22); every tab opened with nothing chosen and in the oldest season drew with no error and no empty tab |
+| The pages in a browser | Every tab of the six pages photographed whole before and after (`data/ui-polish/screenshots/p6-before/`, `p6-after/`), dark at 1440px with a team and a player chosen, Roster Fit and Postseason Outlook with nothing chosen too, and Postseason Outlook in light; the chance curve's band read before and after in both themes; on the throwaway copy, the optimizer run and its first roster saved and opened in Team Builder |
+| Boundaries and data | `charts.py`, `theme.py` and three views; no service, model or data touched; the optimizer and the roster save ran on a throwaway copy, never the lab's data |
+
 ## UI polish P5 - the League and Explore pages, one by one (2026-10-12)
 
 League Overview, Winning Benchmarks, Player Explorer, Player Value, Team Explorer, Contract

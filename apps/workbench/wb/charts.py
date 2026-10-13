@@ -1084,11 +1084,15 @@ def band_line(
                 xanchor="left", yanchor="middle", xshift=6, align="left",
             )  # fmt: skip
     for column, fill in ((low, None), (high, "tonexty")):
+        # Each edge is a line of no width: with no line at all, Plotly drew the lower edge
+        # nowhere and the band filled to nothing - it was missing in both themes until UI
+        # polish P6 looked at the chart in a browser.
         figure.add_trace(
             go.Scatter(
                 x=frame[x],
                 y=frame[column],
-                mode="none",
+                mode="lines",
+                line={"width": 0},
                 fill=fill,
                 fillcolor=palette.wash(palette.accent) if fill else None,
                 hoverinfo="skip",

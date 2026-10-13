@@ -215,6 +215,16 @@ and four line series at most) and the categorical order. The chart surface follo
 - **The export buttons are short**: *Data (CSV)* and *Chart (HTML)*, the second with a
   tooltip; "Interactive chart (HTML)" was cut in a narrow column.
 
+**Added in P6:**
+
+- **An uncertainty band is drawn, and can be seen.** The chance curve on Postseason Outlook
+  says "the band is the 95% interval", and no band had ever been drawn: its edges were
+  traces with no line, so Plotly placed the lower edge nowhere and filled to nothing. The
+  edges are now lines of no width. The wash behind a line is a role of the palette,
+  `wash_opacity`: 0.15 in the light theme and 0.25 in the dark, where a tenth was all but
+  invisible. A test holds it visible against the chart, translucent, and under a line that
+  still reads at 3:1.
+
 ## 7. The assistant's surfaces (guidance for P7)
 
 The answer is drawn by `wb/answers.py` on the AI Research page, and in short in the *Ask

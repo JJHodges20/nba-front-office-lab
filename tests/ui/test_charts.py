@@ -212,6 +212,8 @@ class TestHouseRules:
     def test_lines_are_thin(self, build) -> None:
         for trace in build(LIGHT).data:
             if trace.type == "scatter" and "lines" in (trace.mode or ""):
+                if trace.line.width == 0 and trace.hoverinfo == "skip":
+                    continue  # a band's edge: not drawn, it holds the band's fill (P6)
                 assert trace.line.width == charts.LINE_WIDTH == 2
 
     @EVERY_CHART
@@ -478,7 +480,8 @@ class TestLine:
     def test_an_area_is_a_wash_never_a_block(self) -> None:
         line = BUILDERS["line"](LIGHT).data[0]
         assert line.fill == "tozeroy"
-        assert line.fillcolor == LIGHT.wash(LIGHT.accent) and line.fillcolor.endswith(",0.1)")
+        assert line.fillcolor == LIGHT.wash(LIGHT.accent)
+        assert line.fillcolor.endswith(f",{LIGHT.wash_opacity})")
         plain = charts.line(FRAME, x="x", y="y", text="text", palette=LIGHT).data[0]
         assert plain.fill is None
 
@@ -864,9 +867,15 @@ class TestMeter:
 class TestBandLine:
     def test_the_band_is_a_wash_from_low_to_high_behind_the_line(self) -> None:
         lower, upper, line, dots = BUILDERS["band_line"](LIGHT).data
-        assert lower.mode == upper.mode == "none"
+        # Edges drawn as lines of no width: with mode "none" Plotly placed the lower edge
+        # nowhere and the band filled to nothing - unseen in a browser until UI polish P6.
+        assert lower.mode == upper.mode == "lines"
+        assert lower.line.width == upper.line.width == 0
         assert lower.fill is None and upper.fill == "tonexty"
         assert upper.fillcolor == LIGHT.wash(LIGHT.accent)
+        # The dark theme's wash is stronger: at a tenth its band could not be seen (P6).
+        dark_upper = BUILDERS["band_line"](DARK).data[1]
+        assert dark_upper.fillcolor == DARK.wash(DARK.accent) and DARK.wash_opacity > 0.1
         assert list(lower.y) == [0.0, 0.1, 0.4] and list(upper.y) == [0.2, 0.5, 0.8]
         assert lower.hoverinfo == upper.hoverinfo == "skip"
         assert line.mode == "lines" and line.line.color == LIGHT.accent
