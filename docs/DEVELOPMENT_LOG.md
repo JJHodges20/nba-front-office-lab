@@ -3,6 +3,67 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## UI polish P4 - the charts: read on any screen, in either theme (2026-10-12)
+
+The chart builders in `wb/charts.py` and the light palette, polished once for every chart.
+No chart's data, scale, colour order or table view changed, and no number moved.
+
+**Found first.** All 42 charts on the pages - every tab, with a team and a player chosen -
+were photographed in both themes at 1440px, and in the dark at 1024 and 390, and the text
+of each was measured against the chart's own box. At 1440 they held the house rules. On a
+phone six axis titles and one line's name ran past the chart's edge, and *Tax* sat on *2nd
+apron* above all four cap-line charts; at 1024 three dates on Team Explorer's form chart
+printed on top of each other; at every width the histogram's first value label touched the
+count axis's "0". In the dark the cap lines were drawn in nearly the gridlines' own shade.
+The light theme's green, amber and pink stood at 2.74, 2.11 and 2.62:1 on its charts, and
+its 12px tick labels at 3.5:1 - a theme test had allowed 3:1, calling them large text.
+
+**Built**
+
+- **Cap lines**: names on three rows, not two; lines in `deemphasis`, a step above the grid
+  (unchanged in the light theme, where that is the colour they had); the meter keeps room
+  for the third row.
+- **Long axis titles** (over 32 characters) take two balanced lines.
+- **Names kept on the chart**: a reference line's name, and the value a histogram marks,
+  run away from the end of the axis they sit near.
+- **Intervals kept off the edge**: interval rows leave room either side of the widest.
+- **Dates** slant where they would not fit level; the histogram's value labels sit lower.
+- **Stacked bars** refuse a ninth part (finding F19), as the other builders refuse theirs.
+- **The light palette** (finding F16): green `#19a472`, amber `#c28400` and pink `#e46494`,
+  each just past 3:1; muted ink `#74726d`, 4.68:1. Every colour-blind separation still
+  holds - neighbours 18.8 and 9.0, the first three 22.6 and 9.7 - and a fourth scatter
+  series is still unsafe. `config.toml` says the same.
+- **Tried and put back**: Benchmarks' *How far teams went* with its column labels free to
+  tilt. Each label carries a second line (how many teams), and tilted they garbled.
+- **Kept, with reasons** (DESIGN_SYSTEM.md section 6; audit D10, D11): the moment after a
+  theme switch when a chart keeps its old colours (F2) - Streamlit does not run the page
+  again on a switch and only a script in the page could; the next click redraws it, the
+  choice is remembered, and the user's guide now says so. And the filled chart panel
+  (F10): an outlined card, like the tiles, needs a see-through chart, whose text would be
+  dark on dark in that same moment. The owner accepted both with P4 (D10).
+- **Documents**: DESIGN_SYSTEM.md sections 2, 3 and 6; CLAUDE.md on charts on a phone and
+  the contrast floors; the user's guide on the theme switch; the audit's F22, F23, D10 and
+  D11; this roadmap's phase table.
+
+**Left for later**: Benchmarks' column labels run together below about 1100px, and two
+axis titles of more than fifty characters still run past a phone's chart (F23, P5: shorter
+wording); on a phone the tab rows of five pages scroll sideways, as Streamlit draws them
+(F22). A correction to the P3 report: its check on tab rows matched nothing in this
+Streamlit's markup, so "no tab row is cut" was unchecked; checked now, only phones are
+affected, and every tab can be reached.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| `tests/ui/test_theme.py`, `test_charts.py` | Passed. New: every series 3:1 on its chart in both themes; a line's name away from the edge; cap lines a step above the grid; a ninth stacked part refused; a histogram's end value and its labels; long axis titles on two lines. Changed, for the fixes: muted ink 4.5:1 on surface and page (was 3:1); cap-line names on three rows; dates left to slant; the plain interval axis padded. Kept: level labels for interval columns |
+| `pytest -n auto`, once at the gate | 3,974 passed (4 min 31 s); at P3, 3,967 |
+| Chart text, every chart at three widths | Before: on a phone 6 titles and 1 name past the edge, 4 cap-line collisions; at 1024 crowded dates; at every width the histogram's corner. After: none at 1440; at 1024 and on a phone only Benchmarks' column labels and, on a phone, two long titles (F23) |
+| The charts in a browser | 42 charts photographed before and after (`data/ui-polish/screenshots/p4-charts-before/`, `-after/`), dark at 1440, 1024 and 390, light at 1440 |
+| The pages in a browser | The P0 set taken again (`data/ui-polish/screenshots/p4/`, 100 shots under the same names, both themes, four sizes), no page with an error. Compared with P3: the cap lines' names on three rows above Contract Explorer's and the payroll meters; the light theme's tick labels a shade darker; everything else as at P3 |
+| Boundaries and data | `wb/charts.py`, `wb/theme.py`, `config.toml`; no view, service, model or data touched; the browser pass read the disposable copy |
+
 ## UI polish P3 - shared components: tiles that wrap, one look per tag, deletes that ask (2026-10-11)
 
 The pieces every page shares, made once. No number, calculation, model, data source or

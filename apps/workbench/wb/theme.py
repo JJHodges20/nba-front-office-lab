@@ -65,21 +65,24 @@ class Palette:
         return f"rgba({red},{green},{blue},{opacity})"
 
 
+# UI polish P4: the green, amber and pink a step darker, so every series reaches 3:1 on the
+# light surface (they were 2.74, 2.11 and 2.62), and the muted ink too, so 12px tick labels
+# reach the 4.5:1 of small text (it was 3.5). Hue kept; every separation still holds.
 LIGHT = Palette(
     mode="light",
     surface="#fcfcfb",
     plane="#f9f9f7",
     ink="#0b0b0b",
     ink_secondary="#52514e",
-    ink_muted="#898781",
+    ink_muted="#74726d",
     grid="#e1e0d9",
     axis="#c3c2b7",
     series=(
         "#2a78d6",
         "#eb6834",
-        "#1baf7a",
-        "#eda100",
-        "#e87ba4",
+        "#19a472",
+        "#c28400",
+        "#e46494",
         "#008300",
         "#4a3aa7",
         "#e34948",

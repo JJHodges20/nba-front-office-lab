@@ -47,7 +47,8 @@ computer's own setting. To choose, open the menu at the top right (the three dot
 pick *Dark*, *Light* or *System*: your browser remembers the choice, through restarts, until
 its site data is cleared. Another browser, a private window or another port starts from
 the computer's setting again. Charts keep their own colours in both themes; green is never
-used for data.
+used for data. Just after you switch, a chart may keep the old theme's colours until your
+next click on the page.
 
 ## Reading a page
 

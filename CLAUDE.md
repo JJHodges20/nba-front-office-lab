@@ -333,9 +333,13 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
 - **Charts go through `wb/charts.py`**, and onto a page through `components.chart`, which
   adds the table view and the exports. The house rules (one scale, thin marks, ink text,
   series caps) are tested in `tests/ui/test_charts.py`; do not work around them in a page.
+  Charts are also read on a phone (UI polish P4): a long axis title takes two lines, a
+  line's name keeps to the chart, cap-line names take three rows - and a page still keeps
+  its axis titles and category labels short, since a phone's plot can be 150px wide.
 - **Colours live in `wb/theme.py`.** `.streamlit/config.toml` repeats them and a test
   keeps the two in step. A new colour has to pass `tests/ui/test_theme.py`. The page's
-  primary colour is the forest-green `brand`, never a chart colour (UI polish P1).
+  primary colour is the forest-green `brand`, never a chart colour (UI polish P1). Every
+  series reaches 3:1 on its chart and tick labels 4.5:1, in both themes (P4).
 - **Styling is the theme's.** No page writes CSS or HTML. What the theme cannot set is a
   rule in `wb/style.css`, applied once by the frame (`style.apply()`), listed in
   `docs/ui-polish/DESIGN_SYSTEM.md` and held to that list by `tests/ui/test_style.py`; a new

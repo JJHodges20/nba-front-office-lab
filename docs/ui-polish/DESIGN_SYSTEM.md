@@ -6,8 +6,9 @@ in the app's menu (the browser remembers it), and `#2f8556` / `#1f6b45` for acti
 frame and the style rules (sections 8-9) are in effect since P2**: the navigation in a top
 bar and one style rule, both the owner's choice. **The tiles, tags and controls (sections 4,
 5, 9 and 10) are in effect since P3**: tiles that wrap, one look per tag, dropdowns where
-choices were cut off, and every delete asking first. Sections 6-7 are still proposals, for
-the phases named in them. The evidence behind each value is in [BASELINE_AUDIT.md](BASELINE_AUDIT.md).
+choices were cut off, and every delete asking first. **The charts (section 6, and the light
+palette's changes in sections 2-3) are in effect since P4.** Section 7 is still a proposal,
+for P7. The evidence behind each value is in [BASELINE_AUDIT.md](BASELINE_AUDIT.md).
 
 The roadmap's direction: a near-black canvas, a dark forest-green accent, balanced
 density, the whole workbench in scope, navigation and behaviour unchanged. This proposal
@@ -44,13 +45,13 @@ now. Contrast is the WCAG ratio; "OKLab" is the theme tests' colour difference x
 | `surface` | Cards, sidebar, widget fills, chart backgrounds (`secondaryBackgroundColor`, sidebar `backgroundColor`) | `#1a1a19` | **`#151b17`** | `#fcfcfb` | keep |
 | `ink` | Text (`textColor`), chart titles | `#ffffff` | **`#f1f5f2`** | `#0b0b0b` | keep |
 | `ink_secondary` | Chart axis titles, legends | `#c3c2b7` | **`#a7b4a9`** | `#52514e` | keep |
-| `ink_muted` | Tick labels, quiet text | `#898781` | **`#7f9084`** | `#898781` | keep |
+| `ink_muted` | Tick labels, quiet text | `#898781` | **`#7f9084`** | `#898781` | keep; **P4: `#74726d`** (4.68:1, was 3.5) |
 | `grid` | Gridlines, borders (`borderColor`, `dataframeBorderColor`) | `#2c2c2a` | **`#2a362e`** | `#e1e0d9` | keep |
 | `axis` | Hover borders, reference marks | `#383835` | **`#3a4a40`** | `#c3c2b7` | keep |
 | `deemphasis` | Context marks beside the subject | `#52514e` | **`#4e5e54`** | `#c3c2b7` | keep |
 | **`brand`** (new) | `primaryColor`: primary buttons, selected tabs and toggles, sliders, focus | (blue `#3987e5`, = `series[0]`) | **`#2f8556`** | (blue `#2a78d6`) | **`#1f6b45`** |
 | **`link`** (new) | `linkColor` | (blue `#3987e5`) | **`#79b391`** | (blue `#2a78d6`) | **`#1f6b45`** |
-| `series` | Categorical chart colours, fixed order | 8 hues, blue first | keep | 8 hues, blue first | keep |
+| `series` | Categorical chart colours, fixed order | 8 hues, blue first | keep | 8 hues, blue first | keep; **P4: the 3rd to 5th a step darker** - green `#19a472`, amber `#c28400`, pink `#e46494` (3.10, 3.10, 3.12:1; were 2.74, 2.11, 2.62) |
 | `positive` / `negative` | Either side of a baseline | `#3987e5` / `#e66767` | keep | `#2a78d6` / `#e34948` | keep |
 | `good` / `warning` / `serious` / `critical` | State, always with an icon and a word | `#0ca30c` `#fab219` `#ec835a` `#d03b3b` | keep | same | keep |
 
@@ -115,6 +116,13 @@ colour, no state colour, and at least 15 from the chart accent; and parity of
 the palette. Status colours on the new dark surface: good 5.2, warning 9.5, serious 6.6,
 critical 3.6.
 
+Checks P4 added or tightened, in both themes: every series at least 3:1 on its chart (the
+light theme's green, amber and pink were under it, finding F16); and the muted ink at least
+4.5:1 on the surface and on the page. That test had allowed 3:1, calling 12px tick labels
+large text, which they are not. With the three light series darker, neighbours still differ
+by 18.8 (9.0 for colour-blind readers), the first three by 22.6 (9.7), and a fourth scatter
+series is still unsafe (2.0), so the cap of three stands.
+
 ## 4. Type, shape and spacing
 
 Kept from today's `config.toml`, which already fits the brief:
@@ -167,8 +175,33 @@ Settled in P3:
 Unchanged: the house rules of `wb/charts.py` (one scale, 2px lines, bars at most 24px,
 ringed markers, no dashes, text in ink, legends only for several series, three scatter
 and four line series at most) and the categorical order. The chart surface follows the
-`surface` role, so charts take the new dark card colour with no builder change. P4 checks
-that the page palette and the chart palette never disagree (audit finding F2).
+`surface` role, so charts took the new dark card colour with no builder change.
+
+**In effect since P4** - every chart was photographed in both themes at 1440, 1024 and
+390px, and its text measured against its own box:
+
+- **Cap lines** (`_thresholds`): their names take turns on three rows, not two - on a phone
+  *Tax* had sat on *2nd apron* - and the lines are drawn in `deemphasis`, a step above the
+  gridlines they stand among (in the light theme that is the colour they had).
+- **Long axis titles** take two balanced lines past 32 characters (`LONG_TITLE`): centred
+  under a phone's narrow plot, six ran past the chart's edge.
+- **A reference line's name** runs away from the end of the axis it sits near, so it stays
+  on the chart; the same for the value a histogram marks.
+- **Interval rows** leave room either side of the widest interval, as they already did
+  beside a reference line: no interval ends on the chart's edge.
+- **Dates** are few, level where they fit and slanted where they do not: on Team Explorer's
+  form chart at 1024px three dates had printed on top of each other.
+- **A histogram's** value labels sit a little lower, clear of the count axis's "0".
+- **Stacked bars** refuse more parts than the palette has slots (finding F19), as the
+  other builders do; a ninth part had been dropped without a word.
+- **Kept, with reasons.** A chart that keeps its old colours for a moment after the theme is
+  switched (F2): Streamlit does not run the page again on a switch, and nothing short of a
+  script in the page would make it; the next click redraws it, and the choice is
+  remembered, so it is seen once. Charts keep their filled panel rather than becoming
+  outlined cards like the tiles (F10): an outlined chart needs a see-through background,
+  and then, just after a switch, its text would be dark on dark until that click.
+  Benchmarks' columns hold their two-line labels level: tilted, they garbled, and below
+  about 1100px they run together (the table view holds every figure); P5 shortens them.
 
 ## 7. The assistant's surfaces (guidance for P7)
 

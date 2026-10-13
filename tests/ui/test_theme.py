@@ -78,8 +78,17 @@ def test_the_subject_stands_out_from_its_context(colors: Palette) -> None:
 def test_text_is_readable_on_the_surface(colors: Palette) -> None:
     assert contrast(colors.ink, colors.surface) >= 7
     assert contrast(colors.ink_secondary, colors.surface) >= TEXT_CONTRAST
-    # Axis labels are large enough for the 3:1 that applies to large text.
-    assert contrast(colors.ink_muted, colors.surface) >= MARK_CONTRAST
+    # Tick labels are 12px, small text, so 4.5:1 - not the 3:1 of large text, which this
+    # test once allowed and the light theme's muted ink (3.5:1) met (UI polish P4).
+    assert contrast(colors.ink_muted, colors.surface) >= TEXT_CONTRAST
+    assert contrast(colors.ink_muted, colors.plane) >= TEXT_CONTRAST
+
+
+@PALETTES
+def test_every_series_stands_out_from_the_surface(colors: Palette) -> None:
+    """A mark needs 3:1 against its chart (UI polish P4: three light series were under it)."""
+    for color in colors.series:
+        assert contrast(color, colors.surface) >= MARK_CONTRAST, color
 
 
 @PALETTES
