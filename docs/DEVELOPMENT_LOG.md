@@ -3,6 +3,54 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## UI polish P8 - accessibility, every size, the final audit (2026-10-12)
+
+The last phase of the polish: the whole workbench measured on the final code, and the
+handoff written. No code changed; two findings and two decisions are left to the owner.
+
+**Found.**
+
+- **The top bar's pages are last in the keyboard's order** (finding F31): Enter opens a menu,
+  but Streamlit draws the open menu after everything else on the page, so its pages came
+  after 16 and 25 presses of Tab on the pages tried; Tab from a menu moves to the next menu,
+  and the arrow keys do nothing there. Before P2 the sidebar's page list came first. Every
+  page can still be reached, and its address typed.
+- **Faint focus marks on links** (F32): a focused button, dropdown, box, tab or download is
+  ringed in green in both themes, but a sidebar link or a menu item shows only a tint - in
+  the light theme barely different from the page - and a top-bar menu a grey outline.
+- **At 150% zoom** (960px wide with the sidebar open) the top bar holds five menus and folds
+  *System* into "1 more", Streamlit's own overflow, which opens it. Nothing else changed
+  between the sizes.
+- Held: nothing cut on any page or tab at six widths; no error and no empty tab in three
+  states; the first run and an unreachable assistant say plainly what to do.
+
+**Decided for the owner, not built**: D13, a short *All pages* list in the sidebar for the
+keyboard (or the guide's note alone); D14, one more style rule ringing a focused link in the
+brand green. A change to the navigation and a new style rule are the owner's to choose
+(decision D4; DESIGN_SYSTEM.md section 9).
+
+**Written**
+
+- `docs/ui-polish/FINAL_AUDIT.md`: what changed from P0 and what did not, every finding's
+  outcome (F1-F32), the decisions, the accessibility measured, the screenshots, the limits.
+- `docs/ui-polish/RELEASE_CHECKLIST.md`: what to decide, look at, test and check before the
+  branch is pushed, and how to undo a phase.
+- DESIGN_SYSTEM.md section 11 (keyboard and zoom); WORKBENCH.md, how to use the workbench by
+  keyboard and reach a page by its address; the README, the top bar and the themes.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| `pytest -n auto`, once at the gate | 3,983 passed (4 min 27 s), as at P7: P8 changed no code |
+| Cut-off text and controls | Every page and tab, a team and a player chosen, at 1440, 1366, 1024 and 390px, and at 1152 and 960 (125% and 150% zoom of a 1440px window): nothing cut. AI Research and its dialog at both zoom sizes: nothing under the question box, nothing too wide |
+| Errors and empty tabs | Every page and tab with nothing chosen, a team and a player chosen, and the oldest season: none |
+| The keyboard, both themes | Tab order, focus marks, a page from the top bar, a team typed into the sidebar, tabs by the arrows, the dialog opened and closed, a download by Enter - all work; F31 and F32 as above |
+| Edge states in a browser | No data at all, and the assistant unreachable (a copy of `configs/` pointed at an empty local port - the owner's Ollama untouched): both say what to do, in both themes and on a phone, with no error |
+| Against P0 | Every page at 1440x900 in both themes beside its P0 screenshot (`data/ui-polish/screenshots/p8-final/compare-*.png`) |
+| Boundaries and data | Documents only; the browser passes read the photo copy and the throwaway copy, never the lab's data |
+
 ## UI polish P7 - the assistant's surfaces (2026-10-12)
 
 AI Research and the *Ask AI about this* dialog, photographed before and after at four window

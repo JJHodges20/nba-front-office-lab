@@ -50,6 +50,15 @@ the computer's setting again. Charts keep their own colours in both themes; gree
 used for data. Just after you switch, a chart may keep the old theme's colours until your
 next click on the page.
 
+**With the keyboard.** Tab moves through the sidebar, then the top bar, then the page, and
+the control in focus is ringed in green. Type in a dropdown to narrow it and press Enter
+to choose; the arrow keys move between tabs; Space ticks a box; Enter presses a button or
+downloads a file; Escape closes the *Ask AI about this* dialog. Enter opens a group in the
+top bar, but its pages come last in the order - after everything on the page. To go
+straight to a page, type its address after the workbench's own - `/players`, `/teams`,
+`/research` and so on, as the address bar shows each page - which opens it afresh, with the
+sidebar's choices cleared.
+
 ## Reading a page
 
 - **Headline figures** sit in tiles across the top of a page; in a narrow window or on a

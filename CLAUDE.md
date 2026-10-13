@@ -434,7 +434,9 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   drops the sidebar's choices. A page with a question box opens at its end. Check the
   assistant's surfaces live, with the local model, on a throwaway copy of the data:
   Ollama's own log (`%LOCALAPPDATA%\Ollama\server.log`) counts its chat requests, the way to
-  show that nothing is asked twice (P7).
+  show that nothing is asked twice (P7). For the offline state, point a copy of `configs/` at
+  an empty local port through `FOL_HOME` - never stop the owner's Ollama. And go through a
+  changed page once with the keyboard alone (P8: `docs/ui-polish/FINAL_AUDIT.md` section 5).
 
 ## Conventions
 

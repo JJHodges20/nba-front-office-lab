@@ -135,9 +135,11 @@ Stop it with Ctrl+C. [docs/WORKBENCH.md](docs/WORKBENCH.md) is the guide.
 | AI Research | Ask in plain words: a model on this machine answers from the lab's data and fitted models, its own documents, games, moves and injuries since the build, dated news from the feeds the lab may read, and the web - every figure checked against what the tools returned, each modeled figure with its interval, each answer shown with its rows, charts and dated sources. Ask for rosters under a budget and get two to four to review, each saved only when you press its button; ask for an experiment that might improve one of the lab's models and get a proposal to review, the idea beside the lab's own test - never applied. Research is kept in named workspaces on this computer - questions and answers, findings, notes, proposed rosters, experiment proposals - and *Ask AI about this* on the other pages asks about what they show. |
 | Data Health | Freshness, failed fetches, missing data, quality checks and source status. |
 
-Season, phase, team, player and comparison window are chosen once in the sidebar and
+The pages are in six menus across the top - League, Explore, Build, Forecast, Ask and
+System. Season, phase, team, player and comparison window are chosen once in the sidebar and
 hold on every page. Each page says which of its numbers the league measured, which the
-lab derived or estimated, and which you assumed.
+lab derived or estimated, and which you assumed. The workbench is designed dark, with a
+matching light theme: choose either in the menu at the top right.
 
 ![Player Explorer: a player's percentile profile and form](docs/images/player-explorer.png)
 

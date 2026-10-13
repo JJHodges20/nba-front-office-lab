@@ -9,8 +9,10 @@ bar and one style rule, both the owner's choice. **The tiles, tags and controls 
 choices were cut off, and every delete asking first. **The charts (section 6, and the light
 palette's changes in sections 2-3) are in effect since P4**, with P5's and P6's additions to
 sections 6 and 10. **The assistant's surfaces (section 7) are in effect since P7**, with code
-text in the secondary ink (section 2). The evidence behind each value is in
-[BASELINE_AUDIT.md](BASELINE_AUDIT.md).
+text in the secondary ink (section 2). **P8 measured the whole** (section 11): two choices
+are left to the owner, a keyboard path to the pages (D13) and a clearer focus mark on links
+(D14). The evidence behind each value is in [BASELINE_AUDIT.md](BASELINE_AUDIT.md) and
+[FINAL_AUDIT.md](FINAL_AUDIT.md).
 
 The roadmap's direction: a near-black canvas, a dark forest-green accent, balanced
 density, the whole workbench in scope, navigation and behaviour unchanged. This proposal
@@ -327,3 +329,20 @@ the frame applies it, and that no page injects HTML or CSS of its own.
 - **The open page's group is not named on the page** (decision D7, the owner's): placed
   above or beside the title it must clear the top bar, which pushes every page down about
   60px. The open menu marks the page, and the title names it.
+
+## 11. Keyboard and zoom (P8)
+
+- **Focus.** The control in focus is ringed in the brand green - buttons, dropdowns, boxes,
+  tabs, downloads - in both themes, by Streamlit's own focus styles. A focused sidebar link
+  or top-bar menu item shows only a background tint, and a top-bar menu a grey outline
+  (finding F32): one more style rule would ring them too (decision D14, the owner's).
+- **Order.** Tab moves through the sidebar - collapse, filters, the data status and its
+  link - then the top bar's six menus, then the page. Enter opens a menu, but its pages come
+  last in the order, after everything on the page (F31); decision D13 proposes a short list
+  of the pages in the sidebar. The user's guide says how to reach a page by its address.
+- **Keys that work**: typing in a dropdown narrows it and Enter chooses; the arrow keys
+  move between tabs; Space ticks a box; Enter presses a button and starts a download;
+  Escape closes the *Ask AI about this* dialog, which takes the focus when it opens.
+- **Zoom.** At 125% and 150% a 1440px window lays the page out as 1152 and 960px wide do,
+  between the sizes every phase checked; the cut-off scan found nothing at either (the
+  development log's P8 entry).
