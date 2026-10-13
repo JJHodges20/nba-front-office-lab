@@ -29,7 +29,7 @@ MODE = "ai_ask_mode"
 DONE = "ai_ask_done"
 """The answer the dialog last waited for."""
 POLL_SECONDS = 1.0
-MODES = {Mode.QUICK.value: "Quick", Mode.DEEP.value: "Deep"}
+MODES = answers.MODES
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,7 +161,7 @@ def body(about: About) -> None:
     _answer()
 
 
-_dialog = st.dialog("Ask AI about this", width="large")(body)
+_dialog = st.dialog("Ask AI about this", width="large", icon=":material/smart_toy:")(body)
 
 
 @st.fragment(run_every=POLL_SECONDS)
@@ -176,13 +176,7 @@ def _answer() -> None:
         st.session_state[DONE] = turn
         job = None
     if job is not None:
-        mode = MODES[job.question.mode.value]
-        with st.status(f"{mode} answer under way: {job.seconds:.0f} s", expanded=True):
-            steps = job.steps
-            if not steps:
-                st.caption("Reading the question...")
-            for step in steps:
-                st.markdown(answers.step_line(step))
+        answers.under_way(job)
         if not job.stopping and st.button("Stop", key="ai_ask_stop", icon=":material/stop_circle:"):
             job.stop()
         return

@@ -14,7 +14,7 @@ that a widget keeps its state as the page reruns and never clashes with another 
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -26,6 +26,7 @@ from front_office.domain.assistant import (
     Chart,
     Evidence,
     EvidenceKind,
+    Mode,
     NameCandidate,
     Outcome,
     ResultStatus,
@@ -47,6 +48,8 @@ SAVES = "ai_saves"
 BENCH = ROSTER_SLOTS[-1]
 TAB_LABEL = 38
 """Characters of a result's title on its tab."""
+MODES = {Mode.QUICK.value: "Quick", Mode.DEEP.value: "Deep"}
+"""How much work a question may take, in the word the page and the dialog both show."""
 
 OUTCOMES = {
     Outcome.SUPPORTED: (
@@ -91,13 +94,15 @@ STEPS = {
     "check": ":material/rule:",
 }
 EVIDENCE = {
-    EvidenceKind.LAB: "The lab's data",
-    EvidenceKind.MODEL: "A fitted model",
-    EvidenceKind.CONTRACTS: "Your contract file",
-    EvidenceKind.CURRENT: "Current information",
-    EvidenceKind.WEB: "The web",
-    EvidenceKind.DOCS: "The lab's documents",
+    EvidenceKind.LAB: ("The lab's data", ":material/database:"),
+    EvidenceKind.MODEL: ("A fitted model", ":material/model_training:"),
+    EvidenceKind.CONTRACTS: ("Your contract file", ":material/request_quote:"),
+    EvidenceKind.CURRENT: ("Current information", ":material/update:"),
+    EvidenceKind.WEB: ("The web", ":material/public:"),
+    EvidenceKind.DOCS: ("The lab's documents", ":material/menu_book:"),
 }
+"""Each kind of source in words, with an icon: the web, the lab and a model tell apart at a
+glance in a long list (UI polish P7)."""
 PROPOSALS = (
     "Example rosters the optimizer found for this question: options to compare, not a "
     "recommendation. The lab has not checked whether the trades or signings to get them are "
@@ -108,6 +113,12 @@ SAVE_HELP = (
     "player value model and the salaries are the same as when the roster was proposed."
 )
 DECLINE_HELP = "Set this option aside: it stays in the workspace's proposals, marked declined."
+WAITING = ("Waiting", ":material/pending:", "orange")
+SAVED = ("Saved", ":material/check_circle:", "green")
+DECLINED = OUTCOMES[Outcome.DECLINED][:3]
+"""What has become of a proposed roster, said first on its card (UI polish P7): it waits
+for the user, is saved for the Team Builder, or is set aside - a declined option looks as a
+declined answer does."""
 RATING_HELP = (
     "Each player's forecast added up for the minutes they are expected to play, relative to "
     "the league. For whole teams these forecasts have typically been off by the amount shown."
@@ -214,6 +225,22 @@ def _option_help(option: NameCandidate) -> str:
     return f'{kind} {option.name}, for "{option.text}".'
 
 
+def under_way(job: api.Job) -> None:
+    """A question under way: its steps as they come, in a box that shows it is running.
+
+    The box is written into without a ``with`` block: leaving one marks a status box
+    complete, and the fragments that draw it again each second had shown a tick beside a
+    question still under way (UI polish P7)."""
+    box = st.status(
+        f"{MODES[job.question.mode.value]} answer under way: {job.seconds:.0f} s", expanded=True
+    )
+    steps = job.steps
+    if not steps:
+        box.caption("Reading the question...")
+    for step in steps:
+        box.markdown(step_line(step))
+
+
 def step_line(step: Step) -> str:
     took = f" ({step.seconds:.1f} s)" if step.seconds >= 0.1 else ""
     return f"{STEPS.get(step.kind, ':material/circle:')} {escaped(_step_words(step))}{took}"
@@ -279,12 +306,8 @@ def proposal_card(
     roster_names: Mapping[int, str],
 ) -> None:
     with st.container(border=True):
-        heading = f"**{escaped(proposal.label)}** · {proposal.payroll_season}"
-        if record is not None and record.status == "saved":
-            heading += " · saved"
-        elif record is not None and record.status == "declined":
-            heading += " · declined"
-        st.markdown(heading)
+        st.markdown(f"**{escaped(proposal.label)}** · {proposal.payroll_season}")
+        components.tagged(*_proposal_state(record, roster_names))
         components.figures(
             [
                 Figure(
@@ -331,7 +354,10 @@ def proposal_card(
         status = None if record is None else record.status
         with st.container(horizontal=True, vertical_alignment="center"):
             if status != "saved":
-                with st.popover("Save approved roster", icon=":material/save:"):
+                # Keyed, so that it stays itself when a notice above it comes and goes (P7).
+                with st.popover(
+                    "Save approved roster", icon=":material/save:", key=f"ai_proposal_menu_{key}"
+                ):
                     st.caption(SAVE_HELP)
                     name = st.text_input(
                         "Roster name",
@@ -360,15 +386,22 @@ def proposal_card(
         pressed = st.session_state.get(SAVES, {}).get(proposal.fingerprint)
         if pressed is not None:
             _saved(pressed)
-        elif record is not None and record.status == "saved" and record.roster_id is not None:
-            name = roster_names.get(record.roster_id)
-            st.caption(
-                f"Saved for the Team Builder as “{escaped(name)}”."
-                if name
-                else "Saved for the Team Builder; that roster has since been deleted there."
-            )
-        elif record is not None and record.status == "declined":
-            st.caption("Declined. It can still be saved: press Save approved roster.")
+
+
+def _proposal_state(
+    record: ProposalRecord | None, roster_names: Mapping[int, str]
+) -> tuple[tuple[str, str, str], str]:
+    """The tag that heads a proposed roster's card, and what it means in words."""
+    if record is not None and record.status == "saved":
+        if record.roster_id is None:
+            return SAVED, "For the Team Builder."
+        name = roster_names.get(record.roster_id)
+        if name:
+            return SAVED, f"In the Team Builder as “{escaped(name)}”."
+        return SAVED, "For the Team Builder, where that roster has since been deleted."
+    if record is not None and record.status == "declined":
+        return DECLINED, "Set aside. It can still be saved: press Save approved roster."
+    return WAITING, "Not saved yet: save it for the Team Builder, or decline it, below."
 
 
 def _saved(saved: ProposalSaved) -> None:
@@ -593,7 +626,7 @@ def _rows(table: pd.DataFrame, *, key: str) -> None:
         for column in shown.columns
     }
     plain_columns = {
-        column: plain
+        column: WRITTEN.get(str(column), plain)
         for column in shown.columns
         if column not in specs
         and pd.api.types.is_numeric_dtype(shown[column])
@@ -619,6 +652,11 @@ def _rows(table: pd.DataFrame, *, key: str) -> None:
         placeholder=components.EMPTY_CELL,
         key=key,
     )
+
+
+WRITTEN = {"percentile": formats.percentile}
+"""Figures no catalog describes that the workbench writes its own way on every page: a
+percentile as "92nd percentile" - a comparison's rows had shown 99.399 (UI polish P7)."""
 
 
 def plain(value: object) -> str:
@@ -666,19 +704,30 @@ INTERNAL = ("_id", "_key")
 SHOWN_IDS = {"source_id": "Source"}
 """Ids a reader needs: at A7 news answers sent the user to "the source ID s2", which no
 table or evidence line showed."""
+TWINS = {"value": "shown", "metric": "name"}
+"""A column left to the CSV where the lab's own words for it stand beside it: a figure's
+raw value beside its written form, a metric's key beside its name. A comparison's rows had
+read "fg_pct, 0.467 ... Field goal percentage ... 46.7%" (UI polish P7)."""
+HEADINGS = {**SHOWN_IDS, "shown": "Value"}
 
 
 def shown_columns(columns: Iterable[object]) -> list[object]:
     """A result's columns a reader sees: not the lab's internal ids and keys - a
-    transaction's key showed at A7 - but a source's id, by which an answer names it."""
+    transaction's key showed at A7 - but a source's id, by which an answer names it; and
+    each figure once, in the lab's words where it has them (``TWINS``)."""
+    columns = list(columns)
+    present = {str(column) for column in columns}
     return [
-        column for column in columns if column in SHOWN_IDS or not str(column).endswith(INTERNAL)
+        column
+        for column in columns
+        if (column in SHOWN_IDS or not str(column).endswith(INTERNAL))
+        and TWINS.get(str(column)) not in present
     ]
 
 
 def _words(column: str) -> str:
-    if column in SHOWN_IDS:
-        return SHOWN_IDS[column]
+    if column in HEADINGS:
+        return HEADINGS[column]
     text = column.replace("_", " ").strip()
     return text[:1].upper() + text[1:]
 
@@ -799,14 +848,22 @@ def evidence(answer: Answer) -> None:
     items = answer.evidence
     if not items:
         return
-    label = f"Evidence: {len(items)} source{'s' if len(items) != 1 else ''}"
-    with st.expander(label, icon=":material/fact_check:"):
+    with st.expander(evidence_label(items), icon=":material/fact_check:"):
         for item in items:
             st.markdown(evidence_line(item))
 
 
+def evidence_label(items: Sequence[Evidence]) -> str:
+    """How many sources, and of what kinds: whether an answer read the web shows before the
+    list is opened (UI polish P7)."""
+    kinds = dict.fromkeys(item.kind for item in items)
+    named = ", ".join(word[:1].lower() + word[1:] for word, _ in (EVIDENCE[kind] for kind in kinds))
+    return f"Evidence: {len(items)} source{'s' if len(items) != 1 else ''} · {named}"
+
+
 def evidence_line(item: Evidence) -> str:
-    parts = [f"**{EVIDENCE[item.kind]}**", escaped(item.label)]
+    word, icon = EVIDENCE[item.kind]
+    parts = [f"{icon} **{word}**", escaped(item.label)]
     if item.location:
         location = item.location
         is_link = location.startswith(("http://", "https://")) and not re.search(

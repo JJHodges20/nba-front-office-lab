@@ -197,6 +197,15 @@ class TestPageThemeMatchesTheCharts:
         assert page["primaryColor"] != colors.accent
 
     @pytest.mark.parametrize(("mode", "colors"), [("light", LIGHT), ("dark", DARK)])
+    def test_code_is_quiet_text_not_green(self, config: dict, mode: str, colors: Palette) -> None:
+        """UI polish P7: left unset, code takes the green of a good state, and a file path in
+        an answer's evidence read as a link beside the real ones. Code is the secondary ink,
+        which reads at 4.5:1 on the cards (``test_text_is_readable_on_the_surface``)."""
+        page = config[mode]
+        assert page["codeTextColor"] == colors.ink_secondary
+        assert page["codeTextColor"] not in (colors.good, colors.brand, colors.link)
+
+    @pytest.mark.parametrize(("mode", "colors"), [("light", LIGHT), ("dark", DARK)])
     def test_categorical_order_and_status_colours(
         self, config: dict, mode: str, colors: Palette
     ) -> None:

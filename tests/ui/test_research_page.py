@@ -30,6 +30,7 @@ from tests.helpers import BOS, BROWN, BRUNSON, NYK, TATUM, WHITE
 from tests.ollama_fakes import ScriptedOllama, chat_chunks, tool_call
 from tests.ui.conftest import drawn, texts
 from wb import answers
+from wb.views import research
 
 HISTORY = tool_call("team_stats", team_id=BOS, season="2025-26", view="history")
 DAMAGED = b"not a database " * 300
@@ -99,6 +100,24 @@ def opened_workspace(app: AppTest) -> int:
     return int(app.session_state["ai_workspace"])
 
 
+def shelved(app: AppTest, label: str) -> bool:
+    """A shelf as the workspace's one fold counts it, with a tab of its own under its plain
+    name (UI polish P7: the three had been folds of their own, one under another; a count
+    in a tab's name would make it a new tab, and close the fold, whenever it changed)."""
+    folds = [block.label for block in app.status if block.label.startswith(research.SHELF)]
+    if len(folds) != 1:
+        return False
+    counted = folds[0].removeprefix(research.SHELF).split(" · ")
+    name = label.split(" (")[0]
+    return label in counted and name in [tab.label for tab in app.tabs]
+
+
+def tagged(tag: tuple[str, str, str], text: str) -> str:
+    """A line led by a tag, as ``components.tagged`` writes it."""
+    word, icon, color = tag
+    return f":{color}-badge[{icon} {word}] {text}"
+
+
 def keyed(widgets: Any, prefix: str) -> Any:
     """The one widget whose key begins with ``prefix``. A form's keys end with what it shows,
     or with how many times it was sent, so that it starts again as new widgets: a browser
@@ -165,7 +184,9 @@ def test_an_answer_shows_its_outcome_its_rows_its_chart_and_its_evidence(
     said = texts(app)
     assert "Their net rating was +8.3 in 2025-26 [r1]." in said
     assert "Supported" in said
-    assert [tab.label for tab in app.tabs][0].startswith("r1 · Boston Celtics, every season")
+    # The workspace's shelves are tabs too, in their fold above the conversation (UI polish P7).
+    results = [tab.label for tab in app.tabs if tab.label not in research.SHELVES]
+    assert results[0].startswith("r1 · Boston Celtics, every season")
     charts = drawn(app)
     key = f"ai_chart_t{turn.turn_id}_r1_0"
     assert key in charts, "the tool chose a line of net rating by season"
@@ -173,7 +194,9 @@ def test_an_answer_shows_its_outcome_its_rows_its_chart_and_its_evidence(
     assert seasons == sorted(seasons) and "2025-26" in seasons
     # AppTest files an expander that has an icon among the status blocks.
     folded = [block.label for block in app.status]
-    assert "Evidence: 1 source" in folded and "How it was answered" in folded
+    # The kinds of source are named before the list is opened (UI polish P7).
+    assert "Evidence: 1 source · the lab's data" in folded and "How it was answered" in folded
+    assert ":material/database: **The lab's data**" in said, "each source led by its kind"
     assert len(app.dataframe) >= 1
 
 
@@ -192,6 +215,32 @@ def test_running_the_page_again_asks_nothing_again_and_draws_the_answer_once(
     assert not app.exception, [error.value for error in app.exception]
     assert len(ollama.chat_payloads) == asked and len(kept(home)) == 1
     assert texts(app).count("It went well [r1].") == 1
+
+
+def walked(node: Any) -> Iterator[Any]:
+    """Every block and element of a drawn page, in the order the page shows them."""
+    yield node
+    for _, child in sorted(getattr(node, "children", {}).items()):
+        yield from walked(child)
+
+
+def test_the_conversation_starts_before_the_buttons_that_ask(model, page, home: Path) -> None:
+    """UI polish P7 (audit finding F9): the workspace's three shelves are one fold, and the
+    mode and the conversation's buttons follow the conversation, by the question box. Above
+    it, they and two more folds had put the first question 608px down a 900px window, and
+    below the window of a laptop or a phone."""
+    model(ScriptedOllama(chats=[NOTHING]))
+    app = ask(page(home, "research"), "Hello?")
+    order = list(walked(app.main))
+    keys = [getattr(node, "key", None) for node in order]
+    kinds = [getattr(node, "type", None) for node in order]
+    last = max(at for at, kind in enumerate(kinds) if kind == "chat_message")
+    # The question box is in Streamlit's bottom bar, under everything the page draws.
+    assert min(keys.index(key) for key in ("ai_mode", "ai_new", "ai_refresh")) > last
+    shelves = "Findings (0) · Proposed rosters (0) · Experiment proposals (0)"
+    folds = [block.label for block in app.status if block.label.startswith(research.SHELF)]
+    assert folds == [research.SHELF + shelves]
+    assert not [block for block in app.status if block.label.startswith("Findings")], "one fold"
 
 
 def test_a_chart_the_house_rules_refuse_is_not_drawn_and_the_rows_are(
@@ -300,6 +349,9 @@ def test_a_question_under_way_shows_its_steps_and_can_be_stopped(model, page, ho
     job = app.session_state["ai_job"]
     assert job is not None and not job.done
     assert app.chat_input(key="ai_question").disabled, "one question at a time"
+    # Shown as running: drawn in a with block, the box had shown a tick (UI polish P7).
+    (box,) = [block for block in app.status if block.label.startswith("Quick answer under way")]
+    assert box.state == "running"
     app.button(key="ai_stop").click().run()
     assert job.stopping
     gate.set()
@@ -404,7 +456,8 @@ def test_findings_are_saved_edited_and_deleted(model, page, home: Path) -> None:
     keyed(app.text_input, f"ai_find_title_{key}_").set_value("A finding")
     app.button(key=f"ai_find_save_{key}").click().run()
     assert "Saved “A finding” to the findings." in texts(app)
-    assert any(block.label == "Findings (1)" for block in app.status)
+    assert shelved(app, "Findings (1)")
+    assert [tab.label for tab in app.tabs][:3] == list(research.SHELVES), "names that never change"
     with Lab(load_settings(home)) as lab:
         (finding,) = lab.workspaces.findings(turn.workspace_id)
     keyed(app.text_input, f"ai_f_title_{finding.finding_id}_").set_value("Renamed")
@@ -413,7 +466,7 @@ def test_findings_are_saved_edited_and_deleted(model, page, home: Path) -> None:
     assert app.button(key=f"ai_f_delete_{finding.finding_id}").disabled, "ticked first (P3)"
     app.checkbox(key=f"ai_f_delete_ok_{finding.finding_id}").check().run()
     app.button(key=f"ai_f_delete_{finding.finding_id}").click().run()
-    assert any(block.label == "Findings (0)" for block in app.status)
+    assert shelved(app, "Findings (0)")
 
 
 def test_history_is_cleared_and_a_workspace_deleted_only_when_ticked(
@@ -511,7 +564,11 @@ def test_proposed_rosters_are_saved_only_by_the_users_click(model, page, priced_
     )
     assert "Asked for: 14 to 15 players. Salaries from your contract file as of" in said
     assert f"in {proposals[1].added[0]}" in said, "an option is compared with Option A"
-    assert any(block.label == "Proposed rosters (3, 3 waiting)" for block in app.status)
+    assert shelved(app, "Proposed rosters (3, 3 waiting)")
+    # Each card says first what has become of it (UI polish P7): under the answer and on
+    # the shelf, three waiting.
+    waiting = tagged(answers.WAITING, "Not saved yet: save it for the Team Builder, or decline")
+    assert said.count(waiting) == 6
 
     key = f"t{turn.turn_id}_r1"
     with Lab(load_settings(priced_home)) as lab:
@@ -520,7 +577,9 @@ def test_proposed_rosters_are_saved_only_by_the_users_click(model, page, priced_
     app.button(key=f"ai_proposal_save_{key}_1").click().run()
     assert not app.exception, [error.value for error in app.exception]
     assert any("Saved as" in item.value for item in app.success)
-    assert any(block.label == "Proposed rosters (3, 2 waiting)" for block in app.status)
+    assert shelved(app, "Proposed rosters (3, 2 waiting)")
+    saved = tagged(answers.SAVED, "In the Team Builder as “Option B from the assistant”.")
+    assert texts(app).count(saved) == 2, "said on the card under the answer and on the shelf"
     with Lab(load_settings(priced_home)) as lab:
         rosters = lab.rosters.list()
         assert rosters["name"].tolist() == ["Option B from the assistant"]
@@ -533,7 +592,10 @@ def test_proposed_rosters_are_saved_only_by_the_users_click(model, page, priced_
         log = [entry.action for entry in lab.workspaces.approvals(turn.workspace_id)]
     assert records == {"Option A": "draft", "Option B": "saved", "Option C": "declined"}
     assert log == ["saved", "declined"]
-    assert any(block.label == "Proposed rosters (3, 1 waiting)" for block in app.status)
+    assert shelved(app, "Proposed rosters (3, 1 waiting)")
+    declined = tagged(answers.DECLINED, "Set aside. It can still be saved")
+    assert texts(app).count(declined) == 2
+    assert answers.DECLINED == answers.OUTCOMES[Outcome.DECLINED][:3], "one look per word"
     with Lab(load_settings(priced_home)) as lab:
         assert len(lab.rosters.list()) == 1, "a decline saves nothing"
 
@@ -572,12 +634,12 @@ def test_an_experiment_is_drafted_and_kept_only_by_the_users_click(model, page, 
     assert "Experiments to review" in said and "Keeping one changes no model" in said
     assert "Rookies by draft place" in said and "Not tested" in said
     assert "The lab's test, from the Player value model, revision" in said
-    assert any(block.label == "Experiment proposals (0)" for block in app.status)
+    assert shelved(app, "Experiment proposals (0)")
 
     key = f"t{turn.turn_id}_r1_0"
     app.button(key=f"ai_experiment_keep_{key}").click().run()
     assert not app.exception, [error.value for error in app.exception]
-    assert any(block.label == "Experiment proposals (1)" for block in app.status)
+    assert shelved(app, "Experiment proposals (1)")
     with Lab(load_settings(home)) as lab:
         (record,) = lab.workspaces.experiments(turn.workspace_id)
     assert record.turn_id == turn.turn_id and record.proposal.idea.title == "Rookies by draft place"
@@ -603,8 +665,6 @@ def test_an_experiment_is_drafted_and_kept_only_by_the_users_click(model, page, 
 
 def answers_stamp(*stored: object) -> str:
     """The note form's key ends with what it shows (A6): see ``research._stamp``."""
-    from wb.views import research
-
     return research._stamp(*stored)
 
 
@@ -650,6 +710,31 @@ def test_a_reader_sees_a_source_s_id_and_no_internal_key() -> None:
     # transactions table showed each move's internal key.
     columns = ["source_id", "transaction_key", "group_key", "player_id", "headline", "published"]
     assert answers.shown_columns(columns) == ["source_id", "headline", "published"]
+
+
+def test_a_figure_is_shown_once_in_the_lab_s_words() -> None:
+    # UI polish P7, live: a comparison's rows read "fg_pct, 0.467 ... Field goal percentage
+    # ... 46.7%". The raw value and the metric's key are left to the CSV where the lab's
+    # written form and the metric's name stand beside them, and the written form is the Value.
+    compared = ["metric", "value", "percentile", "player_id", "player_name", "label", "name"]
+    compared += ["category", "shown"]
+    assert answers.shown_columns(compared) == [
+        "percentile",
+        "player_name",
+        "label",
+        "name",
+        "category",
+        "shown",
+    ]
+    assert answers._words("shown") == "Value"
+    assert answers.shown_columns(["metric", "value", "rank"]) == ["metric", "value", "rank"], (
+        "kept where nothing stands in for them: a team's figures"
+    )
+    # A percentile as every page writes one; the rows had shown 99.399.
+    assert [answers.WRITTEN["percentile"](v) for v in (99.399, 55.756)] == [
+        "99th percentile",
+        "56th percentile",
+    ]
 
 
 def test_a_figure_no_catalog_describes_has_no_tail_of_zeros() -> None:

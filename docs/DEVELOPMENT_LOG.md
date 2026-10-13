@@ -3,6 +3,81 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## UI polish P7 - the assistant's surfaces (2026-10-12)
+
+AI Research and the *Ask AI about this* dialog, photographed before and after at four window
+sizes, and used live with the local model (qwen3:8b through Ollama) on a throwaway copy of
+the test data (`data/ui-polish/workbench-data-p7`): seven questions - five on the page and
+two from the dialog - a roster saved and another declined, the server restarted. No answer,
+tool, model, approval or stored record changed.
+
+**Found.**
+
+- **The conversation started far down the page** (finding F9): seven bands of controls came
+  first, and the first question began 608px down a 1440x900 window - below the fold at
+  1024x768 (803px) and on a phone (1,026px).
+- **A question under way showed a tick** (F27): a fragment draws the box with its steps
+  again each second inside a `with` block, and leaving one marks Streamlit's status box
+  complete - on the page and in the dialog alike.
+- **File paths in an answer's evidence were green** (F26): Streamlit prints code in the green
+  of a good state unless told otherwise, so they read like links.
+- **A comparison's rows showed each figure twice** (F28): "fg_pct, 0.467 ... Field goal
+  percentage ... 46.7%", and percentiles to three decimals.
+- **Folds and popovers closed under the user** (F30): a finding's or an experiment's *Delete*
+  popover closed as its box was ticked whenever the line saying what the last action did had
+  just gone - everything below moves up a place, and an unkeyed popover is then a new one
+  (since P3). And the new shelf, first built with counts in its labels, closed when a roster
+  was declined on it.
+- Held already: nothing sat under the question box at any size, nothing was wider than the
+  window, and one question ran at a time across the page and the dialog.
+
+**Built**
+
+- **AI Research's top**: a two-line subtitle; the three shelves one fold - "In this
+  workspace: Findings (n) · Proposed rosters (n, k waiting) · Experiment proposals (n)" - with
+  a tab for each; the mode, *New conversation*, *Fetch current information* and what a fetch
+  did under the conversation, by the question box. The first question now starts 411px down
+  at 1440x900, 451 at 1366x768, 585 at 1024x768 - above the question box - and 754 on a phone.
+- **What stays open**: the shelf's fold and tabs keyed, the tabs named without counts (on a
+  phone the three names now fit one row); every popover below the line that says what the
+  last action did keyed.
+- **A question under way** (`answers.under_way`, shared by the page and the dialog): a
+  spinner, the box written into without a `with` block.
+- **The answer**: the evidence's fold names the kinds of source ("Evidence: 3 sources · the
+  lab's data, the web") and each source is led by its kind's icon; a result's raw value and a
+  metric's key are left to the CSV where the lab's written form and the metric's name stand
+  beside them; a percentile written as every page writes one.
+- **Rosters to review**: each card leads with *Waiting*, *Saved* ("In the Team Builder as
+  ...") or *Declined*, the last looking as a declined answer does.
+- **The dialog**: the assistant's icon in its title. **The theme**: code is the secondary ink
+  in both themes (`codeTextColor`).
+- **Documents**: DESIGN_SYSTEM.md sections 2 and 7; the audit's F9, F22 and F26-F30 and
+  decision D12; WORKBENCH.md's AI Research; CLAUDE.md.
+
+**Considered and left**: a docked assistant panel beside a page (the roadmap's P7, task 3) -
+Streamlit draws a dialog only as a centred modal, and a panel would need HTML and CSS of the
+lab's own or the sidebar, which holds the filters (decision D12); the result tabs under an
+answer, which a phone scrolls sideways (F22); the avatars' column, which indents a phone's
+messages about 50px - Streamlit's chat layout, with no setting.
+
+**Seen, for the owner** (F29): asked from Team Explorer which team had the best defense, the
+model read only the Celtics' figures and wrote that their defensive rating "ranked 1st in the
+league"; the result said 4th of 30, and held a "1st of 30" for points allowed. The answer
+checker took out another figure and marked the answer *Partly answered*, but the place
+stood. That is the assistant's checking, not the polish: a later milestone, through its
+evaluation.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New and changed tests | `test_research_page.py`: the conversation comes before the mode and its buttons, and the shelves are one fold (new); a question under way is shown running; the evidence's fold names its kinds and each source leads with its icon; each roster card says waiting, saved or declined, under its answer and on the shelf; each figure once in the lab's words, a percentile as the pages write one (new); a shelf counted on the fold's label, with a tab whose name never changes. `test_theme.py`: code is the secondary ink, never green (new) |
+| `pytest -n auto`, once at the gate | 3,983 passed (4 min 39 s); at P6, 3,979 |
+| Live, with the local model, on the throwaway copy | Questions under way and answered at 1440, 1366, 1024 and 390px, nothing under the question box; three rosters proposed, Option B saved and Option C declined - the copy then held A waiting, B saved as roster 2, C declined, the approvals "saved, declined", and in the Team Builder only the saved one besides the copy's own; the history the same after a server restart; two questions from the dialog, at 1440 and 390, kept in the workspace open on AI Research and reached by *Open in AI Research*. Ollama's request log counted 2, 2, 2, 2, 4, 3 and 4 chat requests for the seven questions: for each, the number of model steps it recorded - three were sent back once or twice by the answer checker, as designed - and opening AI Research after the dialog's answer asked nothing more. With the shelf open on *Proposed rosters*, a finding saved under an answer left it open on that tab; on *Findings*, a delete's popover stayed open after its tick, and the delete left the fold open where it was |
+| The pages in a browser | AI Research and the dialog before and after (`data/ui-polish/screenshots/p7-before/`, `p7-after/`): the top, the end and the first 2,600px at 1440x900, 1366x768, 1024x768 and 390x844 in the dark, at 1440 and 390 in the light; answers with their folds open; each live step photographed |
+| Boundaries and data | `answers.py`, `ask.py`, `research.py` and `.streamlit/config.toml`; no service, tool, model or stored record changed; the live questions, the save and the decline ran on the throwaway copy, never the lab's data |
+
 ## UI polish P6 - the Build, Forecast and System pages (2026-10-12)
 
 Team Builder, Roster Fit, Roster Optimizer, Postseason Outlook, Scenario Simulator and Data

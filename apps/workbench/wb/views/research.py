@@ -66,14 +66,13 @@ PROGRESS_SECONDS = 1.0
 TITLE_LENGTH = 60
 
 SUBTITLE = (
-    "Ask a question in your own words. An AI model running on this computer answers from the "
-    "lab's data, models and documents, the latest league news, and the web. Every number it "
-    "gives is checked against those sources before you see it. Your questions and answers are "
-    "kept in the workspace you choose, on this computer; nothing is saved to the Team Builder "
-    "unless you press a save button."
+    "Ask in your own words. An AI model on this computer answers from the lab's data, models "
+    "and documents, the news and the web, and every number is checked before you see it. Your "
+    "research is kept on this computer, and nothing is saved to the Team Builder unless you "
+    "press save."
 )
 PROMPT = "Ask about players, teams, seasons, forecasts, recent games, injuries, trades or news"
-MODES = {Mode.QUICK.value: "Quick", Mode.DEEP.value: "Deep"}
+MODES = answers.MODES
 MODE_HELP = (
     "Quick: for one fact or one comparison - up to 3 lookups and about 90 seconds. Deep: for "
     "a longer look at several sources - up to 12 lookups and 5 minutes, thinking it through "
@@ -115,6 +114,8 @@ EXAMPLES = (
     "Suggest an experiment that might make the player projections better.",
 )
 SIDEBAR = "Sidebar's"
+SHELF = "In this workspace: "
+SHELVES = ("Findings", "Proposed rosters", "Experiment proposals")
 UNREADABLE = (
     "The file that keeps your workspaces - their questions, answers, findings and notes - "
     "cannot be read ({reason}). Nothing has been changed or deleted. Set it aside to start a "
@@ -153,7 +154,6 @@ def _research(research: WorkspaceService, filters: Filters, status: api.Assistan
     turns = research.turns(workspace.workspace_id)
     current = [turn for turn in turns if turn.conversation == workspace.conversation]
     earlier = [turn for turn in turns if turn.conversation != workspace.conversation]
-    _controls(research, workspace, busy=job is not None, started=bool(current))
     records = {record.fingerprint: record for record in research.proposals(workspace.workspace_id)}
     kept = {record.fingerprint: record for record in research.experiments(workspace.workspace_id)}
     stamp = research.stamp()
@@ -175,6 +175,10 @@ def _research(research: WorkspaceService, filters: Filters, status: api.Assistan
             _turn(turn, research, can_ask=False, records=records, kept=kept, names=roster_names, stamp=stamp)  # fmt: skip
     if job is not None:
         _progress()
+    # The mode and the conversation's own buttons sit just above the question box, where a
+    # question is asked; above the conversation they pushed its start below a laptop's
+    # window (UI polish P7, audit finding F9).
+    _controls(research, workspace, busy=job is not None, started=bool(current))
     asked = st.chat_input(PROMPT, key="ai_question", disabled=not can_ask)
     if asked and asked.strip():
         _start(_question(asked.strip(), filters, workspace), workspace.workspace_id)
@@ -290,9 +294,6 @@ def _status(status: api.AssistantStatus) -> None:
             components.state_badge(source.state, f"{name}: {_source_state(source)}")
     if not status.is_ready:
         components.empty("The assistant cannot answer yet", status.message, icon=icon)
-    for refreshed in st.session_state.get(REFRESHED, ()):
-        name = SOURCES.get(refreshed.source, refreshed.source)
-        st.caption(f"{name}: {refreshed.status} - {answers.escaped(refreshed.detail)}")
 
 
 def _source_state(source: CurrentSource) -> str:
@@ -565,43 +566,57 @@ def _position(options: list, value: object) -> int:
 
 
 def _shelf(research: WorkspaceService, workspace: Workspace, names: dict[int, str]) -> None:
+    """What the workspace keeps, in one fold whose label counts it all: three folds, one
+    under another, had put the conversation's start below a laptop's window (UI polish P7,
+    audit finding F9). Each shelf is a tab inside.
+
+    The fold and its tabs are keyed, and the tabs' names hold no count: a fold or a tab whose
+    label changes is otherwise drawn as a new one, and declining a roster on its shelf closed
+    the fold."""
     findings = research.findings(workspace.workspace_id)
     held = research.proposals(workspace.workspace_id)
-    waiting = sum(record.status == "draft" for record in held)
-    with st.expander(f"Findings ({len(findings)})", icon=":material/bookmark:"):
-        if not findings:
-            st.caption(
-                "None yet. To keep an answer worth keeping, press Save as finding under it: a "
-                "copy stays here even if the history is cleared."
-            )
-        for finding in findings:
-            _finding(research, finding)
-    label = f"Proposed rosters ({len(held)}" + (f", {waiting} waiting)" if waiting else ")")
-    with st.expander(label, icon=":material/groups:"):
-        if not held:
-            st.caption(
-                "None yet. Ask for rosters under a budget, and the options are kept here until "
-                "you save or decline each."
-            )
-        for record in held:
-            answers.proposal_card(
-                record.proposal,
-                record.proposal,
-                key=f"w{workspace.workspace_id}_{record.fingerprint}",
-                workspace_id=workspace.workspace_id,
-                record=record,
-                roster_names=names,
-            )
     kept = research.experiments(workspace.workspace_id)
-    with st.expander(f"Experiment proposals ({len(kept)})", icon=":material/science:"):
-        if not kept:
-            st.caption(
-                "None yet. Ask for an experiment that might improve one of the lab's models, "
-                "and press Keep in the workspace under a proposal you want to come back to. "
-                "Keeping one changes no model."
-            )
-        for experiment in kept:
-            _experiment(research, experiment)
+    waiting = sum(record.status == "draft" for record in held)
+    counted = (
+        f"Findings ({len(findings)})",
+        f"Proposed rosters ({len(held)}" + (f", {waiting} waiting)" if waiting else ")"),
+        f"Experiment proposals ({len(kept)})",
+    )
+    label = SHELF + " · ".join(counted)
+    with st.expander(label, icon=":material/folder_open:", key="ai_shelf"):
+        on_findings, on_rosters, on_experiments = st.tabs(list(SHELVES), key="ai_shelves")
+        with on_findings:
+            if not findings:
+                st.caption(
+                    "None yet. To keep an answer worth keeping, press Save as finding under "
+                    "it: a copy stays here even if the history is cleared."
+                )
+            for finding in findings:
+                _finding(research, finding)
+        with on_rosters:
+            if not held:
+                st.caption(
+                    "None yet. Ask for rosters under a budget, and the options are kept here "
+                    "until you save or decline each."
+                )
+            for record in held:
+                answers.proposal_card(
+                    record.proposal,
+                    record.proposal,
+                    key=f"w{workspace.workspace_id}_{record.fingerprint}",
+                    workspace_id=workspace.workspace_id,
+                    record=record,
+                    roster_names=names,
+                )
+        with on_experiments:
+            if not kept:
+                st.caption(
+                    "None yet. Ask for an experiment that might improve one of the lab's "
+                    "models, and press Keep in the workspace under a proposal you want to come "
+                    "back to. Keeping one changes no model."
+                )
+            for experiment in kept:
+                _experiment(research, experiment)
 
 
 def _finding(research: WorkspaceService, finding: Finding) -> None:
@@ -619,7 +634,10 @@ def _finding(research: WorkspaceService, finding: Finding) -> None:
         if finding.evidence:
             st.caption(answers.escaped("Rests on: " + "; ".join(finding.evidence.splitlines())))
         with st.container(horizontal=True, gap="small"):
-            with st.popover("Edit", icon=":material/edit:"):
+            # Keyed, as every popover below the notice line: a notice gone moves what
+            # follows up a place, and an unkeyed popover was then a new one - closed just as
+            # its box was ticked (UI polish P7).
+            with st.popover("Edit", icon=":material/edit:", key=f"ai_f_edit_menu_{key}"):
                 shown = _stamp(finding.title, finding.note)
                 title = st.text_input(
                     "Title",
@@ -637,7 +655,7 @@ def _finding(research: WorkspaceService, finding: Finding) -> None:
                         components.alert("error", str(error))
                     else:
                         _after("Finding saved.")
-            with st.popover("Delete", icon=":material/delete:"):
+            with st.popover("Delete", icon=":material/delete:", key=f"ai_f_delete_menu_{key}"):
                 if components.confirmed_button(
                     "Delete finding",
                     "I want to delete this finding",
@@ -654,13 +672,13 @@ def _experiment(research: WorkspaceService, record: ExperimentRecord) -> None:
     if record.note:
         st.markdown(f"*{answers.escaped(record.note)}*")
     with st.container(horizontal=True, gap="small"):
-        with st.popover("Note", icon=":material/edit:"):
+        with st.popover("Note", icon=":material/edit:", key=f"ai_x_note_menu_{key}"):
             shown = _stamp(record.note)
             note = st.text_area("Note", value=record.note or "", key=f"ai_x_note_{key}_{shown}")
             if st.button("Save", key=f"ai_x_save_{key}", type="primary"):
                 research.annotate_experiment(key, note or None)
                 _after("Note saved.")
-        with st.popover("Delete", icon=":material/delete:"):
+        with st.popover("Delete", icon=":material/delete:", key=f"ai_x_delete_menu_{key}"):
             if components.confirmed_button(
                 "Delete proposal",
                 "I want to delete this experiment proposal",
@@ -702,6 +720,10 @@ def _controls(
             with st.spinner("Fetching what is due..."):
                 st.session_state[REFRESHED] = api.refresh_current()
             st.rerun()
+    # What the last fetch did, under its button: the page sits at its end, by the question box.
+    for refreshed in st.session_state.get(REFRESHED, ()):
+        name = SOURCES.get(refreshed.source, refreshed.source)
+        st.caption(f"{name}: {refreshed.status} - {answers.escaped(refreshed.detail)}")
 
 
 def _welcome(status: api.AssistantStatus, workspace: Workspace) -> None:
@@ -773,7 +795,9 @@ def _turn_actions(
     changed = research.changed_since(turn, stamp=stamp)
     with st.container(horizontal=True, gap="small", vertical_alignment="center"):
         if turn.answer is not None:
-            with st.popover("Save as finding", icon=":material/bookmark_add:"):
+            with st.popover(
+                "Save as finding", icon=":material/bookmark_add:", key=f"ai_find_menu_{key}"
+            ):
                 sent = _sent(f"finding_{key}")
                 title = st.text_input(
                     "Title",
@@ -829,13 +853,7 @@ def _progress() -> None:
             where = " · in another workspace"
         st.caption(answers.escaped(f"{MODES[job.question.mode.value]}{where}"))
     with st.chat_message("assistant", avatar=":material/smart_toy:"):
-        mode = MODES[job.question.mode.value]
-        with st.status(f"{mode} answer under way: {job.seconds:.0f} s", expanded=True):
-            steps = job.steps
-            if not steps:
-                st.caption("Reading the question...")
-            for step in steps:
-                st.markdown(answers.step_line(step))
+        answers.under_way(job)
         if job.stopping:
             st.caption("Stopping at the next step; what was gathered by then is kept.")
         elif st.button(

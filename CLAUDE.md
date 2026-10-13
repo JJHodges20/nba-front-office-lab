@@ -339,7 +339,9 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
 - **Colours live in `wb/theme.py`.** `.streamlit/config.toml` repeats them and a test
   keeps the two in step. A new colour has to pass `tests/ui/test_theme.py`. The page's
   primary colour is the forest-green `brand`, never a chart colour (UI polish P1). Every
-  series reaches 3:1 on its chart and tick labels 4.5:1, in both themes (P4).
+  series reaches 3:1 on its chart and tick labels 4.5:1, in both themes (P4). Code in text
+  is the secondary ink (`codeTextColor`): left unset it is the green of a good state, and a
+  file path read as a link (P7).
 - **Styling is the theme's.** No page writes CSS or HTML. What the theme cannot set is a
   rule in `wb/style.css`, applied once by the frame (`style.apply()`), listed in
   `docs/ui-polish/DESIGN_SYSTEM.md` and held to that list by `tests/ui/test_style.py`; a new
@@ -367,6 +369,11 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   selected, and it then overrules every later choice in the sidebar.
 - **Never assign to a widget's session key after the widget is drawn.** Park the value
   and apply it at the top of the next run (`state.choose`, `builder.CREATED`).
+- **Key a fold, a tab row or a popover that must stay open while the page changes around
+  it.** Unkeyed, one whose label changes - a count - or that moves up a place when a line
+  above it goes - a notice - is drawn as a new one, closed. At UI polish P7 declining a
+  roster closed the workspace's shelf, and a delete's popover closed as its box was ticked.
+  Keep counts out of a tab's name.
 - **A form that starts again gets new widgets.** Give its widgets their stored values with
   `value=` and end their keys with what they show (`research._stamp`) or with how many
   times the form was sent (`research.SENT`). Popping a key is not enough: the browser keeps
@@ -401,6 +408,10 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   An answer is drawn by `wb/answers.py` wherever it appears; its widget keys come from the
   kept turn's id. Opening the page makes a workspace if there is none, and asking keeps
   turns: a test that asks, or counts workspaces, works on a private copy of a project.
+  A status box that a fragment draws again is written into without a `with` block
+  (`answers.under_way`): leaving one marks it complete, and a running question showed a
+  tick (UI polish P7). The conversation comes straight after the workspace and its one fold
+  of shelves; the mode and the conversation's buttons sit under it, by the question box.
 - **Ask AI about this** (`wb/ask.py`) goes under a page's header:
   `ask.button(ask.from_filters(page, filters, roster_id=...))`. It never changes the
   sidebar, asks in the workspace open on the AI Research page, and shares that page's one
@@ -420,7 +431,10 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   load and intercepts every click. Look with a team and a player chosen as well as without:
   some charts and controls appear only then, and at P5 two of them were cut at 1024px.
   Reach the pages through the top bar - an address typed in starts a new session, which
-  drops the sidebar's choices.
+  drops the sidebar's choices. A page with a question box opens at its end. Check the
+  assistant's surfaces live, with the local model, on a throwaway copy of the data:
+  Ollama's own log (`%LOCALAPPDATA%\Ollama\server.log`) counts its chat requests, the way to
+  show that nothing is asked twice (P7).
 
 ## Conventions
 

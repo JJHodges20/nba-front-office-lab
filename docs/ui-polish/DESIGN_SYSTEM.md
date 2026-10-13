@@ -7,8 +7,10 @@ frame and the style rules (sections 8-9) are in effect since P2**: the navigatio
 bar and one style rule, both the owner's choice. **The tiles, tags and controls (sections 4,
 5, 9 and 10) are in effect since P3**: tiles that wrap, one look per tag, dropdowns where
 choices were cut off, and every delete asking first. **The charts (section 6, and the light
-palette's changes in sections 2-3) are in effect since P4**, with P5's additions to
-sections 6 and 10. Section 7 is still a proposal, for P7. The evidence behind each value is in [BASELINE_AUDIT.md](BASELINE_AUDIT.md).
+palette's changes in sections 2-3) are in effect since P4**, with P5's and P6's additions to
+sections 6 and 10. **The assistant's surfaces (section 7) are in effect since P7**, with code
+text in the secondary ink (section 2). The evidence behind each value is in
+[BASELINE_AUDIT.md](BASELINE_AUDIT.md).
 
 The roadmap's direction: a near-black canvas, a dark forest-green accent, balanced
 density, the whole workbench in scope, navigation and behaviour unchanged. This proposal
@@ -44,7 +46,7 @@ now. Contrast is the WCAG ratio; "OKLab" is the theme tests' colour difference x
 | `plane` | Page background (`backgroundColor`) | `#0d0d0d` | **`#0a0d0b`** | `#f9f9f7` | keep |
 | `surface` | Cards, sidebar, widget fills, chart backgrounds (`secondaryBackgroundColor`, sidebar `backgroundColor`) | `#1a1a19` | **`#151b17`** | `#fcfcfb` | keep |
 | `ink` | Text (`textColor`), chart titles | `#ffffff` | **`#f1f5f2`** | `#0b0b0b` | keep |
-| `ink_secondary` | Chart axis titles, legends | `#c3c2b7` | **`#a7b4a9`** | `#52514e` | keep |
+| `ink_secondary` | Chart axis titles, legends; **P7**: code in text (`codeTextColor`), which Streamlit otherwise prints in the green of a good state | `#c3c2b7` | **`#a7b4a9`** | `#52514e` | keep |
 | `ink_muted` | Tick labels, quiet text | `#898781` | **`#7f9084`** | `#898781` | keep; **P4: `#74726d`** (4.68:1, was 3.5) |
 | `grid` | Gridlines, borders (`borderColor`, `dataframeBorderColor`) | `#2c2c2a` | **`#2a362e`** | `#e1e0d9` | keep |
 | `axis` | Hover borders, reference marks | `#383835` | **`#3a4a40`** | `#c3c2b7` | keep |
@@ -225,18 +227,57 @@ and four line series at most) and the categorical order. The chart surface follo
   invisible. A test holds it visible against the chart, translucent, and under a line that
   still reads at 3:1.
 
-## 7. The assistant's surfaces (guidance for P7)
+## 7. The assistant's surfaces (P7)
 
 The answer is drawn by `wb/answers.py` on the AI Research page, and in short in the *Ask
-AI about this* dialog. Proposed presentation, once the tokens are in place:
+AI about this* dialog. In effect since P7, each part checked live with the local model on a
+throwaway copy of the data, at four window sizes and in both themes:
 
-- The user's question: a quiet `surface` card with its mode, focus and time.
-- The answer: its outcome tag first (the word, the icon, the colour), then the text, then
-  notes and limits; modeled figures keep their interval in the text.
-- Tool activity, evidence and "how it was answered": collapsed by default, as now.
-- Rosters and experiments to review: bordered cards, the action buttons last and labelled
-  with what they do; nothing is saved without the click, as now.
-- Errors and an offline model: a tagged line that says what to do; the conversation stays.
+- **The page's top** holds what a question needs to start: the title and a two-line
+  subtitle, the kinds of number, the assistant's and the sources' state, the workspace bar
+  and what the workspace is about. What the workspace keeps is **one fold** - "In this
+  workspace: Findings (n) · Proposed rosters (n, k waiting) · Experiment proposals (n)" - with
+  a tab for each shelf (three folds, one under another, had pushed the first question below
+  a laptop's window: finding F9). The fold and its tabs are keyed and the tabs' names hold no
+  count, so saving or deleting on a shelf leaves it open where it was; every popover below
+  the line that says what the last action did is keyed too, so it stays open as that line
+  goes (F30).
+- **The mode and the conversation's buttons** - Quick or Deep, *New conversation*, *Fetch
+  current information* and what the last fetch did - sit under the conversation, just above
+  the question box, where a question is asked. The page opens at its end, so they are in
+  view.
+- **The question**: Streamlit's user message, a filled card, with its mode, focus and time
+  under it. **The answer**: its outcome tag first (the word, the icon, the colour) and the
+  kinds of number it rests on, then the text, then notes and limits; modeled figures keep
+  their interval in the text.
+- **A question under way**: a running box - a spinner, never a tick - with each step as it
+  comes, then *Stop*. A box a fragment draws again is written into without a `with` block,
+  since leaving one marks it complete (F27).
+- **What an answer rests on**: each result in a tab, with the chart its tool chose and its
+  rows; each figure once, in the lab's words where it has them, and a percentile as every
+  page writes one (F28). The evidence's fold counts the sources and names their kinds -
+  "Evidence: 3 sources · the lab's data, the web" - so a reader sees whether the web was
+  read before opening it; each source is led by its kind's icon: the lab's data `database`,
+  a fitted model `model_training`, the contract file `request_quote`, current information
+  `update`, the web `public`, the lab's documents `menu_book`. Paths and table names are code,
+  in the secondary ink (F26). *How it was answered* lists each step, the model, the rules'
+  version and the time. Both folds start closed.
+- **Rosters to review**: each card leads with what has become of it - *Waiting* (orange,
+  `pending`: "Not saved yet"), *Saved* (green, `check_circle`: "In the Team Builder as ..."),
+  *Declined* (gray, `block`, as a declined answer looks) - then its tiles, how it differs from
+  Option A, what it rests on and its players; the buttons come last and say what they do.
+  Nothing is saved without the click, as before.
+- **Experiments to review**: the assistant's idea tagged as untested, the lab's test tagged
+  Modeled, kept apart, as before.
+- **The dialog** carries the assistant's icon in its title, the answer in short, and *Open in
+  AI Research*. It is the contextual way in at every size; the roadmap's docked panel is not
+  built (decision D12).
+- **Errors and an offline model**: a tagged line that says what to do; the conversation
+  stays.
+
+Kept, with reasons: the result tabs under an answer, which a phone scrolls sideways (F22 -
+shorter, they would not say which result is which); and the avatars' column, which on a phone
+indents each message by about 50px - it is Streamlit's chat layout, and no setting moves it.
 
 ## 8. The frame (P2)
 

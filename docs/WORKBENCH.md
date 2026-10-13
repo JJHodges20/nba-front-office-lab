@@ -287,8 +287,11 @@ played are answered from that season's figures.
 
 - *Above the conversation*: whether the assistant can answer (and, when it cannot, what to
   do: start Ollama, or pull the model), whether web search is set up, and how fresh each
-  current source is, the news feeds included. *Fetch current information* fetches what is
-  due by hand; a question fetches what it needs anyway.
+  current source is, the news feeds included; then the workspace, and one fold, *In this
+  workspace*, that counts its findings, proposed rosters and experiment proposals, with a
+  tab for each. *Below the conversation*, by the question box: Quick or Deep, *New
+  conversation*, and *Fetch current information*, which fetches what is due by hand - a
+  question fetches what it needs anyway. The page opens at its end, by the question box.
 - *News and contracts*: recent reporting comes from Hoops Rumors' feeds - the one news site
   the lab reads directly, since the others it checked turn AI agents away or forbid
   automated reading - each headline with its date and how long ago it was; web search
@@ -318,8 +321,9 @@ played are answered from that season's figures.
   result's rows with the chart its tool chose and a CSV (an article or web page the answer
   names as "s2" is the row marked s2 under *Source*; times are UTC), the evidence (every
   source with its address and its dates: published, effective, fetched; each model file
-  with its revision; each section of the lab's documents by file and heading), and how it
-  was answered (each step, the model, the rules' version, the time).
+  with its revision; each section of the lab's documents by file and heading - its fold
+  names the kinds of source, the web included, and each source is led by an icon for its
+  kind), and how it was answered (each step, the model, the rules' version, the time).
 - *Names and sidebar*: names, seasons and teams are read from the question; where it names
   none, the workspace's focus stands in, then the sidebar's season and team. A "he" or
   "they" with nothing to point to is asked about. A link pasted into a question can be read.
@@ -355,7 +359,8 @@ played are answered from that season's figures.
   was asked for, the contract file's date, and its players with where each would start,
   their salaries and their forecasts. They are examples that fit the budget - options to
   compare, not a recommendation - and nobody has checked that the trades or signings to
-  get them are allowed. The assistant cannot
+  get them are allowed. Each option says first what has become of it: waiting, saved (and
+  under what name) or declined. The assistant cannot
   save one. *Save approved roster* under an option saves it for the Team Builder - only
   if the data, the player value model and the salaries are the same as when it was
   proposed; otherwise it says what changed and saves nothing. A saved option says so, and

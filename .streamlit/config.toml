@@ -3,7 +3,9 @@
 # The colours are the same tokens the charts use (apps/workbench/wb/theme.py): one
 # palette stepped for a light and for a dark surface, so a chart and the page around it
 # always agree. Change them in both places. primaryColor and linkColor are the forest-green
-# brand (UI polish P1): actions and selection, never chart data.
+# brand (UI polish P1): actions and selection, never chart data. codeTextColor is the
+# secondary ink (P7): left to Streamlit it is the green of a good state, and a file path in
+# an answer's evidence read as a link.
 #
 # Streamlit follows the computer's light or dark setting until the user picks one in the
 # app's menu (top right), and then remembers the pick in that browser.
@@ -23,6 +25,7 @@ backgroundColor = "#f9f9f7"
 secondaryBackgroundColor = "#fcfcfb"
 textColor = "#0b0b0b"
 linkColor = "#1f6b45"
+codeTextColor = "#52514e"
 borderColor = "#e1e0d9"
 dataframeBorderColor = "#e1e0d9"
 dataframeHeaderBackgroundColor = "#fcfcfb"
@@ -45,6 +48,7 @@ backgroundColor = "#0a0d0b"
 secondaryBackgroundColor = "#151b17"
 textColor = "#f1f5f2"
 linkColor = "#79b391"
+codeTextColor = "#a7b4a9"
 borderColor = "#2a362e"
 dataframeBorderColor = "#2a362e"
 dataframeHeaderBackgroundColor = "#151b17"
