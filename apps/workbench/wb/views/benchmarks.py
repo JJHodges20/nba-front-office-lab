@@ -443,7 +443,7 @@ def _separation(era_args, stage, stages) -> None:  # type: ignore[no-untyped-def
         high="high",
         text="text",
         palette=components.colors(),
-        value_title="How often the team that got there had the better value",
+        value_title="How often it had the better value",
         tickformat=".0%",
         reference=0.5,
         reference_label="Coin flip",

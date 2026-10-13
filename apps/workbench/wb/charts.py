@@ -44,6 +44,10 @@ THRESHOLD_ROW = 14
 """Pixels between the rows that threshold names take turns on."""
 THRESHOLD_ROWS = 3
 """Rows of threshold names: with two, a phone's narrow chart set "Tax" on "2nd apron"."""
+STAGGER_FROM = 9
+"""Columns from which a column chart's labels take turns on two levels."""
+LABEL_LEVEL = 32
+"""Pixels between those two levels: a two-line label and a little air."""
 LONG_TITLE = 32
 """Characters an axis title takes on one line. A longer one is set on two balanced lines:
 centred under a phone's narrow plot, a long title ran past the chart's edge."""
@@ -884,9 +888,19 @@ def interval_columns(
     crowded = MAX_BAR_THICKNESS * max(len(frame), 1) / COLUMN_PLOT_WIDTH
     figure.update_layout(bargap=min(max(1 - crowded, 0.3), 0.9))
     # Level labels: a label carries a second line (how many cases), and tilted, two-line
-    # labels garble into each other (tried at UI polish P4). On a phone they run together;
-    # the table view below the chart holds every figure.
+    # labels garble into each other (tried at UI polish P4).
     figure.update_xaxes(type="category", showgrid=False, tickangle=0)
+    if len(frame) >= STAGGER_FROM:
+        # Many columns: the labels take turns on two levels, each with two columns' room,
+        # so they stay apart in a narrower window - at 1024px fourteen ran together (P5).
+        figure.update_xaxes(showticklabels=False)
+        for position, name in enumerate(frame[label]):
+            figure.add_annotation(
+                text=str(name), x=name, y=0, xref="x", yref="paper", yanchor="top",
+                showarrow=False, font={"color": palette.ink_muted, "size": 12},
+                yshift=-6 - LABEL_LEVEL * (position % 2),
+            )  # fmt: skip
+        figure.update_layout(margin={"b": 8 + 2 * LABEL_LEVEL})
     figure.update_yaxes(title_text=value_title, tickformat=tickformat, rangemode="tozero")
     return figure
 

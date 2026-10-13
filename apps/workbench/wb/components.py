@@ -268,19 +268,52 @@ def chart(
     with st.expander("Table view and export", icon=":material/table_view:"):
         plain = catalog is None and not formats
         shown = table if plain else _styled(table, catalog, formats)
-        st.dataframe(shown, hide_index=True, placeholder="—", key=f"{key}_table")
+        headings: dict = {column: heading(str(column)) for column in table.columns}
+        if catalog is not None:
+            headings |= metric_columns(
+                catalog, [column for column in table.columns if column in catalog]
+            )
+        st.dataframe(
+            shown, hide_index=True, placeholder="—", key=f"{key}_table", column_config=headings
+        )
         with st.container(horizontal=True, gap="small"):
             export(table, filename, key=f"{key}_csv")
             st.download_button(
-                "Interactive chart (HTML)",
+                # Short, like "Data (CSV)": the longer label was cut in a narrow column (P5).
+                "Chart (HTML)",
                 figure.to_html(include_plotlyjs="cdn", full_html=True),
                 file_name=f"{filename}.html",
                 mime="text/html",
                 key=f"{key}_html",
                 icon=":material/download:",
                 on_click="ignore",
+                help="The chart as a page to open in a browser, where it can still be hovered "
+                "and zoomed.",
             )
         st.caption("For a static image, use the camera button at the top right of the chart.")
+
+
+HEADINGS = {
+    "name": "Name",
+    "team_name": "Team",
+    "player_name": "Player",
+    "team": "Team",
+    "season": "Season",
+    "season_type": "Phase",
+    "conference": "Conference",
+    "game_date": "Date",
+    "games_played": "Games",
+}
+"""Words for the columns a chart's table view shows most often, where no metric names them."""
+
+
+def heading(column: str) -> str:
+    """A column's heading in a chart's table view: its word, or its name in plain case. The CSV
+    keeps the column's own name (UI polish P5: the table views showed "team_name")."""
+    if column in HEADINGS:
+        return HEADINGS[column]
+    words = column.replace("_", " ").strip()
+    return words[:1].upper() + words[1:]
 
 
 def export(table: pd.DataFrame, filename: str, *, key: str, label: str = "Data (CSV)") -> None:

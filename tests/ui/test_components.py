@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -223,8 +224,22 @@ def test_a_chart_comes_with_its_table_and_says_how_to_save_an_image() -> None:
     table = opened.dataframe[0].value
     assert table["season"].tolist() == ["2024-25", "2025-26"]
     assert table["efg_pct"].iloc[0] == 0.543  # numbers underneath, so the table sorts
+    # Headings in words, a metric by its stat-sheet label (UI polish P5: they were the
+    # columns' own names, such as "team_name"); the data keeps its names, and so the CSV.
+    settings = json.loads(opened.dataframe[0].proto.columns)
+    headings = {column: shown["label"] for column, shown in settings.items() if "label" in shown}
+    assert headings == {"season": "Season", "efg_pct": "eFG%"}
+    downloads = [button.proto.label for button in opened.get("download_button")]
+    assert downloads == ["Data (CSV)", "Chart (HTML)"]
     captions = [caption.value for caption in opened.caption]
     assert "For a static image, use the camera button at the top right of the chart." in captions
+
+
+def test_a_table_view_names_its_columns_in_words() -> None:
+    assert components.heading("team_name") == "Team"
+    assert components.heading("player_name") == "Player"
+    assert components.heading("wins_low") == "Wins low"
+    assert components.heading("p10") == "P10"
 
 
 def test_an_empty_section_says_what_is_missing_and_why() -> None:

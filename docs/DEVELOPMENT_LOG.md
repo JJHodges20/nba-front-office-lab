@@ -3,6 +3,58 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## UI polish P5 - the League and Explore pages, one by one (2026-10-12)
+
+League Overview, Winning Benchmarks, Player Explorer, Player Value, Team Explorer, Contract
+Explorer and Analytics Lab, reviewed whole, every tab, in a window tall enough to hold
+each page, and measured at four widths with a team and a player chosen as well as without.
+No figure, calculation, page address or action changed. The owner granted P5 to P8 in one
+run, each stage committed when its gate passes and nothing pushed without asking.
+
+**Found.** League Overview, Player Explorer and Contract Explorer needed nothing at 1440. A
+scan with a team and a player chosen - every earlier scan had neither - found what only
+they bring: on Team Explorer and Player Explorer the form chart's *Trailing games* cut off
+the choice of 20 at 1024px, and Player Value's row for the chosen player cut "Wins above
+replacement" at every width, 1440 included (finding F24). Analytics Lab put its tags under
+its Study control and its three numbers in a fifth of the page, where at 1024px they were
+cut (F13). Benchmarks' fourteen column labels ran together at 1024px, and two axis titles
+of over fifty characters ran past a phone's chart (F23). Every chart's table view headed
+its columns with their own names, such as `team_name`, and in a narrow column its
+"Interactive chart (HTML)" button was cut.
+
+**Built**
+
+- **Analytics Lab**: the study is read before its control is drawn, so the kinds of number
+  stand under the title, as on every page; the three numbers are a row of tiles above a
+  chart that now takes the page's width.
+- **Benchmarks**: from nine columns, a column chart's labels take turns on two levels
+  (`charts.STAGGER_FROM`), the band and its count kept; *What separates them* titled "How
+  often it had the better value" (the caption says who "it" is).
+- **Team and Player Explorer**: the form chart's *Metric* and *Trailing games* one above
+  the other.
+- **Player Value**: the chosen player's tiles three a row; the model's chart titled
+  "Model's miss less the method's, in points", the page's own word for its error.
+- **Every chart's table view** (`components.chart`): columns headed in words - a metric by
+  its stat-sheet label with its meaning on hover, the rest from `components.heading` - and
+  the HTML export labelled *Chart (HTML)*, with a tooltip. The CSV keeps the columns' names.
+- **Documents**: DESIGN_SYSTEM.md sections 6 and 10; CLAUDE.md on looking with a team and a
+  player chosen; the audit's F13, F23 and F24; this roadmap's phase table.
+
+**Considered and left**: marking the sidebar's team in League Overview's standings - the
+table's Styler would have to carry a row style the data grid may not draw; the 3:2 split of
+the explorers' profile row, which at 1024px leaves the form chart narrow but now whole.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New and changed tests | `test_charts.py`: from nine columns the labels take two levels, fewer keep one. `test_components.py`: a chart's table view headed in words, a metric by its label; the two export buttons; `heading` |
+| `pytest -n auto`, once at the gate | 3,976 passed (4 min 45 s); at P4, 3,974 |
+| Cut-off text, every page and tab, team and player chosen | Before: at 1024px both form charts' *Trailing games*, Analytics Lab's three tiles and the HTML export in narrow columns; Player Value's player row at every width. After: nothing on the seven pages at 1440, 1024 or 390px - left only the simulator's and Data Health's long tile notes (P6) and the phone tab rows (F22) |
+| The pages in a browser | Every tab of the seven pages photographed whole before and after (`data/ui-polish/screenshots/p5-before/`, `p5-after/`), a team and a player chosen, dark at 1440 and 1024px, the two most changed in light too; and every tab opened in three states - nothing chosen, a team and a player chosen, the oldest season (1996-97) - each drawn with no error and no empty tab |
+| Boundaries and data | Five views, `components.py`, `charts.py`; no service, model or data touched; the browser pass read the disposable copy |
+
 ## UI polish P4 - the charts: read on any screen, in either theme (2026-10-12)
 
 The chart builders in `wb/charts.py` and the light palette, polished once for every chart.

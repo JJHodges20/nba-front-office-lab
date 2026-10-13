@@ -259,7 +259,9 @@ def _player(filters: Filters, everyone: pd.DataFrame, catalog: MetricCatalog) ->
                 f"{catalog['minutes_share'].format_value(row['minutes_share'])} of team minutes",
                 help=catalog["reliability"].description,
             ),
-        ]
+        ],
+        # Three a row: five across cut "Wins above replacement" short (UI polish P5).
+        per_row=3,
     )
     left, right = st.columns(2, gap="large")
     with left:
@@ -815,7 +817,7 @@ def _against(card: ModelCard) -> None:
         high="high",
         text="text",
         palette=components.colors(),
-        value_title="The model's error less the method's, in points of net rating",
+        value_title="Model's miss less the method's, in points",
         tickformat="+.1f",
         reference=0.0,
         reference_label="No difference",

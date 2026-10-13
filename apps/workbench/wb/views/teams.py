@@ -223,14 +223,15 @@ def _factors(filters: Filters, table: TeamTable) -> None:
 def _form(filters: Filters, table: TeamTable) -> None:
     catalog, palette = table.metrics, components.colors()
     st.markdown("**Form over the season**")
-    pick, span = st.columns(2, vertical_alignment="bottom")
-    key = pick.selectbox(
+    # One above the other: side by side in this column, at 1024px the choice of 20 games
+    # was cut off (UI polish P5).
+    key = st.selectbox(
         "Metric",
         [key for key in ROLLING if key in catalog],
         format_func=lambda option: catalog[option].name,
         key="team_form_metric",
     )
-    games = span.segmented_control(
+    games = st.segmented_control(
         "Trailing games", [5, 10, 20], default=10, required=True, key="team_form_games"
     )
     rolling = data.team_rolling(

@@ -415,7 +415,10 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   theme and use every control you touched. Passing tests say nothing about clipped
   labels, collisions, or a click that does the wrong thing. A browser pass cannot share
   the machine with a parallel test run: Streamlit's connection-error dialog appears under
-  load and intercepts every click.
+  load and intercepts every click. Look with a team and a player chosen as well as without:
+  some charts and controls appear only then, and at P5 two of them were cut at 1024px.
+  Reach the pages through the top bar - an address typed in starts a new session, which
+  drops the sidebar's choices.
 
 ## Conventions
 

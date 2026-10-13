@@ -695,6 +695,33 @@ class TestIntervalColumns:
         band = charts.COLUMN_PLOT_WIDTH / 14
         assert band * (1 - gap(14)) <= charts.MAX_BAR_THICKNESS + 1e-9
 
+    def test_many_columns_take_turns_on_two_levels_of_labels(self) -> None:
+        """UI polish P5: at 1024px fourteen level labels ran together; staggered, each label
+        has two columns' room. A few columns keep their labels on one level."""
+
+        def columns(count: int) -> go.Figure:
+            frame = pd.DataFrame(
+                {"band": [f"{n} to {n + 5}<br>n = {n}" for n in range(count)], "rate": 0.5,
+                 "low": 0.4, "high": 0.6, "text": "t"}
+            )  # fmt: skip
+            return charts.interval_columns(
+                frame, label="band", value="rate", low="low", high="high", text="text",
+                palette=LIGHT,
+            )  # fmt: skip
+
+        few = columns(charts.STAGGER_FROM - 1)
+        assert few.layout.xaxis.showticklabels is None and not few.layout.annotations
+        many = columns(14)
+        assert many.layout.xaxis.showticklabels is False
+        notes = many.layout.annotations
+        assert [note.text for note in notes] == list(many.data[0].x)
+        assert [note.x for note in notes] == list(many.data[0].x)
+        levels = [note.yshift for note in notes]
+        assert levels[0::2] == [levels[0]] * 7 and levels[1::2] == [levels[1]] * 7
+        assert levels[0] != levels[1]
+        assert {note.font.color for note in notes} == {LIGHT.ink_muted}
+        assert many.layout.margin.b >= 2 * charts.LABEL_LEVEL
+
     def test_nothing_to_show_is_an_empty_chart_not_an_error(self) -> None:
         figure = charts.interval_columns(
             RATES.iloc[0:0], label="band", value="rate", low="low", high="high", text="text",

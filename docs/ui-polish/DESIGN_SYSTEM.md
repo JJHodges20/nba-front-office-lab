@@ -7,8 +7,8 @@ frame and the style rules (sections 8-9) are in effect since P2**: the navigatio
 bar and one style rule, both the owner's choice. **The tiles, tags and controls (sections 4,
 5, 9 and 10) are in effect since P3**: tiles that wrap, one look per tag, dropdowns where
 choices were cut off, and every delete asking first. **The charts (section 6, and the light
-palette's changes in sections 2-3) are in effect since P4.** Section 7 is still a proposal,
-for P7. The evidence behind each value is in [BASELINE_AUDIT.md](BASELINE_AUDIT.md).
+palette's changes in sections 2-3) are in effect since P4**, with P5's additions to
+sections 6 and 10. Section 7 is still a proposal, for P7. The evidence behind each value is in [BASELINE_AUDIT.md](BASELINE_AUDIT.md).
 
 The roadmap's direction: a near-black canvas, a dark forest-green accent, balanced
 density, the whole workbench in scope, navigation and behaviour unchanged. This proposal
@@ -200,8 +200,20 @@ and four line series at most) and the categorical order. The chart surface follo
   remembered, so it is seen once. Charts keep their filled panel rather than becoming
   outlined cards like the tiles (F10): an outlined chart needs a see-through background,
   and then, just after a switch, its text would be dark on dark until that click.
-  Benchmarks' columns hold their two-line labels level: tilted, they garbled, and below
-  about 1100px they run together (the table view holds every figure); P5 shortens them.
+  Benchmarks' columns hold their two-line labels level: tilted, they garbled.
+
+**Added in P5:**
+
+- **Many columns, two levels of labels** (`STAGGER_FROM` = 9): from nine columns a column
+  chart's labels take turns on two levels, each with two columns' room. At 1024px
+  Benchmarks' fourteen bands ("40 to 45", "n = 145") had run together; the words and the
+  counts stay as they were.
+- **A chart's table view names its columns in words** (`components.heading`): a metric by
+  its stat-sheet label, with its meaning on hover, and the rest in plain case ("Team", "Wins
+  low") - they had shown the columns' own names, such as `team_name`. The CSV keeps the
+  columns' own names.
+- **The export buttons are short**: *Data (CSV)* and *Chart (HTML)*, the second with a
+  tooltip; "Interactive chart (HTML)" was cut in a narrow column.
 
 ## 7. The assistant's surfaces (guidance for P7)
 
@@ -253,6 +265,9 @@ the frame applies it, and that no page injects HTML or CSS of its own.
   controls it cannot, and its last choices are cut off - at 1024px the simulator's
   *Regression* could not be reached. A longer set of choices there is a dropdown:
   Benchmarks' seasons, the Optimizer's budget, the simulator's games missed and development.
+  In a narrow column even three short choices need the column's width: P5 set the form
+  charts' *Metric* and *Trailing games* one above the other, where side by side the choice
+  of 20 games was cut off at 1024px.
 - **What cannot be undone asks first** (the owner's decision): `components.confirmed_button`
   stays off until its box is ticked, and is never the page's main action - deleting a
   roster, a workspace, a finding or an experiment proposal, and clearing a workspace's
