@@ -8,7 +8,7 @@ assistant - is unchanged. This page maps each requirement of the brief to where 
 and how to check it. Why it is built this way: decision
 [0019](decisions/0019-capstone-api.md).
 
-**State:** milestone C5 of C7 (see the [roadmap](ROADMAP.md)). Each requirement below says
+**State:** milestone C6 of C7 (see the [roadmap](ROADMAP.md)). Each requirement below says
 whether it is met, and from which milestone.
 
 | # | Requirement | Where it is met | Status |
@@ -19,7 +19,7 @@ whether it is met, and from which milestone.
 | 4 | JWT authentication | `POST /auth/token` returns a signed token (HS256) that expires after an hour; every endpoint but the health check, registration and sign-in requires it. Tests: altered, unsigned, expired, wrongly issued, other-key and deleted-user tokens are refused | Met (C2) |
 | 5 | RAG pipeline (ChromaDB + Ollama) | The lab's documents (`docs/`) cut into passages and embedded by a local Ollama model (`nomic-embed-text`) into ChromaDB (`data/rag/`: `fol rag index` or `POST /rag/index`); for each question (`POST /rag/ask`) the nearest five passages are retrieved and the local chat model (`qwen3:8b`) answers from them alone, citing each by number; the lab's checker cuts a figure no passage holds. Code: `pipelines/rag.py`, `storage/vectors.py`, `services/passages.py`, `assistant/rag.py` | Met (C3) |
 | 6 | Streamlit frontend | `apps/workbench/` (`fol ui`): fifteen pages. *Ask the Docs* (`wb/views/docs.py`, in the *Ask* menu) is the API's: it registers and signs in, builds the index, asks the documents and shows each answer with its sources, and lists and deletes the user's questions - over HTTP with the token, through `wb/api_client.py` | Met (C5) |
-| 7 | Docker Compose: the whole app with one command | `docker compose up` - the API, the workbench and Ollama | Planned (C6) |
-| 8 | At least 5 passing tests | `tests/` - 4,222 at C5 (`pytest -n auto`); 231 of them for the capstone: `tests/unit/server/`, the account and vector stores, the account and passage services, the RAG pipeline and answer, and the page and its client in `tests/ui/` | Met |
+| 7 | Docker Compose: the whole app with one command | `docker compose up --build` (`compose.yaml`, `Dockerfile`): Ollama, a one-time pull of the two models, the API (which indexes the documents first) and the workbench, at http://localhost:8501 and http://localhost:8000/docs. Run live on 2026-10-15: up in about four minutes from nothing, every check of the Ask the Docs page passed against it | Met (C6) |
+| 8 | At least 5 passing tests | `tests/` - 4,259 at C6 (`pytest -n auto`); 268 of them for the capstone: `tests/unit/server/`, the account and vector stores, the account and passage services, the RAG pipeline and answer, the page and its client in `tests/ui/`, and the Docker files (`tests/unit/test_docker.py`) | Met |
 | 9 | README: setup, architecture diagram, usage guide | [README.md](../README.md) | Setup and usage met; the diagram planned (C7) |
 | 10 | `requirements.txt` | [requirements.txt](../requirements.txt) (runtime) and [requirements-dev.txt](../requirements-dev.txt) (tests), pinned as tested and kept in step with `pyproject.toml` by `tests/unit/test_requirements.py` | Met (C1) |

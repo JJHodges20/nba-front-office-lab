@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 
 from front_office.config import ConfigError, load_assistant_settings
-from front_office.config.assistant import assistant_settings_path
-from front_office.domain.assistant import Mode, is_cloud_model, is_loopback_url
+from front_office.config.assistant import OLLAMA_HOST_VARIABLE, assistant_settings_path
+from front_office.domain.assistant import Mode, is_cloud_model, is_docker_url, is_loopback_url
 
 REPO_CONFIGS = Path(__file__).resolve().parents[3] / "configs"
 
@@ -123,6 +123,52 @@ def test_a_context_length_is_bounded(project: Path) -> None:
 )
 def test_loopback_addresses(url: str, local: bool) -> None:
     assert is_loopback_url(url) is local
+
+
+@pytest.mark.parametrize(
+    ("url", "docker"),
+    [
+        ("http://ollama:11434", True),
+        ("http://OLLAMA:11434", True),
+        ("https://host.docker.internal:11434", True),
+        ("http://ollama.example.com:11434", False),
+        ("http://127.0.0.1:11434", False),
+        ("ftp://ollama:11434", False),
+        ("ollama:11434", False),
+    ],
+)
+def test_dockers_names(url: str, docker: bool) -> None:
+    assert is_docker_url(url) is docker
+
+
+class TestTheHostFromOutside:
+    """``FOL_OLLAMA_HOST``, which Docker Compose sets (decision 0019)."""
+
+    @pytest.mark.parametrize(
+        "host",
+        ["http://ollama:11434", "http://host.docker.internal:11434", "http://127.0.0.1:11500"],
+    )
+    def test_takes_the_place_of_the_files(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch, host: str
+    ) -> None:
+        monkeypatch.setenv(OLLAMA_HOST_VARIABLE, host)
+        settings = load_assistant_settings(project / "configs")
+        assert settings.ollama.host == host
+        assert settings.ollama.timeout_seconds == 180  # the rest is the file's
+
+    @pytest.mark.parametrize(
+        "host", ["http://192.168.1.20:11434", "https://ollama.com", "http://my-ollama:11434"]
+    )
+    def test_is_held_to_the_same_rule(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch, host: str
+    ) -> None:
+        monkeypatch.setenv(OLLAMA_HOST_VARIABLE, host)
+        with pytest.raises(ConfigError, match=OLLAMA_HOST_VARIABLE):
+            load_assistant_settings(project / "configs")
+
+    def test_left_empty_is_the_files(self, project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(OLLAMA_HOST_VARIABLE, " ")
+        assert load_assistant_settings(project / "configs").ollama.host == "http://127.0.0.1:11434"
 
 
 @pytest.mark.parametrize(

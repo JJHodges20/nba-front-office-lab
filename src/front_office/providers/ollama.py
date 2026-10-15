@@ -1,24 +1,28 @@
 """Ollama on this machine: the AI research assistant's language model, over HTTP.
 
 Decision 0018. The model runs locally, and this adapter makes sure of it: it talks to the
-loopback address only, and refuses a model that Ollama marks as remote or whose name is a
-cloud model's - a signed-in Ollama serves cloud models through the same local interface,
-and bills for them. The context length is sent with every request rather than left to the
+loopback address only - or, inside Docker Compose, to the two names Docker gives this
+machine's Ollama, and only where they resolve to private addresses (decision 0019) - and
+refuses a model that Ollama marks as remote or whose name is a cloud model's: a signed-in
+Ollama serves cloud models through the same local interface, and bills for them. The context length is sent with every request rather than left to the
 server's default. Like every provider it returns what it was sent, in plain types, and
 interprets nothing.
 """
 
 from __future__ import annotations
 
+import ipaddress
 import json
+import socket
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
+from urllib.parse import urlsplit
 
 import requests
 
-from front_office.domain.assistant import is_cloud_model, is_loopback_url
+from front_office.domain.assistant import is_cloud_model, is_docker_url, is_loopback_url
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
 # Ollama reports durations in nanoseconds. Written as a power, since a literal this large is
@@ -81,6 +85,36 @@ def requests_transport(
             raise OllamaUnavailable(f"Ollama stopped answering: {error}") from error
         except ValueError as error:
             raise OllamaError(f"Ollama sent something that is not JSON: {error}") from error
+
+
+Resolve = Callable[[str], Sequence[str]]
+"""A name's addresses."""
+
+
+def resolve_addresses(name: str) -> list[str]:
+    try:
+        found = socket.getaddrinfo(name, None, proto=socket.IPPROTO_TCP)
+    except (socket.gaierror, UnicodeError) as error:
+        raise OllamaUnavailable(f"{name} could not be found: {error}") from error
+    return sorted({str(info[4][0]) for info in found})
+
+
+def _require_private(url: str, resolve: Resolve) -> None:
+    """One of Docker's names for the model is accepted only where every address it resolves
+    to is a private one (decision 0019): the container's, or the computer Docker runs on. A
+    name that leads to the internet is another machine."""
+    name = urlsplit(url).hostname or ""
+    addresses = list(resolve(name))
+    private = [
+        address
+        for address in addresses
+        if ipaddress.ip_address(address.split("%", 1)[0]).is_private
+    ]
+    if not addresses or len(private) != len(addresses):
+        raise NotLocal(
+            f"{url!r} must lead to this machine or its Docker containers, but {name} is at "
+            f"{', '.join(addresses) or 'no address'}"
+        )
 
 
 def _error_detail(response: requests.Response) -> str:
@@ -185,8 +219,11 @@ class OllamaProvider:
         timeout: float = 180.0,
         transport: Transport = requests_transport,
         clock: Callable[[], float] = time.monotonic,
+        resolve: Resolve = resolve_addresses,
     ) -> None:
-        if not is_loopback_url(host):
+        if is_docker_url(host):
+            _require_private(host, resolve)
+        elif not is_loopback_url(host):
             raise NotLocal(
                 f"the model must run on this machine; {host!r} is not a loopback address"
             )

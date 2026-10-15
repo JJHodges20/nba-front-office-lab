@@ -214,3 +214,44 @@ without asking.
     out of the index (`configs/api.yaml`, `rag.left_out`) besides what the keyword search
     leaves out; the assistant's keyword search keeps its corpus, whose cases are frozen. The
     index fell to 1,182 passages, and the same question was answered from decision 0010.
+
+## Settled while building C6 (2026-10-15)
+
+- **One image, four services.** `Dockerfile`: Python 3.14.6 as the suite runs it, the pinned
+  `requirements.txt`, the package, and the configs, documents and workbench - run as a user,
+  not root, with `FOL_HOME=/app`. `compose.yaml`: `ollama` (no port published); `models`, which
+  pulls the two models the configs name once and stops; `api`, which indexes the documents
+  (`fol rag index`, a no-op when the index matches) and then serves the app factory; and `ui`,
+  the workbench, listening on every interface inside its container and published on this
+  machine only. Each waits for the one before: Ollama healthy, the models pulled, the API
+  healthy. `compose.gpu.yaml` adds an NVIDIA card to Ollama.
+- **Where the model may be.** Point 5 as decided: `FOL_OLLAMA_HOST` names the model's address
+  from outside the file, held to the file's rule; the rule accepts the loopback address and
+  exactly two names, `ollama` and `host.docker.internal`, and the provider looks either up and
+  refuses it unless every address is private. A LAN address is refused as before, and so is
+  any other name - before it is looked up.
+- **Settings from `.env`, never in the file.** Compose reads the project's `.env`:
+  `FOL_API_SECRET` goes to the API and `FOL_OLLAMA_API_KEY` (web search) to the workbench when
+  they are set; `FOL_OLLAMA_HOST`, `FOL_API_PORT`, `FOL_UI_PORT` and `FOL_DOCKER_DATA` change
+  where the model is, the two ports and the data folder. The ports and the folder became
+  settings during the live run: another of the owner's projects held 127.0.0.1:8000 and :8501,
+  and the run was to write to a copy of the data, not the owner's. `.env.example` names them
+  all, with no value. `docker compose config` prints what it substitutes - the keys included -
+  so it is run with `--env-file` pointing elsewhere.
+- **The files are tested against the code** (`tests/unit/test_docker.py`): the services and
+  their order, ports on 127.0.0.1 only, every image pinned, the Python version the suite's,
+  the models pulled the ones the configs name, every variable a name the code reads, the
+  default model address one the rule accepts, the keys left to `.env`, and the data folder
+  mounted and never built in.
+- **The live run** (the owner's choice: a full run, on a copy of the data): the image (1.61
+  GB) built in 116 seconds; the first `docker compose up` took 247 seconds, the Ollama image
+  and both models (5.5 GB) into the volume included; the API indexed 1,195 passages in 55
+  seconds on the RTX 4060, which the container's Ollama found. The Ask the Docs pass passed in
+  full against it - registered, two answers (71 seconds the first time, while the model loaded;
+  7 to 16 seconds after), a question deleted, a wrong password refused, signed out and in, the
+  account deleted. League Overview drew from the mounted data, AI Research said *Assistant:
+  ready* through `http://ollama:11434`, and the README's PowerShell examples worked word for
+  word. `docker compose down` left the image and the model volume for the next start.
+- **Not tried**: a Linux host, where a data folder owned by another user than the container's
+  (uid 1000) needs that user given in Compose; and a computer without a graphics card, where
+  the same answers come from the processor, more slowly.

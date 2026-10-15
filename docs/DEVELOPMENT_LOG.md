@@ -3,6 +3,49 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Capstone C6 - Docker: the whole lab with one command (2026-10-15)
+
+`docker compose up --build` runs Ollama, pulls the two models once, indexes the documents,
+and starts the API and the workbench. Decision 0019's section "Settled while building C6"
+records what the building and the live run decided.
+
+**Built**
+
+- **`Dockerfile`**: one image for the API and the workbench - Python 3.14.6, the pinned
+  `requirements.txt`, the package, configs, documents and workbench, run as a user rather
+  than root. `.dockerignore` keeps `data/`, `.env`, the virtual environment and the tests out.
+- **`compose.yaml`**: `ollama`; `models`, a one-time pull of the embedding model and the
+  assistant's model; `api`, which indexes the documents and then serves; `ui`, the workbench.
+  Each waits for the one before. Ports on 127.0.0.1 only; the owner's `data/` mounted. Settings
+  from `.env`: the model's address, both ports, the data folder, and the two keys.
+  `compose.gpu.yaml` gives Ollama an NVIDIA card.
+- **Where the model may be**: the loopback address, or exactly `ollama` and
+  `host.docker.internal` where every address they resolve to is private
+  (`domain/assistant.py`, `providers/ollama.py`); `FOL_OLLAMA_HOST` sets it from outside the
+  file and is held to the same rule.
+- `.env.example` names the new settings with no value; `CLAUDE.md`, `docs/ARCHITECTURE.md` and
+  `docs/AI_ASSISTANT_SPEC.md` give the rule.
+
+**The live run** (the owner's choice: a full run, on a copy of the data, the owner's other
+Docker project left running): the image, 1.61 GB, built in 116 seconds; the first `up` took
+247 seconds with the Ollama image and both models (5.5 GB) pulled; the API indexed 1,195
+passages in 55 seconds on the RTX 4060. Against it the Ask the Docs browser pass passed in
+full, League Overview drew from the mounted data, AI Research said *Assistant: ready*
+through the container's Ollama, and the README's PowerShell examples worked word for word.
+Two things changed on the way: the ports and the data folder became settings, because the
+owner's other project held 8000 and 8501 and the run was to write to a copy.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| `docker compose config` | Both files valid (run with an empty `--env-file`: it prints what it substitutes from `.env`) |
+| New tests | 37: Docker's two names accepted only where private, any other name refused before it is looked up, the override from outside held to the rule; the Compose and Docker files against the code (services and their order, ports, pinned images, Python's version, the models the configs name, the variables the code reads, keys left to `.env`, the data mounted and never built in) |
+| `pytest -n auto` | 4,259 passed (7 min 48 s, beside Docker Desktop); before C6, 4,222 |
+| Live | As above |
+| Boundaries and data | The model's address widened by exactly two names, each refused unless private; nothing of the owner's data written by the run |
+
 ## Capstone C5 - Ask the Docs, the workbench page that uses the API (2026-10-15)
 
 The brief's Streamlit frontend was met already; this is the page that puts the API in front

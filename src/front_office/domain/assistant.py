@@ -29,22 +29,42 @@ from front_office.domain.proposals import RosterProposal
 LOCAL_NAMES = frozenset({"localhost"})
 
 
-def is_loopback_url(url: str) -> bool:
-    """Whether ``url`` is an http(s) address on this machine: ``localhost`` or a loopback IP."""
+DOCKER_NAMES = frozenset({"ollama", "host.docker.internal"})
+"""Inside Docker Compose, the model is not at the loopback address: it is the Compose file's
+own container, ``ollama``, or the computer Docker runs on, ``host.docker.internal``. These two
+names, and no other, are accepted besides this machine's own (decision 0019) - and the
+provider refuses either unless every address it resolves to is private."""
+
+
+def _http_host(url: str) -> str | None:
+    """The host of an http(s) address, lower case; ``None`` for anything else."""
     try:
         parts = urlsplit(url)
         host = parts.hostname
         parts.port  # noqa: B018 - raises on a malformed port
     except ValueError:
-        return False
+        return None
     if parts.scheme not in {"http", "https"} or not host:
+        return None
+    return host.lower()
+
+
+def is_loopback_url(url: str) -> bool:
+    """Whether ``url`` is an http(s) address on this machine: ``localhost`` or a loopback IP."""
+    host = _http_host(url)
+    if host is None:
         return False
-    if host.lower() in LOCAL_NAMES:
+    if host in LOCAL_NAMES:
         return True
     try:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
         return False
+
+
+def is_docker_url(url: str) -> bool:
+    """Whether ``url`` is an http(s) address at one of :data:`DOCKER_NAMES`."""
+    return _http_host(url) in DOCKER_NAMES
 
 
 def is_cloud_model(name: str) -> bool:
@@ -76,9 +96,10 @@ class OllamaConnection(_Settings):
     @field_validator("host")
     @classmethod
     def _on_this_machine(cls, value: str) -> str:
-        if not is_loopback_url(value):
+        if not (is_loopback_url(value) or is_docker_url(value)):
             raise ValueError(
-                f"the model must run on this machine; {value!r} is not a loopback address"
+                f"the model must run on this machine; {value!r} is not a loopback address, "
+                "nor one of Docker's names for it (ollama, host.docker.internal)"
             )
         return value.rstrip("/")
 

@@ -431,7 +431,10 @@ The assistant is the outermost layer, beside `interfaces` (decision 0018). Its s
 them): the loopback address of Ollama, the default and fallback models, and for Quick and
 Deep the context length, thinking and output limit. `providers/ollama.py` refuses any
 address off this machine and any model Ollama marks as remote, and sends the context
-length with every request. `assistant/tools.py` is the registry: every tool's name, its
+length with every request. Inside Docker Compose `FOL_OLLAMA_HOST` names the Compose file's
+own Ollama, `ollama`, or the computer's, `host.docker.internal` - the two names accepted
+besides the loopback address, and only where every address they resolve to is private
+(decision 0019). `assistant/tools.py` is the registry: every tool's name, its
 arguments as a Pydantic model, its permission class (read, compute, net, draft - no
 write) and the milestone that builds it; enumerations come from the domain and the
 services rather than being written twice. `assistant/routing.py` asks the model for its
@@ -558,6 +561,12 @@ listed at `/docs`.
   out under their metric keys with a `metrics` list saying what each is (measured, derived or
   modeled, and whether an estimate); missing is null; a player's modeled figures come with
   how the value model was tested. No salary or contract figure is served.
+- **Docker** (`Dockerfile`, `compose.yaml`): one image serves the API and the workbench;
+  Compose adds Ollama, pulls the two models once, indexes the documents and starts the API,
+  then the workbench - your `data/` folder mounted, ports on this machine only, keys from
+  `.env`. Inside it the model is at `http://ollama:11434`, one of the two Docker names the
+  provider accepts besides the loopback address. `tests/unit/test_docker.py` holds the files to
+  the code.
 
 ## Conventions
 

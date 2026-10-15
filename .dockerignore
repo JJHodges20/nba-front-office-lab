@@ -1,0 +1,24 @@
+# What the image is built from: the code, its settings and its documents - never your data,
+# your keys, or anything made on this computer.
+.git
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+.vscode
+.idea
+
+# Yours: Compose mounts data/ at run time, and passes what it needs from .env.
+data
+.env
+.streamlit/secrets.toml
+*.sqlite
+
+# Not needed to run the lab.
+tests
+scripts
+docs/images
+docs/roadmap

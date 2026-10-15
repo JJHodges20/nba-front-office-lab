@@ -62,6 +62,48 @@ class TestOnThisMachineOnly:
         with pytest.raises(NotLocal):
             OllamaProvider(host)
 
+    @pytest.mark.parametrize(
+        ("host", "addresses"),
+        [
+            ("http://ollama:11434", ["172.18.0.3"]),
+            ("http://host.docker.internal:11434", ["192.168.65.254"]),
+            ("http://ollama:11434", ["10.0.0.7", "fd00::7"]),
+        ],
+    )
+    def test_dockers_names_for_this_machine_are_accepted_where_private(
+        self, host: str, addresses: list[str]
+    ) -> None:
+        """Decision 0019: inside Docker Compose the model is the ``ollama`` container, or the
+        computer Docker runs on."""
+        asked: list[str] = []
+        provider = OllamaProvider(host, resolve=lambda name: asked.append(name) or addresses)
+        assert provider.host == host
+        assert asked == [host.split("//")[1].split(":")[0]]
+
+    @pytest.mark.parametrize(
+        "addresses", [["93.184.216.34"], ["172.18.0.3", "8.8.8.8"], ["2606:4700::1111"], []]
+    )
+    def test_a_docker_name_that_leads_off_this_machine_is_refused(
+        self, addresses: list[str]
+    ) -> None:
+        with pytest.raises(NotLocal, match="must lead to this machine"):
+            OllamaProvider("http://ollama:11434", resolve=lambda name: addresses)
+
+    @pytest.mark.parametrize(
+        "host",
+        [
+            "http://ollama.example.com:11434",
+            "http://my-ollama:11434",
+            "http://docker.internal:11434",
+        ],
+    )
+    def test_no_other_name_is_accepted(self, host: str) -> None:
+        def never(name: str) -> list[str]:
+            raise AssertionError("a name that is not Docker's is refused before it is looked up")
+
+        with pytest.raises(NotLocal):
+            OllamaProvider(host, resolve=never)
+
     @pytest.mark.parametrize("model", ["gpt-oss:120b-cloud", "gemma4:cloud", "deepseek-v3-cloud"])
     def test_a_cloud_model_is_refused_by_name_before_asking(self, model: str) -> None:
         ollama = ScriptedOllama(models=[model])

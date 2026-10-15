@@ -44,6 +44,8 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe api                       # the HTTP API at http://localhost:8000, every endpoint at /docs (Ctrl+C stops it)
 .\.venv\Scripts\fol.exe rag index                 # embed the documents into data/rag for the API's answers (Ollama running)
 .\.venv\Scripts\fol.exe rag status                # whether that index matches the documents
+docker compose up --build                         # the API, the workbench and Ollama in Docker (compose.yaml)
+docker compose -f compose.yaml -f compose.gpu.yaml up --build   # the same, Ollama on the NVIDIA card
 .\.venv\Scripts\python.exe -m pytest tests\assistant  # the assistant's evaluation cases, their figures recomputed
 .\.venv\Scripts\python.exe -m pytest -m ollama    # the assistant against the local model (Ollama running)
 .\.venv\Scripts\python.exe scripts\benchmark_ollama.py --write   # benchmark the candidate models (docs/research/ASSISTANT_MODELS.md)
@@ -206,8 +208,10 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   assistant uses only `providers.ollama`, `providers.web`, `pipelines.current`,
   `pipelines.web` and `pipelines.contract_review` (which stores nothing - never
   `pipelines.contracts`, whose import writes). Tests enforce both. Its model is local: `providers/ollama.py` accepts the loopback address
-  only, refuses models Ollama marks remote or names as cloud, and sends the context length
-  with every request; `configs/assistant.yaml` has no field for a key.
+  only - and, inside Docker Compose, exactly two names, `ollama` and `host.docker.internal`,
+  where every address they resolve to is private (`FOL_OLLAMA_HOST`, decision 0019) - refuses
+  models Ollama marks remote or names as cloud, and sends the context length with every
+  request; `configs/assistant.yaml` has no field for a key.
 - **No tool writes.** The registry (`assistant/tools.py`) has read, compute, net and draft
   tools only. Saving a roster is the user's click on a reviewed proposal. Never give the
   model table reads, SQL, code, files, a URL it composed, a fit, a build, an import or a
@@ -345,6 +349,16 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   `configuration` (a deprecation warning). Import it lazily outside the server: it takes a
   second to load. Tests script Ollama through `assistant.api.connect` and embed with
   `tests/rag_fakes.words`.
+- **Docker runs the lab as it runs here** (C6, decision 0019). One image (`Dockerfile`:
+  Python as the suite runs it, `requirements.txt`, the code, configs and documents - never
+  `data/` or `.env`, which `.dockerignore` keeps out) serves the API and the workbench;
+  `compose.yaml` adds Ollama and a one-time pull of the two models the configs name. Your data
+  folder is mounted (`FOL_DOCKER_DATA`, default `./data`); ports are published on 127.0.0.1
+  only (`FOL_API_PORT`, `FOL_UI_PORT`); keys reach a container only from `.env`, never written
+  in the file. `tests/unit/test_docker.py` holds the files to the code: change a model, a
+  variable or the Python version and it fails until they agree. `docker compose config`
+  reads `.env` and prints what it substitutes: run it with `--env-file` pointing elsewhere,
+  never on the owner's `.env`.
 - **Never print data through rich markup.** Use `_say` / `_tagged` in the CLI; text in
   square brackets is otherwise swallowed as a style tag.
 - **Warnings are errors** in the test suite.

@@ -180,8 +180,10 @@ current information* button. Opening the page fetches nothing (decision 0018, A3
 
 ## Settings and failure
 
-`configs/assistant.yaml` holds the Ollama address (loopback only), the default and
-fallback models, the context length and thinking per mode, temperature and output limits.
+`configs/assistant.yaml` holds the Ollama address (loopback only; inside Docker Compose,
+`FOL_OLLAMA_HOST` may name the `ollama` container or `host.docker.internal` where they
+resolve to private addresses - decision 0019), the default and fallback models, the context
+length and thinking per mode, temperature and output limits.
 With Ollama stopped the page says how to start it and every other page works as before.
 Without a network the lab's own questions still work; current and web tools say
 *unavailable* or *cached as of*. A source that fails returns its last good copy, dated.

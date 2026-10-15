@@ -26,6 +26,7 @@ from front_office.config import (
     simulator_model_path,
     simulator_spec_path,
 )
+from front_office.config.assistant import OLLAMA_HOST_VARIABLE
 from front_office.config.settings import ENV_DATA_DIR, ENV_HOME
 from front_office.domain.cap_rules import SeasonRules
 from front_office.domain.datasets import NBA_STATS, partition_for
@@ -129,6 +130,10 @@ def _isolated_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(ENV_DATA_DIR, raising=False)
     monkeypatch.delenv(KEY_VARIABLE, raising=False)
     monkeypatch.delenv(SECRET_VARIABLE, raising=False)
+    # Docker's settings (decision 0019): where the model is, and where the workbench finds
+    # the API. A test sets its own.
+    monkeypatch.delenv(OLLAMA_HOST_VARIABLE, raising=False)
+    monkeypatch.delenv("FOL_API_URL", raising=False)
 
 
 @pytest.fixture(scope="session")

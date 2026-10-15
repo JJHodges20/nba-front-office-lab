@@ -1,0 +1,122 @@
+# The NBA Front Office Lab in Docker (decision 0019): the API, the workbench and Ollama, with
+# one command:
+#
+#   docker compose up --build
+#
+# then open the workbench at http://localhost:8501 and the API's pages at
+# http://localhost:8000/docs. Ctrl+C stops it; `docker compose down` removes the containers
+# (the models stay in their volume, your data in data/).
+#
+# - Your own data/ folder is mounted: build it on this computer first (fol refresh), as the
+#   README says. Nothing in it goes into the image.
+# - The first start pulls the two models into the `ollama` volume - about 5.5 GB - and
+#   indexes the documents; later starts reuse both.
+# - To use the Ollama already running on this computer instead, set
+#   FOL_OLLAMA_HOST=http://host.docker.internal:11434 in .env: nothing is pulled then.
+# - An NVIDIA graphics card makes answers fast: add compose.gpu.yaml
+#   (docker compose -f compose.yaml -f compose.gpu.yaml up --build).
+# - Ports are published on this machine only, as the workbench has always listened.
+# - From .env, Compose passes FOL_API_SECRET (the key that signs sign-in tokens) to the API and
+#   FOL_OLLAMA_API_KEY (web search) to the workbench, when you have set them.
+
+name: nba-front-office-lab
+
+x-lab: &lab
+  build: .
+  image: nba-front-office-lab:0.1.0
+  volumes:
+    # FOL_DOCKER_DATA in .env mounts another folder - a copy, say - in place of data/.
+    - ${FOL_DOCKER_DATA:-./data}:/app/data
+  extra_hosts:
+    # Docker Desktop knows this name; Docker Engine on Linux needs it spelled out.
+    - "host.docker.internal:host-gateway"
+  init: true
+
+x-env: &env
+  FOL_HOME: /app
+  FOL_OLLAMA_HOST: ${FOL_OLLAMA_HOST:-http://ollama:11434}
+
+services:
+  ollama:
+    image: ollama/ollama:0.40.0
+    volumes:
+      - ollama:/root/.ollama
+    # No port is published: only the lab's containers reach it, by its name.
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  models:
+    # Pulls the assistant's chat model and the embedding model once, then stops.
+    image: ollama/ollama:0.40.0
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: ollama:11434
+      FOL_OLLAMA_HOST: ${FOL_OLLAMA_HOST:-http://ollama:11434}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        case "$$FOL_OLLAMA_HOST" in
+          http://ollama:*) ollama pull nomic-embed-text && ollama pull qwen3:8b ;;
+          *) echo "Using the Ollama at $$FOL_OLLAMA_HOST: nothing to pull here." ;;
+        esac
+    restart: "no"
+
+  api:
+    <<: *lab
+    # Indexes the documents if they are not (a matching index is left alone), then serves.
+    # Without a model the index waits: Ask the Docs offers to build it.
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        fol rag index || echo "The documents were not indexed: build the index from Ask the Docs.";
+        exec uvicorn front_office.server.app:create_app --factory --host 0.0.0.0 --port 8000
+    environment:
+      <<: *env
+      FOL_API_SECRET: ${FOL_API_SECRET:-}
+    ports:
+      # FOL_API_PORT in .env moves it, where another program has 8000 already.
+      - "127.0.0.1:${FOL_API_PORT:-8000}:8000"
+    depends_on:
+      models:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 600s
+
+  ui:
+    <<: *lab
+    command:
+      - streamlit
+      - run
+      - apps/workbench/app.py
+      # Inside the container it listens on every interface; the port is published on this
+      # machine only, below.
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.headless=true
+    environment:
+      <<: *env
+      FOL_API_URL: http://api:8000
+      FOL_OLLAMA_API_KEY: ${FOL_OLLAMA_API_KEY:-}
+    ports:
+      # FOL_UI_PORT in .env moves it, where another program has 8501 already.
+      - "127.0.0.1:${FOL_UI_PORT:-8501}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  ollama:

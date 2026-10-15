@@ -1,0 +1,16 @@
+# An NVIDIA graphics card for the Ollama container, added to compose.yaml:
+#
+#   docker compose -f compose.yaml -f compose.gpu.yaml up --build
+#
+# Needs the NVIDIA driver (and, on Linux, the NVIDIA Container Toolkit). Without a card,
+# leave this file out: Ollama runs on the processor, and an answer takes longer.
+
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
