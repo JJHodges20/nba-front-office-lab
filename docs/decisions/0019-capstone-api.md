@@ -255,3 +255,15 @@ without asking.
 - **Not tried**: a Linux host, where a data folder owned by another user than the container's
   (uid 1000) needs that user given in Compose; and a computer without a graphics card, where
   the same answers come from the processor, more slowly.
+
+## Settled while building C7 (2026-10-15)
+
+- **The README** gained an *Architecture* section - two Mermaid diagrams, the system and a
+  question to the documents step by step, each rendered with Mermaid before it was kept (the
+  first draft's lines crossed, and the box's title sat under an arrow) - a *With Docker*
+  setup, and *The API and Ask the Docs*: every endpoint, and PowerShell and curl examples run
+  against the API before they were written down. The page's screenshot was taken as the
+  others were, dark at 1440 pixels from a copy of the data rebuilt without the contract file,
+  here served by the Docker stack.
+- **The Docker files keep Linux line endings** (`.gitattributes`): a carriage return in the
+  Dockerfile would end up in a shell command inside the image.

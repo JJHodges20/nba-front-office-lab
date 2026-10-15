@@ -120,7 +120,7 @@ milestones back to back, each committed when its gate passes, nothing pushed wit
 | C4 | Data endpoints | Seasons, teams and a player through the lab's services | Done (2026-10-15) |
 | C5 | The workbench page | Sign in and ask the documents through the API | Done (2026-10-15) |
 | C6 | Docker | One image, Compose with the API, the workbench and Ollama; `docker compose up` | Done (2026-10-15) |
-| C7 | README and gate | Setup, an architecture diagram, a usage guide; the full suite; the requirement map closed | Planned |
+| C7 | README and gate | Setup, an architecture diagram, a usage guide; the full suite; the requirement map closed | Done (2026-10-15) |
 
 ## Completion gate for every milestone
 

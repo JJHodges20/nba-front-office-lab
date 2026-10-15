@@ -6,5 +6,8 @@
 *.toml text eol=lf
 *.json text eol=lf
 *.ps1 text eol=crlf
+# Read inside Linux containers: a carriage return would end up in a shell command.
+Dockerfile text eol=lf
+.dockerignore text eol=lf
 *.pdf binary
 *.gz binary

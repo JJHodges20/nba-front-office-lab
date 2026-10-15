@@ -3,6 +3,35 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Capstone C7 - the README, and the capstone's gate (2026-10-15)
+
+The last of the brief's requirements, and the close of the capstone: every requirement in
+`docs/CAPSTONE.md` is met, each with where to find it and how to check it.
+
+**Built**
+
+- **The README**: the capstone in the status; an *Architecture* section with two Mermaid
+  diagrams - the system, and a question to the documents step by step - rendered with
+  Mermaid before they were kept, the first draft redrawn because its lines crossed; *With
+  Docker* in the setup; *The API and Ask the Docs*, with every endpoint and PowerShell and
+  curl examples, each run against the API first; the page in the workbench's table and its
+  screenshot (dark, 1440 pixels, from the copy of the data without the contract file, served
+  by the Docker stack); the new commands, five new answers under *When something goes
+  wrong*, and the files in the layout.
+- **`docs/CAPSTONE.md`** closed: the state, a way to check it all in a few minutes, and the
+  README's row.
+- **`.gitattributes`** keeps the Dockerfile and `.dockerignore` in Linux line endings.
+
+**Gate** (the capstone's whole)
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| `docker compose config` | Valid |
+| `pytest -n auto` | 4,259 passed (5 min 31 s); 3,986 before the capstone, so 273 new |
+| The brief | All ten requirements met (`docs/CAPSTONE.md`) |
+| Outgoing | Seven commits on `capstone`, none pushed: no data file but `data/README.md`, no key, one image (the screenshot, without salaries) |
+
 ## Capstone C6 - Docker: the whole lab with one command (2026-10-15)
 
 `docker compose up --build` runs Ollama, pulls the two models once, indexes the documents,

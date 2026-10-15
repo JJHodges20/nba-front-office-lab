@@ -59,6 +59,13 @@ its button. What it was tested against, and how it did, is in
 [docs/AI_EVALUATION.md](docs/AI_EVALUATION.md); what this release holds and its known
 limits are in [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md).
 
+The course capstone (milestones C1-C7) puts an HTTP API in front of the lab: sign-in with
+signed tokens (JWT), users and the questions they asked in two related tables, questions
+about the lab answered from its own documentation by retrieval - ChromaDB and a local
+Ollama model - the lab's data behind the sign-in, a workbench page that uses all of it, and
+Docker Compose to run everything with one command. [docs/CAPSTONE.md](docs/CAPSTONE.md)
+lists each requirement of the brief and where it is met.
+
 The postseason chances and the simulator's seasons are the lab's forecasts, and they are
 shown as estimates with intervals beside the models' record on past seasons. Player value
 and a roster's projection are estimates with a stated error, shown as such; the optimizer
@@ -70,6 +77,68 @@ automatically for this kind of project, so salaries come from a file you supply.
 you import one and rebuild (`fol contracts import`, then `fol build`), the salary,
 payroll and cap views are empty and say so. See
 [docs/CONTRACT_DATA.md](docs/CONTRACT_DATA.md).
+
+## Architecture
+
+Everything runs on your computer - by hand, or in Docker Compose. The workbench's pages
+read the lab directly; *Ask the Docs* and any other client go through the API, which needs a
+sign-in.
+
+```mermaid
+flowchart TB
+    you(["You, in a browser"])
+    client(["curl, PowerShell,<br/>or the API's /docs page"])
+
+    subgraph lab ["The lab"]
+        ui["Workbench<br/>Streamlit, port 8501"]
+        api["API<br/>FastAPI, port 8000"]
+        services["Services<br/>analytics and tested models"]
+        assistant["Assistant<br/>retrieval and the answer check"]
+        db[("front_office.sqlite<br/>league data and rosters")]
+        vectors[("ChromaDB<br/>the documents' passages")]
+        ollama["Ollama<br/>nomic-embed-text and qwen3:8b"]
+        accounts[("accounts.sqlite<br/>users and their questions")]
+    end
+
+    you --> ui
+    client -- "signed token" --> api
+    ui -- "fourteen pages" --> services
+    ui -- "AI Research" --> assistant
+    ui -- "Ask the Docs:<br/>HTTP and a signed token" --> api
+    api --> services
+    api --> assistant
+    api -- "SQLAlchemy ORM" --> accounts
+    services --> db
+    assistant -- "the nearest passages" --> vectors
+    assistant -- "embed, then answer" --> ollama
+    db -. "built by fol refresh from" .-> nba["stats.nba.com"]
+    vectors -. "built by fol rag index from" .-> docs["docs/, the lab's documents"]
+```
+
+A question to the documents, step by step:
+
+```mermaid
+sequenceDiagram
+    actor You
+    participant Page as Ask the Docs
+    participant API as API
+    participant Ollama
+    participant Chroma as ChromaDB
+    participant Accounts as accounts.sqlite
+    You->>Page: a question about the lab
+    Page->>API: POST /rag/ask, with your token
+    API->>Ollama: embed the question (nomic-embed-text)
+    API->>Chroma: the five passages nearest it
+    API->>Ollama: answer from these passages alone (qwen3:8b)
+    API->>API: cut any figure no passage holds
+    API->>Accounts: keep the answer under your name
+    API-->>Page: the answer, its numbered sources, any notes
+```
+
+Inside, the code is in layers, each allowed to import only the ones below it - data
+providers, a raw store, processing, storage, analytics, models, services, and the outer
+interfaces: the command line, the workbench, the AI assistant and the API. A test fails on
+any import that crosses the rules: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Setup
 
@@ -102,12 +171,39 @@ Everything else in the lab works without it.
 1. Install Ollama from ollama.com and start it. It must run on this computer: the lab
    talks to it at 127.0.0.1 only, and refuses Ollama's cloud models.
 2. Get the model once: `ollama pull qwen3:8b` (about 5 GB; it fits an 8 GB graphics card).
+   *Ask the Docs* and the API's answers also need the embedding model:
+   `ollama pull nomic-embed-text` (274 MB).
 3. For web search, which is optional: copy `.env.example` to `.env` and put your own
    Ollama account's key after `FOL_OLLAMA_API_KEY=`. `.env` is never committed. Without a
    key, links you paste into a question are still read.
 
 The AI Research page says at the top whether the assistant is ready, and what to do if it
 is not.
+
+### With Docker
+
+Docker Desktop (or Docker Engine) runs the whole lab - the API, the workbench and Ollama -
+with one command from the project folder:
+
+```powershell
+docker compose up --build
+```
+
+then open the workbench at http://localhost:8501 and the API's pages at
+http://localhost:8000/docs. Ctrl+C stops it; `docker compose down` removes the containers
+and keeps your data and the models.
+
+- **Build your data first**, on this computer (`fol refresh`, below): Compose mounts your
+  `data/` folder and fetches nothing. Nothing in it goes into the image.
+- **The first start** pulls the two models into a Docker volume (about 5.5 GB) and indexes
+  the documents: about four minutes here. Later starts take a minute or two.
+- **An NVIDIA graphics card** makes the answers quick:
+  `docker compose -f compose.yaml -f compose.gpu.yaml up --build`.
+- **Settings**, in `.env` (`.env.example` lists them): `FOL_OLLAMA_HOST=http://host.docker.internal:11434`
+  uses the Ollama already on this computer instead, and nothing is pulled; `FOL_API_PORT`
+  and `FOL_UI_PORT` move the ports when another program has 8000 or 8501; `FOL_DOCKER_DATA`
+  mounts another data folder; `FOL_API_SECRET` is your own key for signing sign-in tokens
+  (without one the API makes one and keeps it in `data/api/`).
 
 ## Using it
 
@@ -142,6 +238,7 @@ Stop it with Ctrl+C. [docs/WORKBENCH.md](docs/WORKBENCH.md) is the guide.
 | Postseason Outlook | How likely each stage of the playoffs is: for a team, a built roster or a strength you set, for every team of a season, and for a decided season's bracket and series - with intervals, and the model's record on seasons it had not seen. |
 | Scenario Simulator | What a change to a roster would do to its season: players in and out, games missed, development and minutes as your assumptions, and thousands of seasons drawn before and after - payroll, rating, wins and the chance of every stage. |
 | AI Research | Ask in plain words: a model on this machine answers from the lab's data and fitted models, its own documents, games, moves and injuries since the build, dated news from the feeds the lab may read, and the web - every figure checked against what the tools returned, each modeled figure with its interval, each answer shown with its rows, charts and dated sources. Ask for rosters under a budget and get two to four to review, each saved only when you press its button; ask for an experiment that might improve one of the lab's models and get a proposal to review, the idea beside the lab's own test - never applied. Research is kept in named workspaces on this computer - questions and answers, findings, notes, proposed rosters, experiment proposals - and *Ask AI about this* on the other pages asks about what they show. |
+| Ask the Docs | Questions about the lab itself - how a figure is computed, how a model was tested, why something was chosen - asked through the API (`fol api`): the local model answers from the passages of the lab's documents nearest your question and names each one, which opens to the words it read. Sign in first; your questions are kept under your name. |
 | Data Health | Freshness, failed fetches, missing data, quality checks and source status. |
 
 The pages are in six menus across the top - League, Explore, Build, Forecast, Ask and
@@ -165,6 +262,59 @@ matching light theme: choose either in the menu at the top right.
 ![Winning Benchmarks: how often teams of each record won the championship, with intervals](docs/images/winning-benchmarks.png)
 
 ![AI Research: a question answered from the benchmarks, with the shares and their intervals it rests on](docs/images/ai-research.png)
+
+### The API and Ask the Docs
+
+```powershell
+.\.venv\Scripts\fol.exe rag index   # once: embed the documents for the answers (Ollama running)
+.\.venv\Scripts\fol.exe api         # the API at http://localhost:8000 (Ctrl+C stops it)
+```
+
+With the API running, open *Ask the Docs* in the workbench's *Ask* menu: register, sign in
+and ask. Each answer cites the passages it came from by number, and each passage opens to
+the words the model read, so you can check a claim against its source. Your questions are
+listed under the box, newest first.
+
+![Ask the Docs: a question about the lab answered from its documents, each sentence citing its passage](docs/images/ask-the-docs.png)
+
+Every endpoint is listed, with its request and response, at http://localhost:8000/docs;
+*Authorize* there signs you in. All but the first three need the token from
+`POST /auth/token`.
+
+| Endpoint | What it does |
+| --- | --- |
+| `GET /health` | Whether the API is up |
+| `POST /auth/register` | A new user: a name and a password (kept only as a bcrypt hash) |
+| `POST /auth/token` | Sign in with a form; returns a signed token that lasts an hour |
+| `GET`, `DELETE /auth/me` | You; delete your account and every question in it |
+| `POST /rag/ask` | Ask the documents; the answer, its numbered sources and any notes, kept under your name |
+| `GET /rag/questions`, `GET`, `DELETE /rag/questions/{id}` | Your questions, newest first; one; delete one |
+| `GET`, `POST /rag/index` | Whether the documents are indexed; index them (`?force=true` to rebuild) |
+| `GET /lab` | What the lab holds: the build, and the seasons it has |
+| `GET /seasons/{season}/teams` | Every team of a season, each figure with its rank and what kind of figure it is |
+| `GET /teams/{team_id}` | A franchise and every season on record |
+| `GET /seasons/{season}/players` | A season's players (one team, qualified only, sorted, paged); no salaries |
+| `GET /players/{player_id}` | A player's seasons and the value model's estimates, with how the model was tested |
+
+From PowerShell:
+
+```powershell
+$api = "http://127.0.0.1:8000"
+Invoke-RestMethod "$api/auth/register" -Method Post -ContentType "application/json" -Body '{"username": "analyst", "password": "a long passphrase"}'
+$token = (Invoke-RestMethod "$api/auth/token" -Method Post -Body @{ username = "analyst"; password = "a long passphrase" }).access_token
+$auth = @{ Authorization = "Bearer $token" }
+Invoke-RestMethod "$api/rag/ask" -Method Post -Headers $auth -ContentType "application/json" -Body '{"question": "How is the player value model tested?"}'
+Invoke-RestMethod "$api/seasons/2025-26/teams" -Headers $auth
+```
+
+or with curl:
+
+```bash
+API=http://127.0.0.1:8000
+curl -X POST "$API/auth/register" -H 'Content-Type: application/json' -d '{"username": "analyst", "password": "a long passphrase"}'
+TOKEN=$(curl -s -X POST "$API/auth/token" --data-urlencode 'username=analyst' --data-urlencode 'password=a long passphrase' | python -c 'import json, sys; print(json.load(sys.stdin)["access_token"])')
+curl -X POST "$API/rag/ask" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"question": "How is the player value model tested?"}'
+```
 
 ### Other commands
 
@@ -197,6 +347,9 @@ matching light theme: choose either in the menu at the top right.
 .\.venv\Scripts\fol.exe current refresh  # for the AI assistant: this season's games, transactions, the injury report and the news feeds, when due
 .\.venv\Scripts\fol.exe current status   # when each of them was last fetched
 .\.venv\Scripts\fol.exe ui --port 8600 --no-browser   # the workbench on another port
+.\.venv\Scripts\fol.exe api --port 8100   # the API on another port (then set FOL_API_URL for the workbench)
+.\.venv\Scripts\fol.exe rag status        # whether the documents' index matches them
+.\.venv\Scripts\fol.exe rag index --force # build the index again even when it matches
 ```
 
 `fol ingest --season 2025-26` fetches one season; `--teams-only` fetches only the
@@ -217,6 +370,11 @@ of salary columns it carries.
 | *Web search: not set up* | Put your key in `.env` (see Setup). |
 | The database is missing, or a page says no data has been built | `fol build` makes it again from the raw store in `data/raw/`; `fol refresh` fetches first. |
 | A page shows an error after an update | Stop the workbench (Ctrl+C) and start it again: a running server keeps the old code. |
+| Ask the Docs says the API is not answering | Start it: `fol api` (or `docker compose up`). Every other page works without it. |
+| Ask the Docs says the documents are not indexed, or have changed | Press *Build the index* with Ollama running, or run `fol rag index`. |
+| An answer says Ollama is not running, or to pull `nomic-embed-text` | Start the Ollama app, or `ollama pull nomic-embed-text`, then ask again. |
+| *The sign-in has expired* | A token lasts an hour: sign in again. |
+| `docker compose up` says a port is already allocated | Another program has 8000 or 8501: set `FOL_API_PORT` or `FOL_UI_PORT` in `.env`. |
 
 ## Development
 
@@ -231,15 +389,18 @@ of salary columns it carries.
 ```
 apps/workbench/     the Streamlit workbench: pages, filters, charts
 configs/            settings, cap rules by season, eras, archetypes, model specs and fitted models
-data/               local data: raw snapshots, database, imports (not committed)
+data/               local data: raw snapshots, database, imports, accounts, the index (not committed)
 docs/               roadmap, architecture, guides, decisions, research, images, dev log
 scripts/            setup helpers
-src/front_office/   the package, one sub-package per architectural layer
+src/front_office/   the package, one sub-package per architectural layer (server/ is the API)
 tests/              unit, architecture, integration and interface tests
+Dockerfile, compose.yaml, compose.gpu.yaml    the lab in Docker
+requirements.txt, requirements-dev.txt       every dependency, pinned as tested
 ```
 
 ## Documentation
 
+- [The capstone](docs/CAPSTONE.md) - each requirement of the course brief and where it is met; why it is built this way: [decision 0019](docs/decisions/0019-capstone-api.md)
 - [Roadmap and milestone status](docs/ROADMAP.md)
 - [The workbench](docs/WORKBENCH.md) - how to read and use the pages
 - [Benchmark research](docs/research/BENCHMARKS.md) - what contenders have looked like, generated from the database
