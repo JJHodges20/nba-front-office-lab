@@ -29,7 +29,9 @@ class PassageService:
     def status(self) -> IndexStatus:
         """The index as built, beside what the documents and the settings are now."""
         rag = load_api_settings(self._settings.config_dir).rag
-        expected = document_passages(load_sections(self._settings.project_root))
+        expected = document_passages(
+            load_sections(self._settings.project_root), left_out=rag.left_out
+        )
         built = None
         if PassageIndex.exists(self._settings.rag_dir):
             with PassageIndex(self._settings.rag_dir) as index:

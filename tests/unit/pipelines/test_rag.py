@@ -48,6 +48,18 @@ def test_every_passage_of_the_searched_documents_is_embedded(documented: Setting
     assert any(text.startswith("search_document: Architecture › The API\n\n") for text in texts)
 
 
+def test_text_a_model_wrote_is_left_out(documented: Settings) -> None:
+    drafted = Path(documented.project_root) / "docs" / "research" / "EXPERIMENT_PROPOSALS.md"
+    drafted.parent.mkdir(parents=True, exist_ok=True)
+    drafted.write_text(
+        "# Proposals\n\n## Drafted\n\nA model drafted this idea.\n", encoding="utf-8"
+    )
+    transport = ollama()
+    _build(documented, transport)
+    texts = [text for payload in transport.embed_payloads for text in payload["input"]]
+    assert not any("drafted this idea" in text for text in texts)
+
+
 def test_the_passages_go_in_batches(documented: Settings) -> None:
     api_file = documented.config_dir / "api.yaml"
     api_file.write_text(

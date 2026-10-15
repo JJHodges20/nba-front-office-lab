@@ -25,7 +25,7 @@ from front_office.config.settings import ENV_HOME
 from front_office.pipelines.build import BuildReport
 from front_office.providers.ollama import OllamaProvider
 from tests.ollama_fakes import ScriptedOllama
-from wb import data
+from wb import api_client, data
 
 APP = Path(__file__).resolve().parents[2] / "apps" / "workbench" / "app.py"
 TIMEOUT = 90
@@ -59,6 +59,19 @@ def _assistant_offline(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda project_root=None, force=False: (
             api.Refreshed("games", "none", "nothing is fetched in tests"),
         ),
+    )
+
+
+@pytest.fixture(autouse=True)
+def _api_offline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No page test reaches the lab's API over the network: nothing answers at its address,
+    unless a test puts an app of its own in (``tests/ui/test_docs_page.py``)."""
+
+    def unanswered(method: str, url: str, **kwargs: object) -> tuple[int, object]:
+        raise api_client.ApiUnreachable(f"Nothing answered at {url}: the tests reach no API")
+
+    monkeypatch.setattr(
+        api_client, "connect", lambda: api_client.LabApi(api_client.DEFAULT_URL, send=unanswered)
     )
 
 

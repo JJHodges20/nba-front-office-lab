@@ -53,7 +53,7 @@ def index_documents(
     Raises :class:`IndexingFailed` when Ollama cannot embed the passages."""
     started = clock()
     rag = load_api_settings(settings.config_dir).rag
-    found = document_passages(load_sections(settings.project_root))
+    found = document_passages(load_sections(settings.project_root), left_out=rag.left_out)
     if not found:
         raise NothingToIndex(f"there are no documents to index in {settings.project_root / 'docs'}")
     fingerprint = index_fingerprint(found, model=rag.embedding_model, prefix=rag.document_prefix)

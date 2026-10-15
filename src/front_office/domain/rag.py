@@ -13,7 +13,7 @@ again.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -47,12 +47,14 @@ class IndexedPassage:
 
 
 def document_passages(
-    sections: Sequence[Section], *, size: int = PASSAGE
+    sections: Sequence[Section], *, size: int = PASSAGE, left_out: Collection[str] = ()
 ) -> tuple[IndexedPassage, ...]:
-    """Every section's passages, in order."""
+    """Every section's passages, in order, but those of the documents ``left_out``."""
     found: list[IndexedPassage] = []
     used: set[str] = set()
     for section in sections:
+        if section.path in left_out:
+            continue
         for ordinal, text in enumerate(passages(section.text, size=size), start=1):
             seed = "\x1f".join((section.location, str(ordinal), text))
             passage_id = _digest(seed)

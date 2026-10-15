@@ -394,6 +394,28 @@ sites ask AI agents not to read their pages, and the assistant does as they ask.
 built this way: [decisions/0018-ai-research-assistant.md](decisions/0018-ai-research-assistant.md);
 how it is measured: [AI_EVALUATION.md](AI_EVALUATION.md).
 
+**Ask the Docs.** Questions about the lab itself - how a figure is computed, how a model was
+tested, why something was chosen - answered from its own documentation, through the lab's
+HTTP API (the capstone's page: [CAPSTONE.md](CAPSTONE.md)). Start the API first with
+`fol api` (Docker Compose starts it for you); without it the page says so and the rest of
+the workbench works as before.
+
+- *Sign in or register*: a name and a password. Your questions and their answers are kept
+  under your name, for you alone; the password is kept only as a hash.
+- *Build the index* the first time: the local model reads every passage of the documents,
+  which took under twenty seconds on this computer's graphics card and takes longer without
+  one. When the documents change, the page offers to build it again.
+- *Ask the documents*: the answer comes from the five passages nearest your question,
+  written by the local model, each sentence citing its passage like [2]. Every passage is
+  listed under it - its document, its heading, how near it was - and opens to the words the
+  model read; "(cited)" marks those the answer uses. A note says when a sentence was cut
+  for a figure no passage holds, or when the answer cites nothing.
+- *Your questions*: what you asked before, newest first, each with its answer and sources,
+  and a delete that stays off until you tick its box. *Your account* deletes the account and
+  every question in it, the same way.
+
+The page reaches the API at `FOL_API_URL` (`http://127.0.0.1:8000` unless you set it).
+
 **Data Health.** How the last build went, the state of each source, what is missing and
 what that costs, every quality check, every adjustment the build made to source data,
 what is held of each dataset, and any fetch that is failing.

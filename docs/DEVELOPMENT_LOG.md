@@ -3,6 +3,50 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Capstone C5 - Ask the Docs, the workbench page that uses the API (2026-10-15)
+
+The brief's Streamlit frontend was met already; this is the page that puts the API in front
+of a user: sign in, build the index, ask the documents, read the sources, keep or delete the
+questions. Decision 0019's section "Settled while building C5" records what the building and
+the live check decided.
+
+**Built**
+
+- **`wb/views/docs.py`**, *Ask the Docs* in the *Ask* menu: Sign in and Register tabs; the
+  index's state with a button to build it, or build it again when the documents change;
+  *Ask the documents*; the answer with its notes and every passage it was given, each
+  opening to the words the model read, "(cited)" on those it uses; the user's earlier
+  questions and the account, each deleted only once its box is ticked.
+- **`wb/api_client.py`**, the workbench's one connection: `requests` to `FOL_API_URL` (http
+  only; this machine by default), the API's own words for every refusal, a 401 signing the
+  page out. The architecture test excepts it alone, and checks it does connect.
+- **The index leaves out what a model or the web wrote** (`rag.left_out`): found live, below.
+- **Tests**: the UI suite finds the API not answering by default; the page's tests run the
+  real app in their process through the client's seam; the page is in the sweep, the page
+  draws and the frame's two lists of pages. `docs/WORKBENCH.md` explains the page.
+
+**The live check** (a throwaway copy of the data; Ollama started for it and stopped after):
+the index built in 16 to 18 seconds (1,206 passages, nomic-embed-text on the graphics card);
+answers in 5 to 17 seconds from qwen3:8b - "What does the API use to sign its tokens?" came
+back right and cited (HS256, `FOL_API_SECRET`, `data/api/signing.key`). Light and dark at
+1440 pixels, light at 1024, and the keyboard alone (a tab row is one stop and the arrow keys
+move along it; Enter sends a form and opens a source; the focus ring shows). Three findings,
+all fixed: the *Ask* button shared its name with the top bar's *Ask* menu (now *Ask the
+documents*); signing out came back on the *Register* tab (now *Sign in*); and "How is a
+player's projected impact tested?" was answered partly from an experiment idea a model had
+drafted, which the index now leaves out with the other model- and web-written documents
+(1,182 passages; the same question then answered from decision 0010).
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New tests | 35: the page against the real app (the API not running, registering, a wrong password in the API's words, building the index then asking, an index older than the documents, earlier questions listed and deleted, signing out and a sign-in that has ended, deleting the account, a question too short, the page in the menu); the client (its address, http only, the token, a form for signing in, refusals in the API's words, a field's message, 401, nothing answering); the left-out documents; the one network exception |
+| `pytest -n auto` | 4,222 passed (5 min 46 s); before C5, 4,187 |
+| UI | Looked at and clicked through as above |
+| Boundaries and data | One named module of the workbench opens a connection, to the address the environment gives, and the test holds it to that; the assistant's keyword search and its frozen cases unchanged |
+
 ## Capstone C4 - the lab's data through the API (2026-10-15)
 
 Five read-only endpoints that put the lab's own data behind the sign-in: what is built, a

@@ -103,6 +103,12 @@ NETWORK_MODULES: dict[str, set[str]] = {
 }
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 
+# The one workbench module that opens a connection: to the lab's own API, at the address
+# FOL_API_URL names - the Ask the Docs page's way in (decision 0019). Nothing else in apps/
+# or scripts/ may.
+APP_API_CLIENT = APPS_DIR / "workbench" / "wb" / "api_client.py"
+APP_API_CLIENT_LIBRARIES = {"requests"}
+
 # Whole-dollar amounts this large in source code are almost certainly a cap figure that
 # belongs in configs/seasons instead.
 LARGEST_ALLOWED_LITERAL = 9_999_999
@@ -354,7 +360,8 @@ def test_third_party_libraries_stay_in_their_layer() -> None:
             for imported, line in imported_modules(path, None):
                 library = imported.split(".")[0]
                 owners = LIBRARY_OWNERS.get(library)
-                if owners is not None and "apps" not in owners:
+                allowed = path == APP_API_CLIENT and library in APP_API_CLIENT_LIBRARIES
+                if owners is not None and "apps" not in owners and not allowed:
                     problems.append(f"{path.relative_to(REPO_ROOT)}:{line} apps imports {library}")
     assert not problems, "third-party library used outside its layer:\n" + "\n".join(problems)
 
@@ -395,8 +402,16 @@ def test_network_access_is_imported_by_the_providers_alone(tmp_path: Path) -> No
             problems += [
                 f"{path.relative_to(REPO_ROOT)}:{line} imports {name}"
                 for name, line in network_imports(path)
+                if not (path == APP_API_CLIENT and name in APP_API_CLIENT_LIBRARIES)
             ]
     assert not problems, "network access outside the providers:\n" + "\n".join(problems)
+
+
+def test_the_workbenchs_one_connection_is_the_api_client() -> None:
+    """The exception above names a module that exists and does connect - a rule that
+    excepts nothing would hide a move - and only with the library it names."""
+    found = {name for name, _ in network_imports(APP_API_CLIENT)}
+    assert found == APP_API_CLIENT_LIBRARIES
 
 
 def test_no_cap_sized_dollar_figures_in_source_code() -> None:

@@ -28,3 +28,11 @@ rag:
   passages: 5
   # Passages embedded per request while the index is built.
   batch: 32
+  # Left out besides the files the keyword search leaves out: text a model or the web wrote,
+  # so that an answer rests on the lab's own words - the experiment ideas a model drafted,
+  # a recorded session's answers, and the web search's recorded results. Found live at C5:
+  # a drafted idea was retrieved for how a model is tested, and the answer repeated it.
+  left_out:
+    - docs/research/EXPERIMENT_PROPOSALS.md
+    - docs/research/ASSISTANT_SESSION.md
+    - docs/research/SEARCH_QUALITY.md

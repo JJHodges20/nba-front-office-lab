@@ -178,3 +178,39 @@ without asking.
 - **A season is checked twice**: its form by the path's pattern (`2025-26`), its sense by
   `Season.parse` (`2025-27` is refused with 422), and whether the lab holds it, with the span
   it does hold (404).
+
+## Settled while building C5 (2026-10-15)
+
+- **The page** is *Ask the Docs*, in the top bar's *Ask* menu beside AI Research
+  (`wb/views/docs.py`). Signed out: a Sign in and a Register tab. Signed in: the index's
+  state, with a button to build it when there is none or the documents have changed; the
+  question box; the answer, its notes and every passage it was given, each opening to the
+  words the model read; the user's earlier questions, each deleted only once its box is
+  ticked; and the account, deleted the same way. The token lives in the session and is
+  never drawn.
+- **`wb/api_client.py`** is the workbench's one connection: `requests`, to `FOL_API_URL`
+  (an `http` or `https` address only; `http://127.0.0.1:8000` by default), five minutes'
+  patience for an answer. A refusal is shown in the API's own words; a 401 signs the page
+  out with the API's reason. The architecture test excepts this module, and only for
+  `requests`, and checks that it does connect - an exception that excepts nothing would hide
+  a move.
+- **Tests**: every UI test finds the API not answering unless it puts an app of its own in;
+  the page's tests run the real app in their process through the client's one seam, with the
+  model scripted where the API reaches it. Streamlit's `AppTest` files an expander that has
+  an icon as a status box, so the page's folds have no icon.
+- **The live check** (2026-10-15, on a throwaway copy of the data; Ollama was not running,
+  so a server was started for the check and stopped after it): the index took 16 to 18
+  seconds for 1,206 passages on the graphics card; answers came in 5 to 17 seconds, the first
+  loading the model; light and dark, 1440 and 1024 pixels, and the keyboard alone. It found
+  three things, all fixed:
+  - the button *Ask* shared its name with the top bar's *Ask* menu - to a keyboard and a
+    screen reader too - and is now *Ask the documents*;
+  - after signing out, the tab row remembered *Register*; signing out now resets it to
+    *Sign in*;
+  - retrieval handed the model an experiment idea another model had drafted
+    (`docs/research/EXPERIMENT_PROPOSALS.md`) for "How is a player's projected impact
+    tested?", and the answer repeated it. Text a model or the web wrote - the drafted
+    proposals, a recorded session's answers, the web search's recorded results - is now left
+    out of the index (`configs/api.yaml`, `rag.left_out`) besides what the keyword search
+    leaves out; the assistant's keyword search keeps its corpus, whose cases are frozen. The
+    index fell to 1,182 passages, and the same question was answered from decision 0010.

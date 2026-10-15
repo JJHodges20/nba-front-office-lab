@@ -18,6 +18,7 @@ from wb.views import (
     benchmarks,
     builder,
     contracts,
+    docs,
     fit,
     health,
     lab,
@@ -126,7 +127,16 @@ PAGES = {
             url_path="simulator",
         ),
     ],
-    "Ask": [RESEARCH_PAGE],
+    "Ask": [
+        RESEARCH_PAGE,
+        # The capstone's page (decision 0019): the documents asked through the lab's own API.
+        st.Page(
+            docs.render,
+            title="Ask the Docs",
+            icon=":material/menu_book:",
+            url_path="docs",
+        ),
+    ],
     "System": [HEALTH_PAGE],
 }
 

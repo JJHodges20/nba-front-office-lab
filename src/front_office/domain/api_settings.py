@@ -40,6 +40,9 @@ class RagSettings(_Settings):
     """How many of the nearest passages one answer is given."""
     batch: int = Field(32, ge=1, le=256)
     """Passages embedded per request while the index is built."""
+    left_out: tuple[str, ...] = ()
+    """Documents left out of the index besides those the keyword search leaves out: text a
+    model or the web wrote, so that an answer rests on the lab's own words."""
 
     @field_validator("embedding_model")
     @classmethod

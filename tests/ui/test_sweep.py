@@ -58,6 +58,9 @@ STARTS: dict[str, dict[str, dict[str, object]]] = {
     "simulator": {"open": {}, "roster": {"sim_subject": "roster"}},
     # Offline, as every page test is: the controls are the mode and the two buttons.
     "research": {"open": {}},
+    # The API does not answer in a sweep (tests/ui/conftest.py): the sidebar is what there is.
+    # Its own controls are tried against an app in tests/ui/test_docs_page.py.
+    "docs": {"open": {}},
     "health": {"open": {}},
 }
 # The one filter a page is swept through in full although it is long, from the first of

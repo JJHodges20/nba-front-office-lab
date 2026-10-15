@@ -57,6 +57,15 @@ def test_an_id_is_stable_and_changes_with_the_words() -> None:
     assert changed[1].passage_id != _passages()[1].passage_id
 
 
+def test_a_document_can_be_left_out() -> None:
+    sections = (
+        *split_sections("docs/A.md", "# A\n\nKept.\n"),
+        *split_sections("docs/research/DRAFTED.md", "# Drafted\n\nA model wrote this.\n"),
+    )
+    found = document_passages(sections, left_out=("docs/research/DRAFTED.md",))
+    assert [passage.path for passage in found] == ["docs/A.md"]
+
+
 def test_passages_alike_in_place_and_words_get_ids_of_their_own() -> None:
     sections = split_sections("docs/X.md", "# X\n\n## A\n\nSame.\n")
     found = document_passages((*sections, *sections))

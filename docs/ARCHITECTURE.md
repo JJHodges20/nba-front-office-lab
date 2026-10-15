@@ -68,7 +68,9 @@ So is anything that can open a connection (A9): `requests`, `nba_api`, `socket`,
 `http.client` and `urllib.request` are imported in `providers` alone - with one exception,
 `urllib.request` in `interfaces`, where `fol ui` asks this machine's own server whether it
 has started. The workbench and `scripts/` import none of them; they reach the network
-through the providers.
+through the providers - but for one module, `apps/workbench/wb/api_client.py`, through
+which the Ask the Docs page reaches the lab's own API with `requests`, at the address
+`FOL_API_URL` names (decision 0019).
 
 These rules are enforced by `tests/architecture/test_layer_boundaries.py`. A forbidden
 import fails the test suite. To change a rule, change this document and that test in the
@@ -543,8 +545,9 @@ listed at `/docs`.
   (`storage/vectors.py`, `data/rag/`, read through `services/passages.py`), and has the
   assistant's chat model answer from them alone, citing each by number
   (`assistant/rag.py`, reached through `assistant.api.ask_documents`). The passages are the
-  ones the assistant's keyword search reads, from the same documents, and the answer is held
-  to them by the assistant's checker: a figure no passage holds, or a passage it was not
+  ones the assistant's keyword search reads, from the same documents less the text a model
+  or the web wrote (`rag.left_out`), and the answer is held to them by the assistant's
+  checker: a figure no passage holds, or a passage it was not
   given, is sent back once and then cut, with a note. `fol rag index` and `POST /rag/index`
   build the index (`pipelines/rag.py`); `GET /rag/index` says whether it still matches the
   documents. Each answer is kept under the user who asked (`/rag/questions`). The assistant's

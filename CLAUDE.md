@@ -336,8 +336,9 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   contract figure; they open the lab per request and never create it.
 - **RAG sits beside the assistant's keyword search, never in its place.** `research_docs`
   and its frozen cases are unchanged. The API's answers come from `assistant/rag.py` through
-  `assistant.api.ask_documents`: the passages the keyword search reads, embedded into
-  ChromaDB (`data/rag/`, `chromadb` imported by `storage` alone), the nearest given to the
+  `assistant.api.ask_documents`: the passages the keyword search reads, less the text a model
+  or the web wrote (`configs/api.yaml`'s `rag.left_out`), embedded into ChromaDB
+  (`data/rag/`, `chromadb` imported by `storage` alone), the nearest given to the
   assistant's model as quoted data, the answer held to them by the assistant's checker.
   ChromaDB gets every embedding from Ollama - never an embedding function, which would
   download a model - and runs with its telemetry off; never read a collection's
@@ -444,6 +445,13 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   (`answers.under_way`): leaving one marks it complete, and a running question showed a
   tick (UI polish P7). The conversation comes straight after the workspace and its one fold
   of shelves; the mode and the conversation's buttons sit under it, by the question box.
+- **Ask the Docs reaches the lab's API through `wb/api_client.py` alone** (the capstone,
+  decision 0019): the workbench's one module that opens a connection, with `requests`, to
+  the address `FOL_API_URL` names and no other; the architecture test excepts it and only it.
+  The token stays in the session. Its page tests run the real app in their process through
+  `api_client.connect`; every other UI test finds the API not answering
+  (`tests/ui/conftest.py`). `AppTest` files an expander that has an icon as a status box:
+  give a fold a test looks for no icon.
 - **Ask AI about this** (`wb/ask.py`) goes under a page's header:
   `ask.button(ask.from_filters(page, filters, roster_id=...))`. It never changes the
   sidebar, asks in the workspace open on the AI Research page, and shares that page's one

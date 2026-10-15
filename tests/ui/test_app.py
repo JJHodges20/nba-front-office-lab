@@ -28,6 +28,7 @@ PAGE_TITLES = (
     "Postseason Outlook",
     "Scenario Simulator",
     "AI Research",
+    "Ask the Docs",
     "Data Health",
 )
 """The navigation's pages in its order: the top bar's, and the sidebar's fold of them."""
