@@ -104,6 +104,24 @@ and [ui-polish/DESIGN_SYSTEM.md](ui-polish/DESIGN_SYSTEM.md). Each phase stops f
 | P7 | The assistant's surfaces | AI Research and *Ask AI about this* | Done (2026-10-12; checked live with the local model on a throwaway copy at four sizes: the conversation starts about 200px higher - the shelves one fold, the mode by the question box; a running question shows a spinner, not a tick; evidence names its kinds; each proposed roster says waiting, saved or declined; each figure once in an answer's rows; code out of the state green; folds and popovers that stay open while the page changes; the docked panel left out, decision D12) |
 | P8 | Accessibility and final audit | Keyboard, zoom, every size, the full regression | Done (2026-10-12; nothing cut at six widths, zoom included; no error or empty tab in three states; every check by keyboard works, but the top bar's pages came last in its order (F31) and links showed a faint focus mark (F32); the owner chose both fixes on 2026-10-13 - an *All pages* fold in the sidebar and a green focus ring - and new README screenshots; the final audit and the release checklist written) |
 
+## Capstone: API, sign-in, RAG, Docker (C1-C7)
+
+The lab as the owner's course capstone: an HTTP API with sign-in, a vector index of the
+lab's documents for retrieval-augmented answers, one workbench page that uses them, and the
+whole app in Docker Compose. Decision [0019](decisions/0019-capstone-api.md); how each of the
+brief's requirements is met: [CAPSTONE.md](CAPSTONE.md). The owner chose to run the
+milestones back to back, each committed when its gate passes, nothing pushed without asking.
+
+| # | Milestone | Deliverable | Status |
+| --- | --- | --- | --- |
+| C1 | Requirements and plan | `requirements.txt` and `requirements-dev.txt` pinned as tested, kept in step with `pyproject.toml` by a test; decision 0019; the requirement map | Done (2026-10-15) |
+| C2 | The API and sign-in | FastAPI app; register, sign in (JWT), who am I, health; users and their questions in two related tables | Planned |
+| C3 | RAG | The documents' passages embedded by Ollama into ChromaDB; ask, history and rebuild endpoints; answers that cite their sources | Planned |
+| C4 | Data endpoints | Seasons, teams and a player through the lab's services | Planned |
+| C5 | The workbench page | Sign in and ask the documents through the API | Planned |
+| C6 | Docker | One image, Compose with the API, the workbench and Ollama; `docker compose up` | Planned |
+| C7 | README and gate | Setup, an architecture diagram, a usage guide; the full suite; the requirement map closed | Planned |
+
 ## Completion gate for every milestone
 
 - Targeted automated tests pass.

@@ -86,6 +86,15 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
 
+or with every version pinned as tested (`requirements.txt` for running the lab,
+`requirements-dev.txt` for its tests as well):
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pip install --no-deps -e .
+```
+
 ### The AI assistant (optional)
 
 Everything else in the lab works without it.

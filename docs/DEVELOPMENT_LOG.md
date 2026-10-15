@@ -3,6 +3,45 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Capstone C1 - requirements files and the plan (2026-10-15)
+
+The owner brought the brief of their course's capstone: a FastAPI backend, SQLAlchemy with
+related tables, Pydantic on every endpoint, JWT sign-in, RAG with ChromaDB and Ollama, a
+Streamlit frontend, Docker Compose for the whole app, tests, a README with a diagram, and a
+`requirements.txt`. An audit of the code found four already met (related SQLAlchemy tables,
+Streamlit, the tests, setup and usage in the README) and the rest missing. The owner chose,
+on the same day: one new workbench page uses the API and the other pages stay as they are;
+Ollama runs inside Compose; Docker mounts the owner's `data/` folder; the milestones run back
+to back, committed as each gate passes, nothing pushed without asking.
+
+**Built**
+
+- **Dependencies**: FastAPI, uvicorn, python-multipart, PyJWT, bcrypt and ChromaDB in
+  `pyproject.toml`, httpx and packaging for the tests. A dry run first: pip added packages and
+  changed none the lab already had. ChromaDB 1.5 ships one wheel for every Python from 3.9
+  (abi3) and its onnxruntime has 3.14 wheels, so it runs in this environment and in Docker
+  alike; an in-memory collection answered a query here offline, telemetry off.
+- **One warning ignored**, with its reason in `pyproject.toml`: ChromaDB's telemetry calls a
+  function Python 3.14 deprecates, inside ChromaDB, on import.
+- **`requirements.txt`** (runtime) and **`requirements-dev.txt`** (tests), every package
+  pinned to the version installed and tested here; `tests/unit/test_requirements.py` holds
+  them to `pyproject.toml`: the same packages, every pin within its declaration, every pin
+  the version installed.
+- **Decision 0019**: the design for the milestones to come - a `server` layer, the accounts
+  file, JWT, RAG beside the assistant's keyword search, the two widened rules (Ollama's
+  container names; the workbench's one API client), Docker.
+- **Documents**: `docs/CAPSTONE.md` (each requirement, where it is met, its status), the
+  roadmap's capstone table, the README's pinned install.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New tests | `test_requirements.py`: five - the same packages declared and pinned, runtime and dev; each pin within its declaration; the dev file installs the runtime file; every pin the installed version |
+| `pytest -n auto` | 3,991 passed (6 min 50 s); before C1, 3,986 |
+| Boundaries and data | Dependencies, two requirements files, one test, documents; no code of the lab changed |
+
 ## UI polish P8, the owner's choices - a keyboard path, focus rings, new screenshots (2026-10-13)
 
 At P8's gate the owner chose the two fixes it left open, and new screenshots for the README,

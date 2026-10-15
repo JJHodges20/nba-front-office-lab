@@ -1,0 +1,36 @@
+# The lab's runtime dependencies, pinned to the versions it is tested with.
+#
+# pyproject.toml declares them (with the lowest versions that work); this file pins them
+# for a reproducible install, and tests/unit/test_requirements.py keeps the two in step.
+#
+#   pip install -r requirements.txt
+#   pip install --no-deps -e .        # the lab itself, and the `fol` command
+#
+# Development and tests: requirements-dev.txt.
+
+# Data, models and the command line
+pandas==3.0.6
+numpy==2.5.3
+scipy==1.18.1
+pydantic==2.13.5
+pyyaml==6.0.3
+sqlalchemy==2.1.1
+typer==0.27.2
+rich==15.0.0
+
+# League data, contracts and the injury report
+nba_api==1.11.4
+requests==2.34.2
+pypdf==6.19.0
+
+# The workbench (Streamlit frontend)
+streamlit==1.64.0
+plotly==7.1.0
+
+# The API (FastAPI backend), sign-in tokens and the document index (docs/CAPSTONE.md)
+fastapi==0.143.2
+uvicorn==0.54.0
+python-multipart==0.0.32
+pyjwt==2.15.1
+bcrypt==5.0.0
+chromadb==1.5.9

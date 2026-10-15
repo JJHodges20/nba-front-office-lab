@@ -1,0 +1,14 @@
+# Everything to run the tests and the linter, pinned as tested. pyproject.toml's `dev`
+# extra declares the same; tests/unit/test_requirements.py keeps the two in step.
+#
+#   pip install -r requirements-dev.txt
+#   pip install --no-deps -e .
+
+-r requirements.txt
+
+pytest==9.1.1
+pytest-cov==7.1.0
+pytest-xdist==3.8.0
+ruff==0.16.9
+httpx==0.28.1
+packaging==26.3
