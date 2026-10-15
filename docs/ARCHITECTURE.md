@@ -549,6 +549,12 @@ listed at `/docs`.
   build the index (`pipelines/rag.py`); `GET /rag/index` says whether it still matches the
   documents. Each answer is kept under the user who asked (`/rag/questions`). The assistant's
   own keyword search is unchanged.
+- **The lab's data** (`server/data.py`): `GET /lab`, a season's teams and players, a
+  franchise and a player, read from the services on a lab opened for the request - never
+  made by asking, so a lab never built is a 503 that says to run `fol refresh`. Figures go
+  out under their metric keys with a `metrics` list saying what each is (measured, derived or
+  modeled, and whether an estimate); missing is null; a player's modeled figures come with
+  how the value model was tested. No salary or contract figure is served.
 
 ## Conventions
 

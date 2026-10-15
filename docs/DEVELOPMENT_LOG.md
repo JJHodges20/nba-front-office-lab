@@ -3,6 +3,36 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Capstone C4 - the lab's data through the API (2026-10-15)
+
+Five read-only endpoints that put the lab's own data behind the sign-in: what is built, a
+season's teams and players, a franchise, a player. Decision 0019's section "Settled while
+building C4" records what the building decided.
+
+**Built**
+
+- **`server/data.py`**: `GET /lab`, `GET /seasons/{season}/teams`, `GET /teams/{team_id}`,
+  `GET /seasons/{season}/players` (one team, qualified players by default, sorted by a
+  metric, paged) and `GET /players/{player_id}`, each reading the services on a lab opened for
+  the request. A lab never built is a 503 that says to run `fol refresh`, and asking creates
+  no database.
+- **What each figure is**: figures go out under their metric keys beside a `metrics` list -
+  label, meaning, provenance (measured, derived, modeled), whether an estimate, how it is
+  shown. A player's value estimates carry the value model's revision and both tested errors,
+  and the note that a single player's figure has no tested interval of its own.
+- **No salary or contract figure is served**; `GET /lab` gives only the contract file's date.
+- On a throwaway copy of the real database every endpoint answered within 0.4 seconds; the
+  full season's players, all 500-odd, are 800 KB.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New tests | 27 (`tests/unit/server/test_data.py`), each figure compared with what the service returns: the lab's state, built and never built (503, nothing created); a season's teams with ranks and the league average, provenance and estimates; seasons not held (404) or written wrongly (422); a franchise; players qualified by default, one team sorted, paging, queries out of bounds; a player's modeled figures and the model's test; no salary anywhere; a token on every endpoint |
+| `pytest -n auto` | 4,187 passed (5 min 35 s); before C4, 4,160 |
+| Boundaries and data | The server reads services and config only; nothing written but the request's own account file |
+
 ## Capstone C3 - asking the documents: RAG with ChromaDB and Ollama (2026-10-15)
 
 The brief's RAG pipeline, beside the AI Research assistant's keyword search and never in its

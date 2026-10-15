@@ -330,7 +330,10 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   published schema. The accounts are a fourth file, `data/api/accounts.sqlite`, which no build
   touches; a password is only ever a bcrypt hash, never returned or logged. The signing key
   is `FOL_API_SECRET` (environment or `.env`) or `data/api/signing.key`: never print it, never
-  give `configs/api.yaml` or `.env.example` a value for it; tests sign with their own.
+  give `configs/api.yaml` or `.env.example` a value for it; tests sign with their own. The
+  data endpoints (`server/data.py`) send each figure under its metric key beside `metrics`
+  saying what it is, a modeled one with the value model's test, and never a salary or a
+  contract figure; they open the lab per request and never create it.
 - **RAG sits beside the assistant's keyword search, never in its place.** `research_docs`
   and its frozen cases are unchanged. The API's answers come from `assistant/rag.py` through
   `assistant.api.ask_documents`: the passages the keyword search reads, embedded into

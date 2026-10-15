@@ -153,3 +153,28 @@ without asking.
   facade's `connect`, as `ask_documents` does, so a test scripts one model for both; the
   pipeline words Ollama's errors itself (`IndexingFailed`), so the server catches no provider
   class.
+
+## Settled while building C4 (2026-10-15)
+
+- **Endpoints**: `GET /lab`; `GET /seasons/{season}/teams`; `GET /teams/{team_id}`;
+  `GET /seasons/{season}/players` (a team, qualified players only by default, sorted by a
+  metric, paged); `GET /players/{player_id}`. All need a token; all read.
+- **The services compute; the API formats.** Each figure is the service's own, under its
+  metric key; the response's `metrics` give each key's label, meaning, provenance (measured,
+  derived, modeled), whether it is an estimate over a span, and how it is shown. Ranks are
+  the service's, within the season. Missing is null, never 0. Filtering by team or
+  qualification, sorting and paging are what a page does with a table, and nothing more.
+- **Modeled figures carry their evidence.** A player's value estimates come with the value
+  model's revision and its out-of-sample test - both errors, with the minutes as played and
+  as projected - and the note that the test is of whole teams: a single player's figure has
+  no tested interval of its own (`CLAUDE.md`'s rule).
+- **No salary or contract figure is served.** The contract file is the user's, from a source
+  with its own terms; `GET /lab` gives only the date it was current. A test checks that no
+  response holds a salary.
+- **A lab is opened per request and never made by asking.** Opening the lab's database
+  creates it when it is missing, so the endpoints look for the file first and answer 503
+  ("run: fol refresh") without it; a service finding the tables missing (`LabNotBuilt`)
+  answers the same.
+- **A season is checked twice**: its form by the path's pattern (`2025-26`), its sense by
+  `Season.parse` (`2025-27` is refused with 422), and whether the lab holds it, with the span
+  it does hold (404).

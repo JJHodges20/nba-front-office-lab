@@ -7,16 +7,18 @@ pages: ``/docs`` (every endpoint, tried in the browser) and ``/redoc``.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request, status
+from fastapi.responses import JSONResponse
 
 from front_office import __version__
 from front_office.config.api import load_api_settings
 from front_office.config.settings import Settings, load_settings
 from front_office.domain.api_settings import ApiSettings
-from front_office.server import auth, rag
+from front_office.server import auth, data, rag
 from front_office.server.schemas import Health
 from front_office.server.security import Tokens, signing_secret
 from front_office.server.state import ServerState
+from front_office.services import LabNotBuilt
 from front_office.services.accounts import AccountService
 
 DESCRIPTION = """\
@@ -53,4 +55,11 @@ def create_app(
     app.include_router(health)
     app.include_router(auth.router)
     app.include_router(rag.router)
+    app.include_router(data.router)
+    app.add_exception_handler(LabNotBuilt, _not_built)
     return app
+
+
+def _not_built(request: Request, error: Exception) -> JSONResponse:
+    """A service found the lab's tables missing: said as the data endpoints say it."""
+    return JSONResponse({"detail": data.NOT_BUILT}, status.HTTP_503_SERVICE_UNAVAILABLE)

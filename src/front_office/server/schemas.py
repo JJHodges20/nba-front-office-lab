@@ -7,7 +7,7 @@ against its model before it is sent. The ``/docs`` page is drawn from these mode
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -22,6 +22,7 @@ from front_office.domain.accounts import (
     check_password,
     check_username,
 )
+from front_office.domain.metrics import MetricSpec
 from front_office.domain.rag import CitedSource, IndexReport, IndexStatus
 
 
@@ -243,3 +244,202 @@ class IndexBuilt(_Model):
             built_at=report.built_at,
             seconds=round(report.seconds, 2),
         )
+
+
+# --- the lab's data (C4) -------------------------------------------------------------------
+
+Figures = dict[str, float | None]
+"""Metric key to value, as the services computed it; null where it is missing - never 0."""
+
+
+class BuildOut(_Model):
+    """The build the figures come from."""
+
+    build_id: int | None
+    built_at: datetime | None = Field(description="When the database was built (UTC).")
+
+
+class LabOut(_Model):
+    """What the lab holds."""
+
+    built: bool
+    current: bool = Field(description="Built by this version of the lab.")
+    build: BuildOut
+    team_seasons: list[str] = Field(description="Seasons with team statistics, newest first.")
+    player_seasons: list[str] = Field(description="Seasons with player statistics, newest first.")
+    cap_seasons: list[str] = Field(description="Seasons with cap rules, newest first.")
+    contract_file_as_of: date | None = Field(
+        description="The date your contract file was current; no salary is served by the API."
+    )
+
+
+class MetricOut(_Model):
+    """What a figure is, and where it comes from."""
+
+    key: str
+    label: str
+    name: str
+    description: str
+    category: str
+    provenance: str = Field(
+        description="measured (recorded by the source), derived (arithmetic on measured "
+        "figures) or modeled (a model's estimate, not a measurement)."
+    )
+    estimated: bool = Field(
+        False,
+        description="An estimate from box scores over a span, not the league's published figure.",
+    )
+    format: str = Field(description="decimal, percent (a share 0-1), count, signed or money.")
+    decimals: int
+    higher_is_better: bool | None = Field(description="null where neither direction is better.")
+
+    @classmethod
+    def of(cls, spec: MetricSpec, *, estimated: bool = False) -> MetricOut:
+        return cls(
+            key=spec.key,
+            label=spec.label,
+            name=spec.name,
+            description=spec.description,
+            category=spec.category,
+            provenance=spec.provenance.value,
+            estimated=estimated,
+            format=spec.format.value,
+            decimals=spec.decimals,
+            higher_is_better=spec.higher_is_better,
+        )
+
+
+class TeamRow(_Model):
+    team_id: int
+    team_name: str
+    abbreviation: str
+    conference: str | None
+    division: str | None
+    conference_rank: int | None
+    postseason_result: str | None = Field(description="How the season ended, where it has.")
+    figures: Figures
+    ranks: dict[str, int | None] = Field(
+        description="Each figure's place among the season's teams: 1 is best, or the highest "
+        "where neither is better."
+    )
+
+
+class TeamsOut(_Model):
+    """Every team of one regular season, compared within that season."""
+
+    season: str
+    build: BuildOut
+    metrics: list[MetricOut]
+    league_average: Figures = Field(description="The league's average of each figure that season.")
+    teams: list[TeamRow]
+
+
+class TeamSeasonRow(_Model):
+    season: str
+    team_name: str
+    conference_rank: int | None
+    postseason_result: str | None
+    league_teams: int | None = Field(description="Teams in the league that season.")
+    figures: Figures
+    rating_ranks: dict[str, int | None] = Field(
+        description="The net, offensive and defensive rating's place in the league that season."
+    )
+
+
+class TeamOut(_Model):
+    """A franchise as it is now, and every season on record, newest first."""
+
+    team_id: int
+    full_name: str
+    abbreviation: str
+    city: str | None
+    conference: str | None
+    division: str | None
+    build: BuildOut
+    metrics: list[MetricOut]
+    seasons: list[TeamSeasonRow]
+
+
+class QualificationOut(_Model):
+    min_games: int
+    min_minutes: float
+    described: str
+
+
+class PlayerRow(_Model):
+    player_id: int
+    player_name: str
+    team: str | None = Field(description="The team's abbreviation; TOT for several teams.")
+    team_id: int | None
+    teams_played_for: int | None
+    position: str | None
+    age: int | None
+    qualified: bool = Field(description="Played enough to be compared (see qualification).")
+    figures: Figures
+
+
+class PlayersOut(_Model):
+    """Players of one regular season. No salary or contract figure is served."""
+
+    season: str
+    build: BuildOut
+    qualification: QualificationOut
+    metrics: list[MetricOut]
+    matched: int = Field(ge=0, description="Players the filters matched, before the limit.")
+    players: list[PlayerRow]
+
+
+class PlayerSeasonRow(_Model):
+    season: str
+    season_type: str
+    team: str | None
+    age: int | None
+    figures: Figures
+
+
+class ValueRow(_Model):
+    season: str
+    team: str | None
+    age: int | None
+    projection_only: bool = Field(
+        description="A season still to be played: the projection, with no impact of its own."
+    )
+    figures: Figures
+
+
+class ValueModelOut(_Model):
+    """The player value model the modeled figures come from, and how it was tested."""
+
+    revision: int
+    tested_seasons: str
+    team_seasons: int
+    rmse_minutes_played: float = Field(
+        description="Error predicting a team's net rating from its players, points per 100 "
+        "possessions, with each season's minutes as played."
+    )
+    rmse_minutes_projected: float | None = Field(
+        description="The same with the minutes projected: what a forecast carries."
+    )
+    note: str
+
+
+class PlayerOut(_Model):
+    """A player: who they are, every season, and the value model's estimates. No salary or
+    contract figure is served."""
+
+    player_id: int
+    full_name: str
+    position: str | None
+    position_group: str | None
+    height_inches: int | None
+    weight_lbs: int | None
+    birth_date: date | None
+    country: str | None
+    college: str | None
+    is_active: bool | None
+    current_team: str | None
+    build: BuildOut
+    metrics: list[MetricOut]
+    seasons: list[PlayerSeasonRow]
+    value: list[ValueRow]
+    value_model: ValueModelOut | None
