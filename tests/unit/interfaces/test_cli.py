@@ -13,10 +13,15 @@ from front_office import __version__
 from front_office.config.settings import ENV_DATA_DIR, ENV_HOME
 from front_office.interfaces.cli import app as cli
 from front_office.interfaces.cli.app import app, money
+from front_office.pipelines import rag as rag_pipeline
 from front_office.pipelines.ingest import Ingestor, RefreshPolicy
+from front_office.providers.ollama import OllamaProvider
 from front_office.rawstore import RawStore
 from tests.conftest import FIXTURE_RAW
 from tests.helpers import FETCHED_AT, Clock, D, FakeProvider
+from tests.ollama_fakes import ScriptedOllama
+from tests.rag_fakes import ollama as rag_ollama
+from tests.rag_fakes import write_documents
 
 runner = CliRunner()
 
@@ -691,6 +696,50 @@ class TestApi:
             cli.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(returncode=3)
         )
         assert runner.invoke(app, ["api"]).exit_code == 3
+
+
+class TestRag:
+    """fol rag: the documents' vector index (decision 0019), with Ollama scripted."""
+
+    @pytest.fixture
+    def documented(self, project: Path) -> Path:
+        write_documents(project)
+        return project
+
+    def ollama_is(self, monkeypatch: pytest.MonkeyPatch, transport: ScriptedOllama) -> None:
+        monkeypatch.setattr(
+            rag_pipeline,
+            "OllamaProvider",
+            lambda host, timeout: OllamaProvider(transport=transport),
+        )
+
+    def test_status_before_a_build(self, documented: Path) -> None:
+        result = runner.invoke(app, ["rag", "status"])
+        assert result.exit_code == 0, result.output
+        assert "Not built yet" in result.output
+        assert "fol rag index" in result.output
+        assert not (documented / "data" / "rag").exists()
+
+    def test_index_builds_then_leaves_a_matching_index_alone(
+        self, documented: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self.ollama_is(monkeypatch, rag_ollama())
+        result = runner.invoke(app, ["rag", "index"])
+        assert result.exit_code == 0, result.output
+        assert "Indexed 5 passages with nomic-embed-text" in result.output
+        again = runner.invoke(app, ["rag", "index"])
+        assert again.exit_code == 0, again.output
+        assert "already matches the documents" in again.output
+        status = runner.invoke(app, ["rag", "status"])
+        assert "It matches the documents as they are now." in status.output
+
+    def test_ollama_not_running_says_what_to_do(
+        self, documented: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self.ollama_is(monkeypatch, ScriptedOllama(down=True))
+        result = runner.invoke(app, ["rag", "index"])
+        assert result.exit_code == 1
+        assert "Ollama is not answering" in result.output
 
 
 class TestValueCommands:

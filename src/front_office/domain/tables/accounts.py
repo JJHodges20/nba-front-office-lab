@@ -81,16 +81,26 @@ API_QUESTIONS = TableContract(
         Field(
             "answer",
             DType.STRING,
-            "The answer the language model wrote from the passages it was given.",
+            "The answer the language model wrote from the passages it was given, after the "
+            "lab's check: a sentence whose figure no passage holds is cut.",
             nullable=False,
             provenance=Provenance.MODELED,
         ),
         Field(
             "sources",
             DType.STRING,
-            "The passages the answer was given, as JSON: number, document, heading, link and "
-            "distance from the question.",
+            "The passages the answer was given, as JSON: the number it cites each by, the "
+            "file, the heading, the link, the distance from the question, the passage's text "
+            "and whether the answer cites it.",
             nullable=False,
+            provenance=Provenance.DERIVED,
+        ),
+        Field(
+            "notes",
+            DType.STRING,
+            "What the reader should know about the answer, as a JSON list: a sentence cut "
+            "for a figure no passage holds, no passage cited, an index older than the "
+            "documents. Null when there is nothing to say.",
             provenance=Provenance.DERIVED,
         ),
         Field(
@@ -119,6 +129,8 @@ API_QUESTIONS = TableContract(
     ),
     primary_key=("question_id",),
     indexes=(("user_id",),),
+    # C2 made the table; C3, which first fills it, added the notes - before any accounts
+    # file existed outside the tests (decision 0019, C3).
     introduced_in="C2",
 )
 

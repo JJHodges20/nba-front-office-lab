@@ -141,6 +141,11 @@ current_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(current_app, name="current")
+rag_app = typer.Typer(
+    help="The vector index of the lab's documents, which the API's answers come from.",
+    no_args_is_help=True,
+)
+app.add_typer(rag_app, name="rag")
 console = Console()
 
 
@@ -1389,3 +1394,69 @@ def current_status_command() -> None:
 
 def _minute(moment: datetime | None) -> str:
     return "-" if moment is None else f"{moment:%Y-%m-%d %H:%M}"
+
+
+# --- the documents' vector index (the capstone, decision 0019) -----------------------------
+
+
+@rag_app.command("index")
+def rag_index_command(
+    force: Annotated[
+        bool, typer.Option("--force", help="Build it again even when it matches the documents.")
+    ] = False,
+) -> None:
+    """Build the vector index of the lab's documents in data/rag, with the local embedding
+    model (Ollama must be running). Nothing is done when it already matches them.
+
+    A running API sees the new index at its next question.
+    """
+    # Imported here: ChromaDB takes a second to load, which no other command should wait for.
+    from front_office.pipelines.rag import IndexingFailed, index_documents
+
+    try:
+        settings = load_settings()
+        _say("Embedding the documents' passages with the local model...")
+        report = index_documents(settings, force=force)
+    except (ConfigError, IndexingFailed) as error:
+        raise _fail(error) from error
+    if not report.rebuilt:
+        _say(
+            f"The index already matches the documents: {report.passages:,} passages, "
+            f"embedded with {report.model} on {_minute(report.built_at)} UTC. "
+            "Use --force to build it again."
+        )
+        return
+    _say(
+        f"Indexed {report.passages:,} passages with {report.model} in "
+        f"{report.seconds:.0f} seconds: {settings.rag_dir}"
+    )
+
+
+@rag_app.command("status")
+def rag_status_command() -> None:
+    """Show whether the documents are indexed, and whether the index matches them."""
+    from front_office.services.passages import PassageService
+
+    try:
+        settings = load_settings()
+        status = PassageService(settings).status()
+    except ConfigError as error:
+        raise _fail(error) from error
+    _say(f"The documents' index: {settings.rag_dir}")
+    if status.built is None:
+        _say(
+            f"Not built yet. The documents hold {status.passages:,} passages; "
+            "build the index with: fol rag index"
+        )
+        return
+    built = status.built
+    _say(
+        f"{built.passages:,} passages, embedded with {built.model} on "
+        f"{_minute(built.built_at)} UTC."
+    )
+    if status.is_current:
+        _say("It matches the documents as they are now.")
+    elif not status.can_answer:
+        _say(f"The settings now name {status.model}: build it again with: fol rag index --force")
+    else:
+        _say("The documents have changed since: build it again with: fol rag index")

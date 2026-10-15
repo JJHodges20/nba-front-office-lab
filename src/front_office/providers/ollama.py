@@ -326,6 +326,25 @@ class OllamaProvider:
             wall_seconds=self._clock() - started,
         )
 
+    def embed(self, model: str, texts: Sequence[str]) -> tuple[tuple[float, ...], ...]:
+        """One vector per text, in order, from an embedding model on this machine (decision
+        0019). A text longer than the model reads is cut by Ollama, as it does by default."""
+        self.require_local(model)
+        if not texts:
+            return ()
+        try:
+            answer = self._one("POST", "/api/embed", {"model": model, "input": list(texts)})
+        except OllamaResponseError as error:
+            if error.status == 404:
+                raise ModelNotAvailable(
+                    f"{model} is not on this machine. Run: ollama pull {model}"
+                ) from error
+            raise
+        vectors = answer.get("embeddings")
+        if not isinstance(vectors, list) or len(vectors) != len(texts):
+            raise OllamaError(f"Ollama sent no embedding for each of the {len(texts)} texts")
+        return tuple(tuple(float(value) for value in vector) for vector in vectors)
+
     def unload(self, model: str) -> None:
         """Take a model out of memory now, so that the next request loads it afresh."""
         self._one("POST", "/api/generate", {"model": model, "keep_alive": 0})

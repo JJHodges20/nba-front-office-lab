@@ -145,6 +145,12 @@ class Settings(_Section):
         return self.api_dir / "accounts.sqlite"
 
     @property
+    def rag_dir(self) -> Path:
+        """The vector index of the lab's documents, in ChromaDB (decision 0019). Built by
+        ``fol rag index``; no build of the lab touches it."""
+        return self.data_dir / "rag"
+
+    @property
     def history_start(self) -> Season:
         return Season.parse(self.seasons.history_start)
 

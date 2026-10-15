@@ -978,8 +978,9 @@ Questions users asked the lab's documents through the API, with the answers.
 | `question_id` | integer | yes | identifier |  | Question id, never reused. |
 | `user_id` | integer | yes | identifier |  | The user who asked. References `api_users.user_id`. |
 | `question` | string | yes | assumption |  | The question, as asked. |
-| `answer` | string | yes | modeled |  | The answer the language model wrote from the passages it was given. |
-| `sources` | string | yes | derived |  | The passages the answer was given, as JSON: number, document, heading, link and distance from the question. |
+| `answer` | string | yes | modeled |  | The answer the language model wrote from the passages it was given, after the lab's check: a sentence whose figure no passage holds is cut. |
+| `sources` | string | yes | derived |  | The passages the answer was given, as JSON: the number it cites each by, the file, the heading, the link, the distance from the question, the passage's text and whether the answer cites it. |
+| `notes` | string | no | derived |  | What the reader should know about the answer, as a JSON list: a sentence cut for a figure no passage holds, no passage cited, an index older than the documents. Null when there is nothing to say. |
 | `model` | string | yes | operational |  | The chat model that wrote the answer. |
 | `asked_at` | datetime | yes | operational |  | When the question was asked. |
 | `seconds` | float | yes | operational | seconds | How long the answer took. |

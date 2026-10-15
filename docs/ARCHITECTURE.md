@@ -62,7 +62,7 @@ Third-party libraries are confined the same way: `nba_api` and `requests` only i
 `providers`; `sqlalchemy` and `sqlite3` only in `storage`; `yaml` only in `config`; `pypdf`
 only in `processing`; `typer` and `rich` only in `interfaces`; `streamlit` and `plotly` only
 in `apps/`; `fastapi`, the `starlette` beneath it, and `jwt` only in `server`; `bcrypt` only
-in `services`.
+in `services`; `chromadb` only in `storage`.
 
 So is anything that can open a connection (A9): `requests`, `nba_api`, `socket`,
 `http.client` and `urllib.request` are imported in `providers` alone - with one exception,
@@ -538,6 +538,17 @@ listed at `/docs`.
 - **Validation.** Every request and every response is a Pydantic model
   (`server/schemas.py`). The rules for a name and a password are the domain's
   (`domain/accounts.py`), read by the request model and the service alike.
+- **Asking the documents (RAG).** `POST /rag/ask` embeds the question with a local Ollama
+  embedding model (`configs/api.yaml`, `rag:`), finds the nearest passages in ChromaDB
+  (`storage/vectors.py`, `data/rag/`, read through `services/passages.py`), and has the
+  assistant's chat model answer from them alone, citing each by number
+  (`assistant/rag.py`, reached through `assistant.api.ask_documents`). The passages are the
+  ones the assistant's keyword search reads, from the same documents, and the answer is held
+  to them by the assistant's checker: a figure no passage holds, or a passage it was not
+  given, is sent back once and then cut, with a note. `fol rag index` and `POST /rag/index`
+  build the index (`pipelines/rag.py`); `GET /rag/index` says whether it still matches the
+  documents. Each answer is kept under the user who asked (`/rag/questions`). The assistant's
+  own keyword search is unchanged.
 
 ## Conventions
 

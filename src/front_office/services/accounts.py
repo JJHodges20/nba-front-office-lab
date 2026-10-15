@@ -18,12 +18,12 @@ import bcrypt
 from front_office.domain.accounts import (
     PASSWORD_BYTES,
     AskedQuestion,
-    CitedSource,
     User,
     check_password,
     check_username,
     normal_username,
 )
+from front_office.domain.rag import CitedSource
 from front_office.storage.accounts import AccountNotFound, AccountStore, NameTaken
 
 _NOBODY = b"the password of a name nobody has"
@@ -100,6 +100,7 @@ class AccountService:
         sources: Sequence[CitedSource],
         model: str,
         seconds: float,
+        notes: Sequence[str] = (),
     ) -> AskedQuestion:
         with self._store() as store:
             return store.add_question(
@@ -109,6 +110,7 @@ class AccountService:
                 sources=sources,
                 model=model,
                 seconds=seconds,
+                notes=notes,
             )
 
     def questions(self, user_id: int, *, limit: int | None = None) -> tuple[AskedQuestion, ...]:

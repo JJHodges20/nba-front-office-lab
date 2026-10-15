@@ -175,6 +175,58 @@ class TestChat:
             provider(ollama).chat("qwen3:8b", MESSAGES, context_tokens=4096)
 
 
+class TestEmbed:
+    """Embedding text for the documents' vector index (decision 0019)."""
+
+    def embedding(self, **kwargs: Any) -> ScriptedOllama:
+        return ScriptedOllama(
+            models=["nomic-embed-text:latest"],
+            embedder=lambda text: [float(len(text)), 1.0],
+            **kwargs,
+        )
+
+    def test_one_vector_per_text_in_order(self) -> None:
+        ollama = self.embedding()
+        vectors = provider(ollama).embed("nomic-embed-text", ["ab", "abcd"])
+        assert vectors == ((2.0, 1.0), (4.0, 1.0))
+        assert ollama.embed_payloads == [{"model": "nomic-embed-text", "input": ["ab", "abcd"]}]
+
+    def test_nothing_to_embed_asks_nothing(self) -> None:
+        ollama = self.embedding()
+        assert provider(ollama).embed("nomic-embed-text", []) == ()
+        assert ollama.embed_payloads == []
+
+    def test_a_model_not_pulled(self) -> None:
+        with pytest.raises(ModelNotAvailable, match="ollama pull nomic-embed-text"):
+            provider(ScriptedOllama(models=["qwen3:8b"])).embed("nomic-embed-text", ["a"])
+
+    def test_a_404_means_the_model_is_gone(self) -> None:
+        ollama = ScriptedOllama(models=["nomic-embed-text:latest"])  # no embedder: 404
+        with pytest.raises(ModelNotAvailable, match="ollama pull"):
+            provider(ollama).embed("nomic-embed-text", ["a"])
+
+    def test_a_cloud_model_is_refused_before_anything_is_sent(self) -> None:
+        ollama = self.embedding()
+        with pytest.raises(NotLocal):
+            provider(ollama).embed("embed-model:cloud", ["a"])
+        assert ollama.embed_payloads == []
+
+    def test_a_vector_missing_from_the_answer(self) -> None:
+        ollama = self.embedding()
+        ollama.embedder = None
+        transport = ollama
+
+        def short(method, url, payload, timeout):
+            if url.endswith("/api/embed"):
+                yield {"embeddings": [[1.0]]}
+            else:
+                yield from transport(method, url, payload, timeout)
+
+        lab = OllamaProvider(transport=short, clock=Clock())
+        with pytest.raises(OllamaError, match="no embedding for each of the 2 texts"):
+            lab.embed("nomic-embed-text", ["a", "b"])
+
+
 class TestWhatIsThere:
     def test_version_and_models(self) -> None:
         listed = {

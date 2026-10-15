@@ -110,3 +110,46 @@ without asking.
 - **FastAPI 0.143 includes a router lazily**, so the tests that every endpoint has its
   models and its sign-in read the published OpenAPI schema - what a client sees - rather than
   the app's route list.
+
+## Settled while building C3 (2026-10-15)
+
+- **Where each part lives.** ChromaDB is stored state, so `storage/vectors.py` alone imports
+  it. `pipelines/rag.py` builds the index (documents, Ollama, store); `services/passages.py`
+  reads it; `assistant/rag.py` writes the answer, reached through
+  `assistant.api.ask_documents` as decision point 1 has it. The assistant's reach is
+  unchanged: it searches through the service and embeds through `providers.ollama`, which it
+  had. `server/rag.py` puts the endpoints on them.
+- **Endpoints**: `POST /rag/ask` (201: the answer, kept), `GET /rag/questions` (newest first,
+  `limit` 1 to 100), `GET` and `DELETE /rag/questions/{id}` (another user's is not found),
+  `GET /rag/index`, `POST /rag/index` (`force` to rebuild a matching index). All need a token.
+- **The passages** are the keyword search's: the same files left out, the same 900-character
+  passages. Each is embedded under its document's title and heading, so it is found for what
+  it is about, with nomic-embed-text's prefixes for a passage and a question. Five passages
+  go to the model for each answer (`configs/api.yaml`).
+- **The answer** is written by the assistant's own model (`configs/assistant.yaml`, the
+  model `status` finds ready) within its quick mode's limits, without thinking, at
+  temperature 0, under rules of its own (`assistant/rag.RULES`, versioned): the passages
+  only, each sentence citing its passage like `[2]`, the passages quoted data, plain words.
+- **Held to its passages** by the assistant's checker. A citation `[2]` is read as a
+  result's `[r2]` for the check, so it is never taken for a figure; a figure no passage (or
+  the question) holds, or a citation of a passage not given, is sent back once and then cut
+  with its sentence; a note says so, and so does an answer citing nothing. The notes travel
+  with the answer and are kept with it.
+- **The index records** the embedding model, a fingerprint of its passages and prefix, and
+  when it was built. A rebuild fills a collection of its own and is then renamed into place.
+  An index from older documents still answers, with a note; one from another embedding model
+  is refused until it is built again - its vectors mean nothing to the new model.
+- **ChromaDB, as used here**: no embedding function, so nothing is downloaded; telemetry
+  off; cosine distance set through the collection's `configuration`. Reading a collection's
+  `configuration` back raises a deprecation warning ("legacy embedding function config"), so
+  it is never read. Opening the index, searching and closing takes about 20 ms, and closing
+  frees its files on Windows, so it is opened afresh for every call, as every store is, and a
+  rebuild is seen at once. Importing ChromaDB takes about a second, so the command line and
+  the assistant's facade import it only when asked to index or answer.
+- **The questions table gained its notes in C3**, and a source its passage's text and whether
+  it was cited, before any accounts file existed outside the tests (the owner's data folder
+  had no `api/`).
+- **One place for a model in tests.** `POST /rag/index` takes its provider from the
+  facade's `connect`, as `ask_documents` does, so a test scripts one model for both; the
+  pipeline words Ollama's errors itself (`IndexingFailed`), so the server catches no provider
+  class.

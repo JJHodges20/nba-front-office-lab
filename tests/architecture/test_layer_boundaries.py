@@ -85,6 +85,8 @@ LIBRARY_OWNERS: dict[str, set[str]] = {
     "starlette": {"server"},
     "jwt": {"server"},
     "bcrypt": {"services"},
+    # The documents' vector index is stored state, like a database (C3).
+    "chromadb": {"storage"},
 }
 
 # What can open a connection (the A9 network audit). The lab reaches the network through

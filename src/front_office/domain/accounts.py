@@ -14,6 +14,8 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime
 
+from front_office.domain.rag import CitedSource
+
 USERNAME = re.compile(r"^[a-z0-9][a-z0-9_.-]{2,31}$")
 """A name: 3 to 32 lower-case letters, digits, dots, hyphens or underscores, starting with a
 letter or a digit. Names are compared in lower case, so "Josh" and "josh" are one name."""
@@ -64,23 +66,9 @@ class User:
 
 
 @dataclass(frozen=True, slots=True)
-class CitedSource:
-    """One passage an answer was given, as the answer cites it by number."""
-
-    number: int
-    path: str
-    """The document, from the project root."""
-    heading: str
-    """The headings the passage sits under."""
-    location: str
-    """The file and the heading as a link within the project."""
-    distance: float
-    """How far the passage was from the question in the embedding space: smaller is nearer."""
-
-
-@dataclass(frozen=True, slots=True)
 class AskedQuestion:
-    """A question a user asked the lab's documents, with the answer it got."""
+    """A question a user asked the lab's documents, with the answer it got - kept exactly as
+    it was given, whatever the documents say since."""
 
     question_id: int
     user_id: int
@@ -91,6 +79,7 @@ class AskedQuestion:
     """The chat model that wrote the answer."""
     asked_at: datetime
     seconds: float
+    notes: tuple[str, ...] = ()
 
 
 def sources_to_json(sources: Sequence[CitedSource]) -> str:
@@ -101,3 +90,12 @@ def sources_to_json(sources: Sequence[CitedSource]) -> str:
 def sources_from_json(text: str) -> tuple[CitedSource, ...]:
     """The sources as :func:`sources_to_json` wrote them."""
     return tuple(CitedSource(**item) for item in json.loads(text))
+
+
+def notes_to_json(notes: Sequence[str]) -> str | None:
+    """The notes as the questions table keeps them: none is null, never an empty list."""
+    return json.dumps(list(notes), ensure_ascii=False) if notes else None
+
+
+def notes_from_json(text: str | None) -> tuple[str, ...]:
+    return tuple(json.loads(text)) if text else ()

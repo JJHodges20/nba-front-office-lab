@@ -26,11 +26,13 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, relationship, sessionmaker
 
 from front_office.domain.accounts import (
     AskedQuestion,
-    CitedSource,
     User,
+    notes_from_json,
+    notes_to_json,
     sources_from_json,
     sources_to_json,
 )
+from front_office.domain.rag import CitedSource
 from front_office.domain.tables import ACCOUNT_TABLES
 from front_office.domain.tables.accounts import API_QUESTIONS, API_USERS
 from front_office.storage.database import (
@@ -86,6 +88,7 @@ class QuestionRow(_Mapped):
     question: Mapped[str]
     answer: Mapped[str]
     sources: Mapped[str]
+    notes: Mapped[str | None]
     model: Mapped[str]
     asked_at: Mapped[datetime]
     seconds: Mapped[float]
@@ -110,6 +113,7 @@ def _asked(row: QuestionRow) -> AskedQuestion:
         model=row.model,
         asked_at=row.asked_at,
         seconds=row.seconds,
+        notes=notes_from_json(row.notes),
     )
 
 
@@ -205,6 +209,7 @@ class AccountStore:
         sources: Sequence[CitedSource],
         model: str,
         seconds: float,
+        notes: Sequence[str] = (),
     ) -> AskedQuestion:
         """Keep a question a user asked, with the answer it got, under that user."""
         with self._session.begin() as session:
@@ -216,6 +221,7 @@ class AccountStore:
                 question=question,
                 answer=answer,
                 sources=sources_to_json(sources),
+                notes=notes_to_json(notes),
                 model=model,
                 asked_at=self._now(),
                 seconds=seconds,

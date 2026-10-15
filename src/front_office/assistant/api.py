@@ -13,6 +13,10 @@
 - ``summarize``: the conversation under way, summarized into the workspace's notes by the
   local model, and a new conversation begun.
 - ``refresh_current``: fetch what is due of the current sources, by hand.
+- ``ask_documents``: a question answered from the lab's documents by retrieval - the
+  passages nearest it in the vector index, and the local model's answer from them alone
+  (decision 0019). The HTTP API's ``POST /rag/ask`` calls it, as the API reaches the
+  assistant through this module alone.
 
 The workspaces themselves - made, renamed, put away, exported - are the services' to keep
 (``Lab.workspaces``), and the workbench reaches them as it reaches every other service.
@@ -36,7 +40,13 @@ from pathlib import Path
 
 from front_office.assistant.orchestrator import Assistant
 from front_office.assistant.toolbox import Toolbox
-from front_office.config import ConfigError, load_assistant_settings, load_settings
+from front_office.config import (
+    ConfigError,
+    Settings,
+    load_api_settings,
+    load_assistant_settings,
+    load_settings,
+)
 from front_office.domain.assistant import (
     Answer,
     Context,
@@ -48,6 +58,7 @@ from front_office.domain.assistant import (
 from front_office.domain.contract_review import ContractPreview
 from front_office.domain.experiments import ExperimentProposal
 from front_office.domain.proposals import RosterProposal
+from front_office.domain.rag import DocumentAnswer
 from front_office.domain.research import RESEARCH_PAGE, ExperimentRecord, Focus, SavedTurn
 from front_office.domain.seasons import Season
 from front_office.domain.tables.current import SOURCES
@@ -562,6 +573,74 @@ def summarize(
         service.update(workspace_id, notes=notes)
         service.new_conversation(workspace_id)
     return summary
+
+
+# --- the documents, by retrieval -----------------------------------------------------------
+
+
+class DocumentsUnavailable(RuntimeError):
+    """The documents cannot be asked now: Ollama is off, a model is missing, or the index is
+    not built. The message says what to do, in plain words."""
+
+
+NOT_INDEXED = (
+    "The documents are not indexed yet. Build the index first: POST /rag/index on the API, or "
+    "run: fol rag index"
+)
+OLDER_INDEX = (
+    "The index was built before the documents last changed: build it again to search what "
+    "they say now."
+)
+
+
+def ask_documents(
+    question: str,
+    *,
+    settings: Settings | None = None,
+    provider: OllamaProvider | None = None,
+) -> DocumentAnswer:
+    """A question answered from the lab's documents by retrieval (decision 0019): the
+    passages nearest it in the vector index, and the local model's answer from them alone.
+    Nothing is kept here; the API keeps the answer under the user who asked."""
+    # Imported here: ChromaDB takes a second to load, which the workbench should not wait for.
+    from front_office.assistant import rag
+    from front_office.services.passages import IndexNotBuilt, PassageService
+
+    lab_settings = settings or load_settings()
+    try:
+        assistant = load_assistant_settings(lab_settings.config_dir)
+        load_api_settings(lab_settings.config_dir)
+    except ConfigError as error:
+        raise DocumentsUnavailable(f"The settings: {error}") from error
+    provider = provider or connect(assistant.ollama.host, assistant.ollama.timeout_seconds)
+    ready = status(lab_settings.project_root, provider=provider)
+    if not ready.is_ready or ready.model is None:
+        raise DocumentsUnavailable(ready.message)
+    index = PassageService(lab_settings).status()
+    if index.built is None:
+        raise DocumentsUnavailable(NOT_INDEXED)
+    if not index.can_answer:
+        raise DocumentsUnavailable(
+            f"The index was built with {index.built.model}, but questions are now embedded "
+            f"with {index.model}. Build it again: POST /rag/index?force=true on the API, or "
+            "run: fol rag index --force"
+        )
+    try:
+        answer = rag.ask(question, settings=lab_settings, provider=provider, model=ready.model)
+    except IndexNotBuilt as error:
+        raise DocumentsUnavailable(NOT_INDEXED) from error
+    except (ModelNotAvailable, NotLocal) as error:
+        raise DocumentsUnavailable(str(error)) from error
+    except OllamaUnavailable as error:
+        raise DocumentsUnavailable(
+            f"Ollama stopped answering ({error}). Start the Ollama app (or run: ollama serve), "
+            "then ask again."
+        ) from error
+    except OllamaError as error:
+        raise DocumentsUnavailable(f"Ollama answered with an error: {error}") from error
+    if not index.is_current:
+        answer = replace(answer, notes=(*answer.notes, OLDER_INDEX))
+    return answer
 
 
 # --- current information -------------------------------------------------------------------

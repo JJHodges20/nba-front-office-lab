@@ -14,3 +14,17 @@ sign_in:
   # bcrypt's cost for a new password: each step doubles the work of checking it, for the
   # API and for anyone guessing at a stolen hash. 12 takes about a quarter of a second.
   password_rounds: 12
+
+# Asking the lab's documents (POST /rag/ask). They are cut into the passages the AI Research
+# assistant's keyword search reads, embedded by a local Ollama model and kept in ChromaDB in
+# data/rag (fol rag index builds it). An answer is written from the nearest passages alone,
+# by the assistant's own model within its quick mode's limits (configs/assistant.yaml).
+rag:
+  embedding_model: "nomic-embed-text"
+  # nomic-embed-text tells a passage from a question by these prefixes.
+  document_prefix: "search_document: "
+  query_prefix: "search_query: "
+  # How many of the nearest passages one answer is given.
+  passages: 5
+  # Passages embedded per request while the index is built.
+  batch: 32

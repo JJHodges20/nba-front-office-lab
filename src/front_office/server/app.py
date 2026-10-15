@@ -13,7 +13,7 @@ from front_office import __version__
 from front_office.config.api import load_api_settings
 from front_office.config.settings import Settings, load_settings
 from front_office.domain.api_settings import ApiSettings
-from front_office.server import auth
+from front_office.server import auth, rag
 from front_office.server.schemas import Health
 from front_office.server.security import Tokens, signing_secret
 from front_office.server.state import ServerState
@@ -52,4 +52,5 @@ def create_app(
     )
     app.include_router(health)
     app.include_router(auth.router)
+    app.include_router(rag.router)
     return app

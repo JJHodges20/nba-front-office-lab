@@ -7,7 +7,7 @@ sent as well as what came back.
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -70,6 +70,7 @@ class ScriptedOllama:
         chats: Sequence[Sequence[Mapping[str, Any]] | Exception] = (),
         loaded: Sequence[Mapping[str, Any]] = (),
         down: bool = False,
+        embedder: Callable[[str], Sequence[float]] | None = None,
     ) -> None:
         self.version = version
         self.models = [
@@ -79,11 +80,17 @@ class ScriptedOllama:
         self.chats = list(chats)
         self.loaded = list(loaded)
         self.down = down
+        self.embedder = embedder
+        """Embeds one text, for ``/api/embed``; without one, embedding is refused."""
         self.requests: list[tuple[str, str, Any]] = []
 
     @property
     def chat_payloads(self) -> list[Mapping[str, Any]]:
         return [payload for _, path, payload in self.requests if path == "/api/chat"]
+
+    @property
+    def embed_payloads(self) -> list[Mapping[str, Any]]:
+        return [payload for _, path, payload in self.requests if path == "/api/embed"]
 
     def __call__(
         self, method: str, url: str, payload: Mapping[str, Any] | None, timeout: float
@@ -102,6 +109,10 @@ class ScriptedOllama:
             yield {"models": self.loaded}
         elif path == "/api/generate":
             yield {"done": True}
+        elif path == "/api/embed":
+            if self.embedder is None:
+                raise OllamaResponseError(404, f"model '{payload['model']}' not found")
+            yield {"embeddings": [list(self.embedder(text)) for text in payload["input"]]}
         elif path == "/api/chat":
             if not self.chats:
                 raise AssertionError("the script has no chat reply left")

@@ -3,6 +3,46 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Capstone C3 - asking the documents: RAG with ChromaDB and Ollama (2026-10-15)
+
+The brief's RAG pipeline, beside the AI Research assistant's keyword search and never in its
+place: the assistant, its `research_docs` tool and its frozen cases are unchanged. Decision
+0019's section "Settled while building C3" records what the building decided.
+
+**Built**
+
+- **The index** (`pipelines/rag.py`, `storage/vectors.py`): the documents the keyword search
+  reads, cut into its passages, each embedded under its title and heading by
+  `nomic-embed-text` through Ollama's new `embed` call (`providers/ollama.py`), kept in
+  ChromaDB in `data/rag/` with the model, a fingerprint and the time. A rebuild fills a
+  collection of its own and is renamed into place; a matching index is left alone unless
+  forced. `fol rag index` and `fol rag status`.
+- **The answer** (`assistant/rag.py`, through `assistant.api.ask_documents`): the question
+  embedded the same way, the five nearest passages (`services/passages.py`) quoted to the
+  assistant's model as numbered data under rules of their own, the answer citing them like
+  `[2]`. The assistant's checker holds it to them: a figure no passage holds, or a passage
+  not given, is sent back once and then cut, with a note; an answer citing nothing says so.
+- **Endpoints** (`server/rag.py`): `POST /rag/ask` keeps each answer under its user with its
+  sources and notes; `GET /rag/questions`, `GET` and `DELETE /rag/questions/{id}` (another
+  user's is not found); `GET` and `POST /rag/index`. Ollama off, a model not pulled or no
+  index is a 503 that says what to do.
+- **The questions table** gained `notes`, and a kept source its passage's text and whether
+  the answer cites it, before any accounts file existed outside the tests.
+- **Rules**: `chromadb` only in `storage`; ChromaDB imported lazily by the command line and
+  the facade, so `fol` and the workbench do not wait a second for it. `docs/ARCHITECTURE.md`,
+  `CLAUDE.md`, `data/README.md` and `docs/CAPSTONE.md` say how it fits.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New tests | 70, with Ollama scripted and a word-hashing embedding that needs no model (`tests/rag_fakes.py`): passages and fingerprints; `embed` (order, nothing to send, a model not pulled, a cloud model, a short answer); the store (built whole, nearest first, swapped in, files freed on close); the service (before and after a build, older documents, another model); the pipeline (every passage embedded with its prefix, batches, left alone unless forced, Ollama off or a model missing said plainly with the old index kept); the answer (cited, quoted passages, a figure sent back then cut, an unknown citation, `[1, 2]`, no citation, the question's own figures); the endpoints (201 and kept, history newest first, each user's own, delete, 503s, 422s, a token on all); `fol rag` |
+| `pytest -n auto` | 4,160 passed (5 min 27 s); before C3, 4,090 |
+| `fol dictionary --write` | The questions table's new column |
+| Live check | Not run: Ollama was not running on this machine. The index build and a few answers with the real models are to be checked once it is (C5, with the page) |
+| Boundaries and data | `chromadb` held to `storage`; the assistant's reach unchanged; a new folder in the data folder, which no build touches |
+
 ## Capstone C2 - the API and sign-in (2026-10-15)
 
 The first of the brief's missing pieces: an HTTP API, sign-in with tokens, and two related

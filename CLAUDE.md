@@ -42,6 +42,8 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe simulate report --write   # regenerate docs/research/SIMULATOR.md
 .\.venv\Scripts\fol.exe ui --no-browser           # the workbench at http://localhost:8501 (Ctrl+C stops it)
 .\.venv\Scripts\fol.exe api                       # the HTTP API at http://localhost:8000, every endpoint at /docs (Ctrl+C stops it)
+.\.venv\Scripts\fol.exe rag index                 # embed the documents into data/rag for the API's answers (Ollama running)
+.\.venv\Scripts\fol.exe rag status                # whether that index matches the documents
 .\.venv\Scripts\python.exe -m pytest tests\assistant  # the assistant's evaluation cases, their figures recomputed
 .\.venv\Scripts\python.exe -m pytest -m ollama    # the assistant against the local model (Ollama running)
 .\.venv\Scripts\python.exe scripts\benchmark_ollama.py --write   # benchmark the candidate models (docs/research/ASSISTANT_MODELS.md)
@@ -329,6 +331,16 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   touches; a password is only ever a bcrypt hash, never returned or logged. The signing key
   is `FOL_API_SECRET` (environment or `.env`) or `data/api/signing.key`: never print it, never
   give `configs/api.yaml` or `.env.example` a value for it; tests sign with their own.
+- **RAG sits beside the assistant's keyword search, never in its place.** `research_docs`
+  and its frozen cases are unchanged. The API's answers come from `assistant/rag.py` through
+  `assistant.api.ask_documents`: the passages the keyword search reads, embedded into
+  ChromaDB (`data/rag/`, `chromadb` imported by `storage` alone), the nearest given to the
+  assistant's model as quoted data, the answer held to them by the assistant's checker.
+  ChromaDB gets every embedding from Ollama - never an embedding function, which would
+  download a model - and runs with its telemetry off; never read a collection's
+  `configuration` (a deprecation warning). Import it lazily outside the server: it takes a
+  second to load. Tests script Ollama through `assistant.api.connect` and embed with
+  `tests/rag_fakes.words`.
 - **Never print data through rich markup.** Use `_say` / `_tagged` in the CLI; text in
   square brackets is otherwise swallowed as a style tag.
 - **Warnings are errors** in the test suite.
