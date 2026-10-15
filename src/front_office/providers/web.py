@@ -31,6 +31,8 @@ from urllib.robotparser import RobotFileParser
 
 import requests
 
+from front_office.domain.env_file import setting_in
+
 KEY_VARIABLE = "FOL_OLLAMA_API_KEY"
 SEARCH_URL = "https://ollama.com/api/web_search"
 USER_AGENT = "NBAFrontOfficeLab/0.1 (personal research; local)"
@@ -211,16 +213,7 @@ def search_key(env_file: Path | None) -> str | None:
         return value
     if env_file is None or not env_file.is_file():
         return None
-    raw = env_file.read_bytes()
-    # Windows PowerShell 5 writes UTF-16 with ">"; Notepad may add a byte-order mark.
-    text = (
-        raw.decode("utf-16") if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else raw.decode("utf-8-sig")
-    )
-    for line in text.splitlines():
-        name, equals, rest = line.strip().partition("=")
-        if equals and name.strip().removeprefix("export ").strip() == KEY_VARIABLE:
-            return rest.strip().strip("\"'").strip() or None
-    return None
+    return setting_in(env_file.read_bytes(), KEY_VARIABLE)
 
 
 class WebProvider:

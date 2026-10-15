@@ -25,6 +25,7 @@ from front_office.config import (
     ConfigError,
     Settings,
     load_all_season_rules,
+    load_api_settings,
     load_settings,
     load_value_model,
     value_model_path,
@@ -104,6 +105,8 @@ SIMULATOR_REPORT = "docs/research/SIMULATOR.md"
 WORKBENCH = "apps/workbench/app.py"
 DEFAULT_PORT = 8501
 STARTUP_SECONDS = 30
+API_FACTORY = "front_office.server.app:create_app"
+API_PORT = 8000
 
 app = typer.Typer(
     help="NBA Front Office Lab: ingest, inspect and analyse league data.",
@@ -873,6 +876,42 @@ def _open_when_ready(url: str, *, patience: float = STARTUP_SECONDS) -> bool:
         except (urllib.error.URLError, OSError):
             time.sleep(0.5)
     return False
+
+
+@app.command()
+def api(
+    port: Annotated[
+        int, typer.Option("--port", min=1024, max=65535, help="Port to serve the API on.")
+    ] = API_PORT,
+) -> None:
+    """Start the lab's HTTP API on this machine (decision 0019). Its endpoints are listed,
+    and can be tried, at /docs. Stop it with Ctrl+C."""
+    try:
+        settings = load_settings()
+        load_api_settings(settings.config_dir)
+    except ConfigError as error:
+        raise _fail(error) from error
+    _say(f"Starting the API at http://localhost:{port} - every endpoint is at /docs.")
+    _say("Ctrl+C stops it.")
+    command = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        API_FACTORY,
+        "--factory",
+        # This machine only, as the workbench listens.
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(port),
+    ]
+    environment = {**os.environ, ENV_HOME: str(settings.project_root)}
+    try:
+        finished = subprocess.run(command, cwd=settings.project_root, env=environment, check=False)
+    except KeyboardInterrupt:
+        return
+    if finished.returncode:
+        raise typer.Exit(code=finished.returncode)
 
 
 def main() -> None:

@@ -77,3 +77,36 @@ without asking.
   fingerprint of each passage, and is rebuilt when either changes.
 - The two widened rules are tested: the Ollama names (accepted, and refused when they
   resolve to a public address) and the workbench's one network module.
+
+## Settled while building C2 (2026-10-15)
+
+- **Endpoints**: `GET /health` (public), `POST /auth/register` (public, 201 or 409 for a
+  name taken), `POST /auth/token` (public, OAuth2's password form), `GET /auth/me`, and
+  `DELETE /auth/me`, which deletes the account and every question it asked: what can be
+  made through the API can be removed through it.
+- **Names and passwords.** A name is 3 to 32 letters, digits, dots, hyphens or underscores,
+  kept and compared in lower case. A password is 8 characters at least and 72 bytes at most:
+  bcrypt reads no further, and from version 5 refuses a longer one rather than cutting it.
+  The rules are the domain's (`domain/accounts.py`); the request model and the service both
+  read them. A wrong password, a name nobody has and a password too long to be anyone's all
+  get the same 401, and an unknown name still checks a hash, so the time a refusal takes
+  does not say which names exist.
+- **The ORM maps the contracts' tables.** `storage/accounts.py` builds the two tables from
+  their contracts, as every store does, and maps a declarative class onto each
+  (`__table__`), so the columns stay the contract's; the classes add the relationship each
+  way. The contracts have no notion of a unique column, so the store adds the unique index on
+  the name itself - two registrations of one name at the same moment cannot both succeed.
+  Ids are never reused (SQLite's `AUTOINCREMENT`): a token names its user by id, and a new
+  user given a deleted user's id would be signed in by the old token.
+- **The key** must be at least 32 bytes (RFC 7518; PyJWT warns below it, and warnings are
+  errors in the suite). A key the API makes is 64 random characters, written only if no file
+  is there yet, so two servers starting at once keep one key.
+- **`configs/api.yaml`** holds what may change - how long a token lasts (60 minutes) and
+  bcrypt's cost (12) - and refuses an unknown field, so a key cannot be put there.
+- **The accounts file is not versioned yet.** The first change to its contracts adds a
+  version table, the way the research store has one.
+- **`server` loads settings**, like `interfaces`: `create_app()` with no arguments is what
+  uvicorn's `--factory` calls. `fol api` starts it on `127.0.0.1:8000`.
+- **FastAPI 0.143 includes a router lazily**, so the tests that every endpoint has its
+  models and its sign-in read the published OpenAPI schema - what a client sees - rather than
+  the app's route list.

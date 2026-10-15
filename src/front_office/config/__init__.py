@@ -4,6 +4,7 @@ and the lab's own documents from ``docs/``.
 Depends only on the domain layer. This is the only place YAML is parsed.
 """
 
+from front_office.config.api import api_settings_path, load_api_settings
 from front_office.config.archetypes import archetypes_path, load_archetypes
 from front_office.config.assistant import assistant_settings_path, load_assistant_settings
 from front_office.config.documents import documents_path, load_sections
@@ -48,6 +49,7 @@ __all__ = [
     "ConfigError",
     "SeasonRulesNotFound",
     "Settings",
+    "api_settings_path",
     "archetypes_path",
     "assistant_settings_path",
     "configured_seasons",
@@ -56,6 +58,7 @@ __all__ = [
     "experiment_rules_path",
     "find_project_root",
     "load_all_season_rules",
+    "load_api_settings",
     "load_archetypes",
     "load_assistant_settings",
     "fit_evidence_path",

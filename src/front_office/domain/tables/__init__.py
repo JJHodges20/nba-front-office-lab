@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from front_office.domain.schema import TableContract
 from front_office.domain.tables import (
+    accounts,
     current,
     finance,
     fit,
@@ -59,9 +60,18 @@ CURRENT_TABLES: tuple[TableContract, ...] = current.TABLES
 # build touches (decision 0018, A6).
 RESEARCH_TABLES: tuple[TableContract, ...] = research.TABLES
 
-# Every table the data dictionary describes: the lab's database, the current cache, then
-# the research store.
-DOCUMENTED_TABLES: tuple[TableContract, ...] = (*ALL_TABLES, *CURRENT_TABLES, *RESEARCH_TABLES)
+# The API's accounts - its users and the questions each one asked: kept in their own file,
+# data/api/accounts.sqlite, which no build touches (decision 0019).
+ACCOUNT_TABLES: tuple[TableContract, ...] = accounts.TABLES
+
+# Every table the data dictionary describes: the lab's database, the current cache, the
+# research store, then the API's accounts.
+DOCUMENTED_TABLES: tuple[TableContract, ...] = (
+    *ALL_TABLES,
+    *CURRENT_TABLES,
+    *RESEARCH_TABLES,
+    *ACCOUNT_TABLES,
+)
 if len({contract.name for contract in DOCUMENTED_TABLES}) != len(DOCUMENTED_TABLES):
     raise RuntimeError("two table contracts share a name")
 
@@ -97,6 +107,7 @@ def table(name: str) -> TableContract:
 
 
 __all__ = [
+    "ACCOUNT_TABLES",
     "ALL_TABLES",
     "CURRENT_TABLES",
     "DOCUMENTED_TABLES",

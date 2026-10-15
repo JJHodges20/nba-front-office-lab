@@ -36,6 +36,7 @@ from front_office.pipelines.contracts import import_contract_file
 from front_office.pipelines.normalize import NormalizedTables, normalize
 from front_office.providers.web import KEY_VARIABLE
 from front_office.rawstore import RawStore
+from front_office.server.security import SECRET_VARIABLE
 from tests.helpers import CONTRACT_FILE
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -122,10 +123,12 @@ def _no_network(
 @pytest.fixture(autouse=True)
 def _isolated_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep the developer's own FOL_* variables from steering a test - the web search key
-    among them: no test may search the web with the user's account."""
+    among them: no test may search the web with the user's account, or sign a token with
+    the user's own key."""
     monkeypatch.delenv(ENV_HOME, raising=False)
     monkeypatch.delenv(ENV_DATA_DIR, raising=False)
     monkeypatch.delenv(KEY_VARIABLE, raising=False)
+    monkeypatch.delenv(SECRET_VARIABLE, raising=False)
 
 
 @pytest.fixture(scope="session")

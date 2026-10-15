@@ -42,12 +42,16 @@ LAYER_RULES: dict[str, set[str]] = {
     "services": {"domain", "config", "storage", "analytics", "quality", "modeling"},
     "interfaces": {"domain", "config", "pipelines", "services"},
     "assistant": {"domain", "config", "providers", "pipelines", "services"},
+    # The capstone's HTTP API (decision 0019): outermost, beside the workbench.
+    "server": {"domain", "config", "pipelines", "services", "assistant"},
 }
 
 # The user interface displays what services return; it never reaches past them. The
 # assistant is the one outer layer it may call, through a single module.
 APP_RULES: set[str] = {"domain", "services", "assistant"}
 APP_ASSISTANT_MODULES: set[str] = {"front_office.assistant.api"}
+# The API reaches the assistant the same way (decision 0019).
+SERVER_ASSISTANT_MODULES: set[str] = {"front_office.assistant.api"}
 
 # Of the layers that touch the network or the data, the assistant may use only these
 # modules: the local model and the web, the current-data refresh and the reading of a web
@@ -75,6 +79,12 @@ LIBRARY_OWNERS: dict[str, set[str]] = {
     "streamlit": {"apps"},
     "plotly": {"apps"},
     "pypdf": {"processing"},
+    # The capstone (decision 0019): the HTTP framework and its tokens belong to the API,
+    # password hashing to the service that keeps the accounts.
+    "fastapi": {"server"},
+    "starlette": {"server"},
+    "jwt": {"server"},
+    "bcrypt": {"services"},
 }
 
 # What can open a connection (the A9 network audit). The lab reaches the network through
@@ -276,6 +286,20 @@ def test_apps_reach_the_assistant_only_through_its_facade() -> None:
         if layer_of(imported) == "assistant" and not _within(imported, APP_ASSISTANT_MODULES)
     ]
     assert not problems, "the UI may import only front_office.assistant.api:\n" + "\n".join(
+        problems
+    )
+
+
+def test_the_server_reaches_the_assistant_only_through_its_facade() -> None:
+    problems = []
+    for path in python_files(PACKAGE_DIR / "server"):
+        module = module_name(path)
+        for imported, line in imported_modules(path, module):
+            if layer_of(imported) == "assistant" and not _within(
+                imported, SERVER_ASSISTANT_MODULES
+            ):
+                problems.append(f"{path.relative_to(REPO_ROOT)}:{line} server -> {imported}")
+    assert not problems, "the API may import only front_office.assistant.api:\n" + "\n".join(
         problems
     )
 

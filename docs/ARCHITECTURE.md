@@ -42,23 +42,27 @@ it, and nothing else in the project (decision
 | `services` | What the UI and CLI call: repositories + analytics, returned display-ready. | `domain`, `config`, `storage`, `analytics`, `quality`, `modeling` |
 | `interfaces` | The `fol` command line. Thin. | `domain`, `config`, `pipelines`, `services` |
 | `assistant` | The AI research assistant: typed tools over the services, a local language model. Outermost. | `domain`, `config`, `providers`, `pipelines`, `services` |
+| `server` | The HTTP API (FastAPI): sign-in with signed tokens, and the capstone's endpoints (decision 0019). Validates requests and formats what services return. Outermost, beside the workbench. | `domain`, `config`, `pipelines`, `services`, `assistant` |
 | `apps/` (UI) | Streamlit workbench. Displays what services return. | `domain`, `services`, `assistant` |
 
 The lower layers (`providers` through `modeling`) take plain values as arguments rather
-than reading configuration themselves. Only `pipelines`, `services`, `interfaces` and
-`assistant` load settings, which keeps everything beneath them trivially testable.
+than reading configuration themselves. Only `pipelines`, `services`, `interfaces`,
+`assistant` and `server` load settings, which keeps everything beneath them trivially
+testable.
 
 Two rules are narrower than a layer (decision 0018). The workbench reaches the assistant
 through `front_office.assistant.api` alone. The assistant uses only `providers.ollama`
 and `providers.web` of the providers, and `pipelines.current` (fetching current
 information), `pipelines.web` (reading a page) and `pipelines.contract_review` (checking a
 contract file, storing nothing - A7) of the pipelines, so it cannot reach the
-stats.nba.com ingest, a build, a fit or a contract import.
+stats.nba.com ingest, a build, a fit or a contract import. The API reaches the assistant
+through `front_office.assistant.api` alone, as the workbench does (decision 0019).
 
 Third-party libraries are confined the same way: `nba_api` and `requests` only in
 `providers`; `sqlalchemy` and `sqlite3` only in `storage`; `yaml` only in `config`; `pypdf`
 only in `processing`; `typer` and `rich` only in `interfaces`; `streamlit` and `plotly` only
-in `apps/`.
+in `apps/`; `fastapi`, the `starlette` beneath it, and `jwt` only in `server`; `bcrypt` only
+in `services`.
 
 So is anything that can open a connection (A9): `requests`, `nba_api`, `socket`,
 `http.client` and `urllib.request` are imported in `providers` alone - with one exception,
@@ -511,6 +515,29 @@ the answer like a roster; the user's click keeps it in the workspace
 and `services/workspaces.py`). No path leads from a proposal to a model file, a setting
 or the lab's data.
 See [AI_ASSISTANT_SPEC.md](AI_ASSISTANT_SPEC.md) and [AI_EVALUATION.md](AI_EVALUATION.md).
+
+## The API
+
+`fol api` - or the `api` service of Docker Compose - serves a FastAPI app,
+`server/app.py:create_app`, on this machine (decision
+[0019](decisions/0019-capstone-api.md); the course brief, and where each of its
+requirements is met: [CAPSTONE.md](CAPSTONE.md)). Its endpoints, with every model, are
+listed at `/docs`.
+
+- **Sign-in.** `POST /auth/register` makes a user; `POST /auth/token` takes OAuth2's
+  password form and returns a JWT (HS256) that expires after `configs/api.yaml`'s
+  `token_minutes`. Every endpoint but these two and `GET /health` asks for
+  `server/auth.current_user`: a token that is altered, expired, signed with another key or
+  names a deleted user is refused with 401. The key is `FOL_API_SECRET` (the environment or
+  the git-ignored `.env`), else `data/api/signing.key`, made once (`server/security.py`).
+- **Accounts** are a file of their own, `data/api/accounts.sqlite` (`storage/accounts.py`),
+  which no build touches: `api_users` and `api_questions`, made from their contracts and
+  mapped with SQLAlchemy's ORM - a user's questions, a question's user - with a unique
+  name, ids never reused, and a user's questions deleted with them. A password is kept as a
+  bcrypt hash (`services/accounts.py`) and never returned.
+- **Validation.** Every request and every response is a Pydantic model
+  (`server/schemas.py`). The rules for a name and a password are the domain's
+  (`domain/accounts.py`), read by the request model and the service alike.
 
 ## Conventions
 

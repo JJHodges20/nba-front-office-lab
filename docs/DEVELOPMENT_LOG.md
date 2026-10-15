@@ -3,6 +3,46 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Capstone C2 - the API and sign-in (2026-10-15)
+
+The first of the brief's missing pieces: an HTTP API, sign-in with tokens, and two related
+tables mapped with SQLAlchemy's ORM. Decision 0019's section "Settled while building C2"
+records what the building decided.
+
+**Built**
+
+- **A `server` layer** (`src/front_office/server/`): `create_app` (uvicorn's factory),
+  `GET /health`, `POST /auth/register`, `POST /auth/token`, `GET /auth/me` and
+  `DELETE /auth/me`. A Pydantic model for every request and response (`schemas.py`); the
+  `/docs` page's *Authorize* button signs in. `fol api` starts it on `127.0.0.1:8000`.
+- **JWT** (`security.py`): HS256 tokens naming their user, issuer and times, expiring after
+  `configs/api.yaml`'s 60 minutes. The key is `FOL_API_SECRET` from the environment or
+  `.env`, else `data/api/signing.key`, made once with 64 random characters; at least 32
+  bytes either way, never printed. `.env.example` names it with no value, and a test keeps
+  every line there empty.
+- **Accounts** (`storage/accounts.py`, `services/accounts.py`): `api_users` and
+  `api_questions` in `data/api/accounts.sqlite`, made from their contracts and mapped with
+  the ORM, a relationship each way; a unique name in the database itself, ids never reused,
+  a user's questions deleted with them. Passwords as bcrypt hashes; a name nobody has still
+  checks a hash. The question table is ready for C3, which fills it.
+- **One reader for `.env`** (`domain/env_file.py`): the web search key and the signing key
+  are read the same way; the web provider's behaviour is unchanged.
+- **Rules**: `server` in the layer table (it reaches the assistant only through
+  `assistant.api`); `fastapi`, `starlette` and `jwt` only in `server`, `bcrypt` only in
+  `services`. `docs/ARCHITECTURE.md` gains the row and a section on the API; `CLAUDE.md` the
+  command and the rule; `data/README.md` the API's folder, and the two files the assistant
+  keeps there, which it had not listed.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| New tests | 99: the name and password rules, the `.env` reader, `configs/api.yaml`, the store (tables as contracted, the foreign key and its cascade, the unique name, ids never reused, the ORM's relationship), the service (salted hashes, sign-in, an unknown name's hash), the endpoints (201, 409, 422 for each rule, 401 for altered, unsigned, other-key, other-issuer, expired and deleted-user tokens), the signing key's sources, the published schema (a model on every endpoint, a token on all but the public three), `fol api`, and the server's one route to the assistant |
+| `pytest -n auto` | 4,090 passed (5 min 49 s); before C2, 3,991 |
+| `fol dictionary --write` | 36 tables; the two new ones documented |
+| Boundaries and data | A new outer layer, its rules tested; a new file in the data folder, which no build touches; nothing of the lab's data, models or pages changed |
+
 ## Capstone C1 - requirements files and the plan (2026-10-15)
 
 The owner brought the brief of their course's capstone: a FastAPI backend, SQLAlchemy with

@@ -66,6 +66,8 @@ measured statistics, modeled estimates and user assumptions visibly apart.
 | [`research_proposals`](#research_proposals) | research | One row per proposal in a workspace, named by its fingerprint. | A6 |
 | [`research_approvals`](#research_approvals) | research | One row per press. | A6 |
 | [`research_experiments`](#research_experiments) | research | One row per proposal kept in a workspace. | A8 |
+| [`api_users`](#api_users) | api_accounts | One row per user. | C2 |
+| [`api_questions`](#api_questions) | api_accounts | One row per question asked. | C2 |
 
 ### teams
 
@@ -948,6 +950,39 @@ Experiment proposals the user kept in a workspace: the assistant's idea and the 
 | `note` | string | no | assumption |  | The user's note on it. |
 | `payload` | string | yes | operational |  | The proposal as the page shows it, as JSON. |
 | `created_at` | datetime | yes | operational |  | When it was kept. |
+
+### api_users
+
+People who may sign in to the lab's API.
+
+- **Grain:** One row per user.
+- **Primary key:** `user_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `user_id` | integer | yes | identifier |  | User id, assigned when the user registers and never given to anyone else: a signed-in token names its user by this id. |
+| `username` | string | yes | assumption |  | The name the user signs in with, in lower case; no two users share one. |
+| `password_hash` | string | yes | operational |  | The password as a bcrypt hash, salt included. The password itself is never kept. |
+| `created_at` | datetime | yes | operational |  | When the user registered. |
+
+### api_questions
+
+Questions users asked the lab's documents through the API, with the answers.
+
+- **Grain:** One row per question asked.
+- **Primary key:** `question_id`
+- **Indexes:** `user_id`
+
+| Column | Type | Required | Provenance | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| `question_id` | integer | yes | identifier |  | Question id, never reused. |
+| `user_id` | integer | yes | identifier |  | The user who asked. References `api_users.user_id`. |
+| `question` | string | yes | assumption |  | The question, as asked. |
+| `answer` | string | yes | modeled |  | The answer the language model wrote from the passages it was given. |
+| `sources` | string | yes | derived |  | The passages the answer was given, as JSON: number, document, heading, link and distance from the question. |
+| `model` | string | yes | operational |  | The chat model that wrote the answer. |
+| `asked_at` | datetime | yes | operational |  | When the question was asked. |
+| `seconds` | float | yes | operational | seconds | How long the answer took. |
 
 ## Planned tables
 

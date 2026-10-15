@@ -635,6 +635,64 @@ class TestUi:
         assert opened == ["http://localhost:8501"]
 
 
+class TestApi:
+    """The command that starts the HTTP API, with the server itself replaced."""
+
+    @pytest.fixture
+    def launched(self, monkeypatch: pytest.MonkeyPatch) -> list[dict]:
+        calls: list[dict] = []
+
+        def run(command, *, cwd, env, check):
+            calls.append({"command": command, "cwd": cwd, "env": env})
+            return SimpleNamespace(returncode=0)
+
+        monkeypatch.setattr(cli.subprocess, "run", run)
+        return calls
+
+    def test_starts_uvicorn_on_the_app_factory_on_this_machine_only(
+        self, project: Path, launched: list[dict]
+    ) -> None:
+        result = runner.invoke(app, ["api"])
+        assert result.exit_code == 0, result.output
+        assert "http://localhost:8000" in result.output
+        assert "/docs" in result.output
+        call = launched[0]
+        assert call["command"][1:] == [
+            "-m",
+            "uvicorn",
+            "front_office.server.app:create_app",
+            "--factory",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "8000",
+        ]
+        assert call["cwd"] == project
+        assert call["env"][ENV_HOME] == str(project)
+
+    def test_the_port_can_be_chosen(self, launched: list[dict]) -> None:
+        result = runner.invoke(app, ["api", "--port", "8100"])
+        assert result.exit_code == 0, result.output
+        assert launched[0]["command"][-1] == "8100"
+
+    def test_broken_settings_are_reported_before_anything_starts(
+        self, project: Path, launched: list[dict]
+    ) -> None:
+        (project / "configs" / "api.yaml").write_text("version: 1\nkey: x\n", encoding="utf-8")
+        result = runner.invoke(app, ["api"])
+        assert result.exit_code == 1
+        assert "invalid API settings" in result.output
+        assert launched == []
+
+    def test_a_failed_start_is_reported_through_the_exit_code(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            cli.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(returncode=3)
+        )
+        assert runner.invoke(app, ["api"]).exit_code == 3
+
+
 class TestValueCommands:
     """fol value fit and fol value show, on the invented league."""
 

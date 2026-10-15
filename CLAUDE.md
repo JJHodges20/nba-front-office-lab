@@ -41,6 +41,7 @@ rules before changing anything. The source plan is
 .\.venv\Scripts\fol.exe simulate fit --write      # measure them again on the built database (configs/models/simulator.json)
 .\.venv\Scripts\fol.exe simulate report --write   # regenerate docs/research/SIMULATOR.md
 .\.venv\Scripts\fol.exe ui --no-browser           # the workbench at http://localhost:8501 (Ctrl+C stops it)
+.\.venv\Scripts\fol.exe api                       # the HTTP API at http://localhost:8000, every endpoint at /docs (Ctrl+C stops it)
 .\.venv\Scripts\python.exe -m pytest tests\assistant  # the assistant's evaluation cases, their figures recomputed
 .\.venv\Scripts\python.exe -m pytest -m ollama    # the assistant against the local model (Ollama running)
 .\.venv\Scripts\python.exe scripts\benchmark_ollama.py --write   # benchmark the candidate models (docs/research/ASSISTANT_MODELS.md)
@@ -69,7 +70,7 @@ Build one roadmap milestone at a time. A milestone is finished only when:
 - **Layers.** Each package under `src/front_office/` is a layer with an allowed-import
   list (`docs/ARCHITECTURE.md`, enforced by `tests/architecture/`). The UI imports only
   `services` and `domain`. Lower layers take plain arguments; only `pipelines`,
-  `services` and `interfaces` load settings.
+  `services`, `interfaces` and the outer `assistant` and `server` load settings.
 - **No cap figures in Python.** Season-specific money lives in `configs/seasons/`. A test
   fails on any dollar-sized literal in source code.
 - **Verify cap figures.** Every figure in `configs/seasons/` cites a source and a
@@ -319,6 +320,15 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   `--rescore`, not run again until it passes (`docs/AI_EVALUATION.md`). The end-to-end
   run's current and web tools see `tests/assistant/recorded.py`, an invented world dated
   the case file's day; change it only to fix what it gets wrong about that day.
+- **The API is an interface too** (the capstone: `docs/decisions/0019-capstone-api.md`,
+  `docs/CAPSTONE.md`). `server/` imports domain, config, pipelines, services and only
+  `front_office.assistant.api`; it validates and formats, and computes nothing. Every request
+  and response is a Pydantic model in `server/schemas.py`, and every endpoint but `/health`,
+  `/auth/register` and `/auth/token` asks for `auth.current_user`: a test reads both off the
+  published schema. The accounts are a fourth file, `data/api/accounts.sqlite`, which no build
+  touches; a password is only ever a bcrypt hash, never returned or logged. The signing key
+  is `FOL_API_SECRET` (environment or `.env`) or `data/api/signing.key`: never print it, never
+  give `configs/api.yaml` or `.env.example` a value for it; tests sign with their own.
 - **Never print data through rich markup.** Use `_say` / `_tagged` in the CLI; text in
   square brackets is otherwise swallowed as a style tag.
 - **Warnings are errors** in the test suite.

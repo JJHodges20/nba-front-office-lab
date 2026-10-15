@@ -134,6 +134,17 @@ class Settings(_Section):
         return self.data_dir / "assistant" / "assistant.sqlite"
 
     @property
+    def api_dir(self) -> Path:
+        """The API's own files (decision 0019): its accounts, and the key that signs its
+        tokens when the environment gives none. No build touches them."""
+        return self.data_dir / "api"
+
+    @property
+    def accounts_path(self) -> Path:
+        """The API's users and the questions each one asked (decision 0019)."""
+        return self.api_dir / "accounts.sqlite"
+
+    @property
     def history_start(self) -> Season:
         return Season.parse(self.seasons.history_start)
 
