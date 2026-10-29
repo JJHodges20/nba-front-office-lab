@@ -4,7 +4,10 @@ The one page that reaches the lab over HTTP rather than through the services: it
 the API, asks the documents, and lists the questions this account has asked - through
 ``wb/api_client.py`` alone, at the address ``FOL_API_URL`` names. The API retrieves the
 passages nearest a question and the local model answers from them; this page only draws what
-comes back. The token is kept in the session, never shown.
+comes back. The token is kept in the session, never shown. Signing in to the workbench
+signs in to the API too when it answers (decision 0020); this page asks again only when it
+did not, or when the API's sign-in has run out. Signing out here, or deleting the account,
+signs out of the whole workbench.
 """
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ from typing import Any
 
 import streamlit as st
 
-from wb import answers, api_client, components, formats
+from wb import answers, api_client, components, formats, signin
 
 TOKEN = "docs_token"
 USER = "docs_user"
@@ -71,6 +74,11 @@ def signing_in(client: api_client.LabApi) -> None:
         "Sign in to ask, or register first. Your questions and their answers are kept under "
         "your name, for you alone."
     )
+    if st.session_state.get(signin.USER):
+        st.caption(
+            "The API was not answering when you signed in to the workbench, or its sign-in "
+            "has run out: sign in to it here with the same name and password."
+        )
     sign_in_tab, register_tab = st.tabs(["Sign in", "Register"], key=TABS)
     with sign_in_tab, st.form("docs_sign_in"):
         name = st.text_input("Name", key="docs_sign_in_name", autocomplete="username")
@@ -143,7 +151,7 @@ def signed_in(client: api_client.LabApi, token: str) -> None:
     with st.container(horizontal=True, vertical_alignment="center", gap="small"):
         st.markdown(f"Signed in as **{answers.escaped(st.session_state.get(USER, ''))}**.")
         if st.button("Sign out", key="docs_sign_out", icon=":material/logout:"):
-            _signed_out("You are signed out.")
+            signin.sign_out()
             st.rerun()
 
     index_state(client, token, index)
@@ -288,5 +296,5 @@ def account(client: api_client.LabApi, token: str) -> None:
             except api_client.ApiError as error:
                 components.alert("error", answers.escaped(error.detail))
             else:
-                _signed_out("Your account and its questions were deleted.")
+                signin.sign_out("Your account and its questions were deleted.")
                 st.rerun()

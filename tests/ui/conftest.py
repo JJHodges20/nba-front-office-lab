@@ -3,7 +3,9 @@
 Streamlit's ``AppTest`` runs a script and exposes what it drew. Each test points the
 workbench at a built project through ``FOL_HOME``; the caches the workbench keeps are
 cleared around every run, because they are keyed on a build id and every test project
-starts at build 1.
+starts at build 1. The whole workbench opens signed in (decision 0020) to a stand-in for
+the project's accounts, which writes nothing: the built projects are shared and read-only.
+``tests/ui/test_sign_in.py`` signs in for real, on private copies.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ import base64
 import json
 import shutil
 from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -22,10 +25,12 @@ from streamlit.testing.v1 import AppTest
 import front_office.assistant.api as api
 from front_office.assistant.toolbox import Toolbox
 from front_office.config.settings import ENV_HOME
+from front_office.domain.accounts import User
 from front_office.pipelines.build import BuildReport
 from front_office.providers.ollama import OllamaProvider
+from front_office.services.accounts import AccountNotFound, ProjectAccounts
 from tests.ollama_fakes import ScriptedOllama
-from wb import api_client, data
+from wb import api_client, data, signin
 
 APP = Path(__file__).resolve().parents[2] / "apps" / "workbench" / "app.py"
 TIMEOUT = 90
@@ -42,6 +47,18 @@ def draw_page(name: str) -> None:
 
 
 Open = Callable[..., AppTest]
+
+ANALYST = User(user_id=1, username="analyst", created_at=datetime(2026, 10, 1))
+"""Who the whole-workbench tests are signed in as."""
+
+
+class OneAccount:
+    """A stand-in for the project's accounts that holds ``ANALYST`` and writes nothing."""
+
+    def user(self, user_id: int) -> User:
+        if user_id != ANALYST.user_id:
+            raise AccountNotFound(f"no user with id {user_id}")
+        return ANALYST
 
 
 @pytest.fixture(autouse=True)
@@ -130,12 +147,22 @@ def page(open_at: Callable[[Path], None]) -> Open:
 
 
 @pytest.fixture
-def app(open_at: Callable[[Path], None]) -> Callable[[Path], AppTest]:
-    """The whole workbench, as ``streamlit run`` starts it."""
+def app(open_at: Callable[[Path], None], monkeypatch: pytest.MonkeyPatch) -> Callable[..., AppTest]:
+    """The whole workbench, as ``streamlit run`` starts it: signed in as ``ANALYST``, or
+    with ``signed_in=False`` at its sign-in page and against the project's real accounts."""
 
-    def run(home: Path) -> AppTest:
+    def run(home: Path, *, signed_in: bool = True) -> AppTest:
         open_at(home)
         opened = AppTest.from_file(str(APP), default_timeout=TIMEOUT)
+        if signed_in:
+            monkeypatch.setattr(
+                signin,
+                "accounts",
+                lambda: ProjectAccounts(OneAccount(), 60),  # type: ignore[arg-type]
+            )
+            opened.session_state[signin.USER_ID] = ANALYST.user_id
+            opened.session_state[signin.USER] = ANALYST.username
+            opened.session_state[signin.SINCE] = datetime.now(UTC).replace(tzinfo=None)
         opened.run()
         assert not opened.exception, [error.value for error in opened.exception]
         return opened

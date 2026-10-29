@@ -3,6 +3,64 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Capstone C8 - sign-in for the whole workbench (2026-10-29)
+
+The owner asked for a sign-in "at every level": a login no matter what. The API already asked
+for a token everywhere but `/health`, registration and sign-in; the workbench asked for
+nothing, outside *Ask the Docs*. Decision [0020](decisions/0020-workbench-sign-in.md).
+
+**Built**
+
+- **`wb/signin.py`**, and the frame checks it first. Signed out:
+  - the sign-in page (*Sign in*, *Register*) is all there is: no menus, filters, data status
+    or figures, and no data is read;
+  - it answers at every page's address. A typed address had shown Streamlit's "Page not
+    found" (found in the browser pass); now, once signed in, the address opens its page.
+- **One set of accounts.** The workbench signs in against the API's own file through
+  `services.accounts.project_accounts`, with the same rules and hashes. A sign-in lasts
+  `sign_in.token_minutes` (60). Every run checks that it has not run out and that the account
+  still exists.
+- **One sign-in for *Ask the Docs*.** When the API answers at sign-in, the same name and
+  password sign in to it. Otherwise the page asks, with a line saying why.
+- **Signing out forgets the whole session**, from the sidebar's *Sign out*, from *Ask the
+  Docs*' own button, or by deleting the account there.
+- **Placement.** "Signed in as" and *Sign out* sit above the data status, so *All pages* stays
+  the sidebar's foot (D13; a frame test caught the first placement under it).
+- **Domain:** `accounts.sign_in_ends`.
+- **Tests.** `tests/ui/conftest.py`'s `app` opens signed in to `OneAccount`, a stand-in that
+  writes nothing, because the built projects are shared and read-only. New:
+  - `tests/ui/test_sign_in.py` (11), on private copies: signed out, register, sign out and in,
+    a wrong password, the rules, a name taken, a sign-in run out, a deleted account, the API
+    signed in at the same time;
+  - unit tests for the domain helper and `project_accounts`.
+  - Two *Ask the Docs* tests now check that signing out there clears the whole session.
+- **Docs:**
+  - decision 0020;
+  - the roadmap's C8 row;
+  - `CLAUDE.md` (the rule);
+  - `docs/WORKBENCH.md` (*Signing in*);
+  - `docs/CAPSTONE.md` (requirement 4).
+- **The README, at the owner's request against the course brief's list:**
+  - *Prerequisites*;
+  - *Setup* step by step: clone, install, configure (every variable), build the data, start;
+  - *Signing in*, with a screenshot of the sign-in page, which shows no data;
+  - ingesting the documents and asking, as their own paragraphs;
+  - the endpoint table with method, path, description and auth required;
+  - *Tech stack*, *Testing* (what is tested where), *Design decisions* (passage size, the
+    models, the guardrails, sign-in) and *Known limitations and future improvements*;
+  - the sign-in in the architecture diagram, and two answers under *When something goes
+    wrong*.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| Targeted | `tests/ui/test_sign_in.py`, `test_app.py`, `test_docs_page.py`, `test_research_page.py`, the account unit tests and `tests/architecture`: all pass |
+| Full suite | `pytest -n 6`: 4,272 passed (5 min 44 s); 4,259 at C7, so 13 new. `-n auto` ran this computer out of memory twice on 2026-10-19 (sixteen workers): use six |
+| Browser, on a throwaway copy of the data | Dark and light at 1440px: a deep link signed out opens the sign-in page (no dialog, no filters), and registering lands on the page it named; a wrong password is refused with a word; *Sign out* comes back to the sign-in page with "You are signed out." 390px in both themes: nothing scrolls sideways. Keyboard alone: Tab to *Name*, type, Enter signs in. With the real API on the same copy, registering at `/docs` landed on *Ask the Docs* already signed in, and its *Sign out* ended the whole session |
+| Outgoing | One commit on `capstone`, not pushed; the throwaway copy and its accounts stayed in the session's scratch folder |
+
 ## Capstone C7 - the README, and the capstone's gate (2026-10-15)
 
 The last of the brief's requirements, and the close of the capstone: every requirement in

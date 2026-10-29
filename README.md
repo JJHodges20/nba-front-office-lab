@@ -63,8 +63,9 @@ The course capstone (milestones C1-C7) puts an HTTP API in front of the lab: sig
 signed tokens (JWT), users and the questions they asked in two related tables, questions
 about the lab answered from its own documentation by retrieval - ChromaDB and a local
 Ollama model - the lab's data behind the sign-in, a workbench page that uses all of it, and
-Docker Compose to run everything with one command. [docs/CAPSTONE.md](docs/CAPSTONE.md)
-lists each requirement of the brief and where it is met.
+Docker Compose to run everything with one command. Since C8 the whole workbench asks for the
+same sign-in before its first page ([decision 0020](docs/decisions/0020-workbench-sign-in.md)).
+[docs/CAPSTONE.md](docs/CAPSTONE.md) lists each requirement of the brief and where it is met.
 
 The postseason chances and the simulator's seasons are the lab's forecasts, and they are
 shown as estimates with intervals beside the models' record on past seasons. Player value
@@ -80,9 +81,10 @@ payroll and cap views are empty and say so. See
 
 ## Architecture
 
-Everything runs on your computer - by hand, or in Docker Compose. The workbench's pages
-read the lab directly; *Ask the Docs* and any other client go through the API, which needs a
-sign-in.
+Everything runs on your computer - by hand, or in Docker Compose. Everything asks for a
+sign-in: the workbench before its first page, the API on every endpoint but its health check,
+registration and sign-in - one set of accounts for both. The workbench's pages then read the
+lab directly; *Ask the Docs* and any other client go through the API with a token.
 
 ```mermaid
 flowchart TB
@@ -100,7 +102,7 @@ flowchart TB
         accounts[("accounts.sqlite<br/>users and their questions")]
     end
 
-    you --> ui
+    you -- "sign in first" --> ui
     client -- "signed token" --> api
     ui -- "fourteen pages" --> services
     ui -- "AI Research" --> assistant
@@ -108,6 +110,7 @@ flowchart TB
     api --> services
     api --> assistant
     api -- "SQLAlchemy ORM" --> accounts
+    ui -- "sign-in, through the services" --> accounts
     services --> db
     assistant -- "the nearest passages" --> vectors
     assistant -- "embed, then answer" --> ollama
@@ -140,29 +143,65 @@ providers, a raw store, processing, storage, analytics, models, services, and th
 interfaces: the command line, the workbench, the AI assistant and the API. A test fails on
 any import that crosses the rules: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Prerequisites
+
+| What | Needed for | Version |
+| --- | --- | --- |
+| Git | Getting the code | Any |
+| Python | Running the lab, and building its data even when it runs in Docker | 3.11 or newer (tested on 3.14) |
+| Docker Desktop or Docker Engine, with Compose | Running everything with one command | Compose v2 (`docker compose`) |
+| Ollama | The AI features: AI Research, Ask the Docs and the API's answers | Tested with 0.40.0, with the models `qwen3:8b` (about 5 GB) and `nomic-embed-text` (274 MB) |
+| An NVIDIA graphics card with 8 GB | Quick answers from the local model | Optional: without one the answers are slow |
+
+Everything but the AI features works with Python alone. With Docker, Ollama runs in a
+container unless you point the lab at your own.
+
 ## Setup
 
-Requires Python 3.11 or newer.
+### Step by step
 
-```powershell
-.\scripts\bootstrap.ps1
-```
+1. **Clone the repository.**
 
-or by hand:
+   ```powershell
+   git clone https://github.com/JJHodges20/nba-front-office-lab.git
+   cd nba-front-office-lab
+   ```
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
-```
+2. **Install the lab**, with every version pinned as tested (`requirements.txt` to run it,
+   `requirements-dev.txt` for its tests as well):
 
-or with every version pinned as tested (`requirements.txt` for running the lab,
-`requirements-dev.txt` for its tests as well):
+   ```powershell
+   python -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+   .\.venv\Scripts\python.exe -m pip install --no-deps -e .
+   ```
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python.exe -m pip install --no-deps -e .
-```
+   `.\scripts\bootstrap.ps1` does the same, and `pip install -e ".[dev]"` takes the newest
+   versions that work instead of the pinned ones.
+
+3. **Configure, if you need to.** Every setting has a working default. To change one, copy
+   `.env.example` to `.env` (never committed) and fill in only what you need:
+
+   | Variable | What it sets | Left empty |
+   | --- | --- | --- |
+   | `FOL_API_SECRET` | Your own key for signing sign-in tokens: 32 characters or more | The API makes one once and keeps it in `data/api/` |
+   | `FOL_OLLAMA_API_KEY` | Web search for AI Research: your Ollama account's key | No web search; links you paste are still read |
+   | `FOL_OLLAMA_HOST` | Docker: which Ollama to use; `http://host.docker.internal:11434` is this computer's own | The Ollama container |
+   | `FOL_API_PORT`, `FOL_UI_PORT` | Docker: the ports | 8000 and 8501 |
+   | `FOL_DOCKER_DATA` | Docker: the data folder to mount | `./data` |
+
+4. **Build the data**, on this computer (Docker fetches nothing):
+
+   ```powershell
+   .\.venv\Scripts\fol.exe refresh
+   ```
+
+   The first run makes about 650 requests to stats.nba.com and takes roughly fifteen
+   minutes.
+
+5. **Start it.** Everything at once: `docker compose up --build`, then open
+   http://localhost:8501 and register or sign in. Or by hand: `.\.venv\Scripts\fol.exe ui`,
+   and `.\.venv\Scripts\fol.exe api` in a second terminal for *Ask the Docs* (see below).
 
 ### The AI assistant (optional)
 
@@ -218,10 +257,25 @@ on/off splits) for the current league year and the three seasons before it. Late
 fetch only what is new. Rebuilding the database takes one to two minutes and never touches
 rosters you have built.
 
+### Signing in
+
+The workbench opens on its sign-in page, whatever address you open
+([decision 0020](docs/decisions/0020-workbench-sign-in.md)).
+
+- **The first time:** *Register* with a name (3 to 32 letters, digits, dots, hyphens or
+  underscores) and a password of at least 8 characters. After that, *Sign in*.
+- **One account for everything:** the workbench and the API share their accounts. Signing in
+  to the workbench signs in to the API too, when it is running, so *Ask the Docs* opens
+  ready.
+- **How long it lasts:** an hour, like an API token. A new browser tab asks again.
+- **Signing out:** *Sign out*, in the sidebar, forgets everything the session held.
+
+![Sign in: the only page before anyone has signed in](docs/images/sign-in.png)
+
 ### The workbench
 
-`fol ui` serves the workbench on this machine only (http://localhost:8501) and opens it.
-Stop it with Ctrl+C. [docs/WORKBENCH.md](docs/WORKBENCH.md) is the guide.
+`fol ui` serves the workbench on this machine only (http://localhost:8501) and opens it on
+the sign-in page. Stop it with Ctrl+C. [docs/WORKBENCH.md](docs/WORKBENCH.md) is the guide.
 
 | Page | What it is for |
 | --- | --- |
@@ -270,31 +324,52 @@ matching light theme: choose either in the menu at the top right.
 .\.venv\Scripts\fol.exe api         # the API at http://localhost:8000 (Ctrl+C stops it)
 ```
 
-With the API running, open *Ask the Docs* in the workbench's *Ask* menu: register, sign in
-and ask. Each answer cites the passages it came from by number, and each passage opens to
-the words the model read, so you can check a claim against its source. Your questions are
-listed under the box, newest first.
+**Ingesting the documents.** The documents are the lab's own Markdown files in `docs/`. Embed
+them into the vector index once, with Ollama running, in any of three ways:
+
+- `fol rag index` (`--force` builds it again);
+- *Build the index* on *Ask the Docs*;
+- `POST /rag/index`.
+
+Docker Compose does it when the API first starts. `fol rag status` says whether the index
+still matches the documents.
+
+**Asking a question.** On *Ask the Docs*, in the workbench's *Ask* menu, type a question and
+press *Ask the documents*. Through the API, send `POST /rag/ask` with
+`{"question": "..."}`.
+
+Each answer cites the passages it came from by number, and each passage opens to the words
+the model read, so you can check a claim against its source. Your questions are listed under
+the box, newest first.
 
 ![Ask the Docs: a question about the lab answered from its documents, each sentence citing its passage](docs/images/ask-the-docs.png)
 
 Every endpoint is listed, with its request and response, at http://localhost:8000/docs;
-*Authorize* there signs you in. All but the first three need the token from
-`POST /auth/token`.
+*Authorize* there signs you in. "Auth required" means the request must carry the token from
+`POST /auth/token` as `Authorization: Bearer <token>`. Every request and response is a
+Pydantic model, so a request it refuses gets a 422 that names the field.
 
-| Endpoint | What it does |
-| --- | --- |
-| `GET /health` | Whether the API is up |
-| `POST /auth/register` | A new user: a name and a password (kept only as a bcrypt hash) |
-| `POST /auth/token` | Sign in with a form; returns a signed token that lasts an hour |
-| `GET`, `DELETE /auth/me` | You; delete your account and every question in it |
-| `POST /rag/ask` | Ask the documents; the answer, its numbered sources and any notes, kept under your name |
-| `GET /rag/questions`, `GET`, `DELETE /rag/questions/{id}` | Your questions, newest first; one; delete one |
-| `GET`, `POST /rag/index` | Whether the documents are indexed; index them (`?force=true` to rebuild) |
-| `GET /lab` | What the lab holds: the build, and the seasons it has |
-| `GET /seasons/{season}/teams` | Every team of a season, each figure with its rank and what kind of figure it is |
-| `GET /teams/{team_id}` | A franchise and every season on record |
-| `GET /seasons/{season}/players` | A season's players (one team, qualified only, sorted, paged); no salaries |
-| `GET /players/{player_id}` | A player's seasons and the value model's estimates, with how the model was tested |
+| Method | Path | Description | Auth required |
+| --- | --- | --- | --- |
+| `GET` | `/health` | Whether the API is up | No |
+| `POST` | `/auth/register` | A new user: a name and a password (kept only as a bcrypt hash) | No |
+| `POST` | `/auth/token` | Sign in with a form (name, password); returns a signed token that lasts an hour | No |
+| `GET` | `/auth/me` | You | Yes |
+| `DELETE` | `/auth/me` | Delete your account and every question in it | Yes |
+| `POST` | `/rag/ask` | Ask the documents; the answer, its numbered sources and any notes, kept under your name | Yes |
+| `GET` | `/rag/questions` | Your questions, newest first (`?limit=`, 1 to 100, 20 by default) | Yes |
+| `GET` | `/rag/questions/{id}` | One of your questions, with its answer and sources | Yes |
+| `DELETE` | `/rag/questions/{id}` | Delete one of your questions | Yes |
+| `GET` | `/rag/index` | Whether the documents are indexed, and whether the index still matches them | Yes |
+| `POST` | `/rag/index` | Index the documents (`?force=true` to rebuild) | Yes |
+| `GET` | `/lab` | What the lab holds: the build, and the seasons it has | Yes |
+| `GET` | `/seasons/{season}/teams` | Every team of a season, each figure with its rank and what kind of figure it is | Yes |
+| `GET` | `/teams/{team_id}` | A franchise and every season on record | Yes |
+| `GET` | `/seasons/{season}/players` | A season's players (one team, qualified only, sorted, paged); no salaries | Yes |
+| `GET` | `/players/{player_id}` | A player's seasons and the value model's estimates, with how the model was tested | Yes |
+
+The API's own pages, `/docs` and `/redoc`, need no sign-in: they describe the endpoints, and
+`/docs` is where *Authorize* signs in.
 
 From PowerShell:
 
@@ -374,15 +449,129 @@ of salary columns it carries.
 | Ask the Docs says the documents are not indexed, or have changed | Press *Build the index* with Ollama running, or run `fol rag index`. |
 | An answer says Ollama is not running, or to pull `nomic-embed-text` | Start the Ollama app, or `ollama pull nomic-embed-text`, then ask again. |
 | *The sign-in has expired* | A token lasts an hour: sign in again. |
+| The workbench shows the sign-in page again | A sign-in lasts an hour, and a new browser tab or an address typed in starts a new session: sign in again. |
+| *That name and password do not sign anyone in* | Check both. There is no password reset: register a new name if you have lost a password. |
 | `docker compose up` says a port is already allocated | Another program has 8000 or 8501: set `FOL_API_PORT` or `FOL_UI_PORT` in `.env`. |
 
-## Development
+## Tech stack
+
+| Part | Technology |
+| --- | --- |
+| Language | Python 3.11 or newer (tested on 3.14; the Docker image uses 3.14.6) |
+| League data | stats.nba.com through `nba_api`; `requests`; `pypdf` for the injury report |
+| Analysis and models | pandas, NumPy, SciPy |
+| Database | SQLite, through SQLAlchemy: tables built from the lab's data contracts, the API's accounts mapped with the ORM |
+| Validation | Pydantic |
+| Frontend | Streamlit, with Plotly for the charts |
+| Backend | FastAPI, uvicorn, python-multipart |
+| Sign-in | PyJWT (HS256 tokens), bcrypt (password hashes) |
+| RAG | ChromaDB (the vector index); Ollama running `nomic-embed-text` (embeddings) and `qwen3:8b` (answers) |
+| Command line | Typer, rich |
+| Containers | Docker, Docker Compose |
+| Tests and lint | pytest, pytest-xdist, pytest-cov, httpx (FastAPI's test client), Ruff |
+
+## Testing
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -n auto  # tests, in parallel (live-network tests are deselected)
-.\.venv\Scripts\python.exe -m ruff check .    # lint
-.\.venv\Scripts\python.exe -m ruff format .   # format
+.\.venv\Scripts\python.exe -m pytest -n auto        # every test but the live ones, in parallel
+.\.venv\Scripts\python.exe -m pytest tests\unit\server tests\ui\test_sign_in.py   # the API and the sign-in alone
+.\.venv\Scripts\python.exe -m pytest -m network     # only the tests that use the live network
+.\.venv\Scripts\python.exe -m pytest -m ollama      # the assistant against the local model (Ollama running)
+.\.venv\Scripts\python.exe -m ruff check .          # lint
+.\.venv\Scripts\python.exe -m ruff format .         # format
 ```
+
+- 4,272 tests, all passing on 2026-10-29 (`pytest -n 6`, under six minutes on this computer).
+- The everyday suite reaches no network and no model. Ollama, the web and the API are
+  scripted fakes in the tests, and the live tests are deselected unless asked for.
+- On a computer with 16 GB of memory, use `-n 6` rather than `-n auto`: one test worker per
+  processor core can run out of memory.
+
+| What is tested | Where |
+| --- | --- |
+| Register, sign in, and use a protected endpoint; altered, expired, other-key and deleted-user tokens refused | `tests/unit/server/test_auth.py` |
+| The workbench's sign-in: register, sign in, a wrong password, sign out, a sign-in run out, a deleted account | `tests/ui/test_sign_in.py` |
+| Create, read and delete a saved question | `tests/unit/server/test_rag.py` |
+| Invalid data returns 422 | `tests/unit/server/test_auth.py`, `tests/unit/server/test_rag.py` |
+| `POST /rag/ask` returns an answer with its sources | `tests/unit/server/test_rag.py` |
+| `GET /health` returns 200, and every other endpoint needs a token | `tests/unit/server/test_app.py` |
+| Every workbench page drawn, and every control on it tried | `tests/ui/` |
+| The layer rules | `tests/architecture/` |
+| The Docker files agree with the code | `tests/unit/test_docker.py` |
+
+## Design decisions
+
+Each is recorded with its reasons in [docs/decisions/](docs/decisions/): the API, RAG and
+Docker in [0019](docs/decisions/0019-capstone-api.md), the workbench's sign-in in
+[0020](docs/decisions/0020-workbench-sign-in.md).
+
+- **Passages of about 900 characters, cut at headings.**
+  - Every Markdown file in `docs/` is split at its headings, and each section into passages
+    of whole paragraphs, grown to about 900 characters. A paragraph longer than that, such as
+    a long table, is cut between its lines.
+  - A passage keeps its document and heading, so its source can be shown exactly.
+  - The size is the assistant's keyword search's own, so both search the same passages.
+- **What is left out of the index.** The metric glossary and data dictionary are long tables
+  whose rows match almost any question. The documents a model or the web wrote are left out
+  too, so an answer rests on the lab's own words.
+- **Five passages per question**, the nearest by cosine similarity, given to the model as
+  numbered, quoted data.
+- **Local models.**
+  - `qwen3:8b` writes the answers. A benchmark on this computer chose it for fitting an 8 GB
+    graphics card, with `qwen3:4b-instruct` as the fallback
+    ([ASSISTANT_MODELS.md](docs/research/ASSISTANT_MODELS.md)).
+  - `nomic-embed-text` makes the embeddings, with its own prefixes for a document and a
+    question.
+  - Both run in Ollama on this computer, at temperature 0 with an 8,192-token context. Ollama's
+    cloud models are refused.
+- **Guardrails on an answer.**
+  - The model answers from the passages alone, and cites the passage behind each sentence.
+  - The passages are quoted data, never instructions to follow.
+  - Every figure must appear in a passage the answer cites. The lab's checker sends an answer
+    back once, then cuts any sentence holding a figure no passage holds, or citing a passage
+    it was not given.
+  - When the passages do not cover a question, the answer says so.
+- **The engine computes, the model narrates.** In AI Research, every figure comes from the
+  lab's tools and is checked. The model saves nothing to the lab: a roster or an experiment it
+  proposes is kept only when you press its button.
+- **Sign-in.**
+  - One set of accounts for the API and the workbench.
+  - Passwords are kept only as bcrypt hashes, at cost 12.
+  - Tokens are signed with HS256 and last an hour; a workbench sign-in lasts as long.
+  - Nothing of the workbench is drawn before a sign-in.
+
+## Known limitations and future improvements
+
+**Limitations**
+
+- **Contract data:** not included. Salaries come from a file you supply
+  ([CONTRACT_DATA.md](docs/CONTRACT_DATA.md)).
+- **Salary-cap rules:** configured for 2024-25 to 2026-27 only. Cap shares for earlier
+  seasons stay blank until each has a rules file from a cited source.
+- **The AI features:** they need Ollama and, in practice, a graphics card.
+  - On the 59 frozen questions, the assistant got every part right in 47 to 49
+    ([AI_EVALUATION.md](docs/AI_EVALUATION.md)).
+  - Its known limits are in [RELEASE_NOTES.md](docs/RELEASE_NOTES.md).
+- **Roster fit:** description only. The lab's own test found it adds nothing to a projection
+  beyond the sum of the players.
+- **The simulator:** it does not model the rest of the league.
+- **A fresh clone has no data:** `fol refresh` makes about 650 requests to stats.nba.com,
+  which can be slow or throttled.
+- **Accounts:**
+  - Anyone who reaches the sign-in page may register; it listens on this computer only.
+  - Rosters and research workspaces are shared by everyone who signs in. Only questions to
+    the documents are each person's own.
+  - There is no password reset.
+- **The API:** no endpoint updates a saved question. They can be created, read and deleted.
+
+**Future improvements**
+
+- **Season rules before 2024-25**, from cited sources.
+- **Payroll history** in the benchmark research.
+- **Lineups:** the `lineups` and `lineup_stats` tables are planned.
+- **The roadmap's version 8:** trades, aging curves, draft value and multi-year planning.
+- **Accounts:** made only by the owner, as an option; and a way to edit a saved question.
+- **A hosted model**, as an option beside Ollama, for computers without a graphics card.
 
 ## Layout
 
@@ -400,7 +589,7 @@ requirements.txt, requirements-dev.txt       every dependency, pinned as tested
 
 ## Documentation
 
-- [The capstone](docs/CAPSTONE.md) - each requirement of the course brief and where it is met; why it is built this way: [decision 0019](docs/decisions/0019-capstone-api.md)
+- [The capstone](docs/CAPSTONE.md) - each requirement of the course brief and where it is met; why it is built this way: [decision 0019](docs/decisions/0019-capstone-api.md); the sign-in for the whole workbench: [decision 0020](docs/decisions/0020-workbench-sign-in.md)
 - [Roadmap and milestone status](docs/ROADMAP.md)
 - [The workbench](docs/WORKBENCH.md) - how to read and use the pages
 - [Benchmark research](docs/research/BENCHMARKS.md) - what contenders have looked like, generated from the database

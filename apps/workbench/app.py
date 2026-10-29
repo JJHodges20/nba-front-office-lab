@@ -4,7 +4,9 @@ Run it with ``fol ui``, or ``streamlit run apps/workbench/app.py`` from the proj
 
 This file is the frame every page sits in: the navigation in the top bar, the global
 filters and the data status in the sidebar (UI polish P2, so the filters are always in
-view). A page draws itself for whatever the filters say.
+view). A page draws itself for whatever the filters say. Nothing of it is drawn until
+someone has signed in (decision 0020, ``wb/signin.py``): until then the sign-in page is the
+only page there is.
 """
 
 from __future__ import annotations
@@ -13,7 +15,7 @@ from datetime import UTC, datetime
 
 import streamlit as st
 
-from wb import ask, components, data, formats, state, style
+from wb import ask, components, data, formats, signin, state, style
 from wb.views import (
     benchmarks,
     builder,
@@ -186,14 +188,40 @@ def all_pages() -> None:
                     st.page_link(each, label=each.title, icon=each.icon)
 
 
+def signed_out_pages() -> list[st.Page]:
+    """The sign-in page at every page's address (decision 0020): a typed or bookmarked
+    address opens it, rather than Streamlit's "Page not found", and once signed in the
+    address opens the page it names."""
+    return [
+        st.Page(
+            signin.page,
+            title="Sign in",
+            icon=":material/login:",
+            url_path=each.url_path or None,
+            default=not each.url_path,
+        )
+        for pages in PAGES.values()
+        for each in pages
+    ]
+
+
+# Signed out, the sign-in page is all there is: nothing of the lab is drawn or read.
+user = signin.current()
+if user is None:
+    st.navigation(signed_out_pages(), position="hidden").run()
+    st.stop()
+
 status = data.status()
 if not status.is_built:
     not_built()
+    signin.sidebar(user)
     st.stop()
 
 page = st.navigation(PAGES, position="top")
 state.sidebar(status)
 components.new_page()
 page.run()
+# Who is signed in sits above the data status; All pages stays the sidebar's foot (D13).
+signin.sidebar(user)
 data_status(status.build_id, status.built_at)
 all_pages()

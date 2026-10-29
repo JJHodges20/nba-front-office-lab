@@ -11,10 +11,13 @@ names exist.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 import bcrypt
 
+from front_office.config.api import load_api_settings
+from front_office.config.settings import load_settings
 from front_office.domain.accounts import (
     PASSWORD_BYTES,
     AskedQuestion,
@@ -128,4 +131,31 @@ class AccountService:
             store.delete_question(user_id, question_id)
 
 
-__all__ = ["AccountNotFound", "AccountService", "NameTaken"]
+@dataclass(frozen=True, slots=True)
+class ProjectAccounts:
+    """The project's accounts as the workbench signs in to them (decision 0020): the API's
+    own file and rules, so one name and password serve both, and how long a sign-in lasts -
+    as long as one of the API's tokens."""
+
+    accounts: AccountService
+    sign_in_minutes: int
+
+
+def project_accounts() -> ProjectAccounts:
+    """The accounts of the project this process finds (``FOL_HOME``, as every command does),
+    with the API's settings from its ``configs/api.yaml``."""
+    settings = load_settings()
+    api = load_api_settings(settings.config_dir)
+    return ProjectAccounts(
+        AccountService(settings.accounts_path, rounds=api.sign_in.password_rounds),
+        api.sign_in.token_minutes,
+    )
+
+
+__all__ = [
+    "AccountNotFound",
+    "AccountService",
+    "NameTaken",
+    "ProjectAccounts",
+    "project_accounts",
+]

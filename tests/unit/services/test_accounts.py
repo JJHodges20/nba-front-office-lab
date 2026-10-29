@@ -8,8 +8,15 @@ from pathlib import Path
 import bcrypt
 import pytest
 
+from front_office.config.api import load_api_settings
+from front_office.config.settings import ENV_HOME
 from front_office.domain.accounts import PASSWORD_BYTES, AccountRuleError, CitedSource
-from front_office.services.accounts import AccountNotFound, AccountService, NameTaken
+from front_office.services.accounts import (
+    AccountNotFound,
+    AccountService,
+    NameTaken,
+    project_accounts,
+)
 
 PASSWORD = "a long passphrase"
 ROUNDS = 4  # bcrypt's least work, for speed; the API's own setting is in configs/api.yaml
@@ -100,3 +107,17 @@ def test_remove_deletes_the_user_and_their_questions(accounts: AccountService) -
     with pytest.raises(AccountNotFound):
         accounts.user(user.user_id)
     assert accounts.authenticate("analyst", PASSWORD) is None
+
+
+def test_the_workbench_signs_in_to_the_apis_own_accounts(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The workbench's sign-in (decision 0020) reads the API's file and its settings, so one
+    name and password serve both, and a sign-in lasts as long as a token."""
+    monkeypatch.setenv(ENV_HOME, str(project))
+    found = project_accounts()
+    assert found.accounts.path == project / "data" / "api" / "accounts.sqlite"
+    api = load_api_settings(project / "configs")
+    assert found.sign_in_minutes == api.sign_in.token_minutes
+    user = found.accounts.register("Analyst", "a long passphrase")
+    assert found.accounts.authenticate("analyst", "a long passphrase") == user

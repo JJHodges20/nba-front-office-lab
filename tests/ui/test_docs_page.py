@@ -22,7 +22,7 @@ from front_office.server.app import create_app
 from tests.ollama_fakes import chat_chunks
 from tests.rag_fakes import ollama, write_documents
 from tests.unit.server.conftest import FAST, PASSWORD, SECRET
-from wb import api_client
+from wb import api_client, signin
 from wb.views import docs
 
 ANSWER = "A token expires after 60 minutes [1]."
@@ -185,8 +185,11 @@ def test_signing_out_and_a_sign_in_that_has_ended(
     opened = _register(page(plain_home, "docs"))
     opened.button(key="docs_sign_out").click()
     opened.run()
+    # Signing out here signs out of the whole workbench (decision 0020): the session is
+    # forgotten, and the word waits for the workbench's sign-in page.
     assert docs.TOKEN not in opened.session_state
-    assert opened.info[0].value == "You are signed out."
+    assert docs.USER not in opened.session_state
+    assert opened.session_state[signin.NOTICE] == "You are signed out."
     opened = page(plain_home, "docs", **{docs.TOKEN: "not.a.token", docs.USER: "analyst"})
     assert docs.TOKEN not in opened.session_state
     assert opened.info[0].value == "The token is not valid. Sign in again."
@@ -200,7 +203,8 @@ def test_deleting_the_account(page: Page, plain_home: Path, online: TestClient) 
     opened.button(key="docs_remove_account").click()
     opened.run()
     assert docs.TOKEN not in opened.session_state
-    assert opened.info[0].value == "Your account and its questions were deleted."
+    assert docs.USER not in opened.session_state
+    assert opened.session_state[signin.NOTICE] == "Your account and its questions were deleted."
     refused = online.post("/auth/token", data={"username": "analyst", "password": PASSWORD})
     assert refused.status_code == 401
 

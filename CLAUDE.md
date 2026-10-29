@@ -459,6 +459,14 @@ Read `docs/decisions/0008-workbench.md` first. `docs/WORKBENCH.md` is the user's
   (`answers.under_way`): leaving one marks it complete, and a running question showed a
   tick (UI polish P7). The conversation comes straight after the workspace and its one fold
   of shelves; the mode and the conversation's buttons sit under it, by the question box.
+- **Nothing is drawn without a sign-in** (decision 0020, `wb/signin.py`). The frame checks
+  the session first; signed out, the sign-in page answers at every page's address and no data
+  is read. The workbench signs in against the API's own accounts through
+  `services.accounts.project_accounts`, for `sign_in.token_minutes`; each run checks the
+  sign-in has not run out and the account still exists. Signing out - from the sidebar or Ask
+  the Docs - forgets the whole session (`signin.sign_out`). Whole-workbench tests (`app`) open
+  signed in to `tests/ui/conftest.OneAccount`, which writes nothing; a test that signs in for
+  real uses a private copy (`scratch_home`): opening the accounts creates their file.
 - **Ask the Docs reaches the lab's API through `wb/api_client.py` alone** (the capstone,
   decision 0019): the workbench's one module that opens a connection, with `requests`, to
   the address `FOL_API_URL` names and no other; the architecture test excepts it and only it.

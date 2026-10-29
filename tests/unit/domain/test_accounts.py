@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 
 from front_office.domain.accounts import (
@@ -12,6 +14,7 @@ from front_office.domain.accounts import (
     check_password,
     check_username,
     normal_username,
+    sign_in_ends,
     sources_from_json,
     sources_to_json,
 )
@@ -60,3 +63,9 @@ def test_sources_go_to_json_and_back() -> None:
     )
     assert sources_from_json(sources_to_json(sources)) == sources
     assert sources_from_json(sources_to_json(())) == ()
+
+
+def test_a_sign_in_ends_its_minutes_after_it_was_made() -> None:
+    made = datetime(2026, 10, 29, 9, 30)
+    assert sign_in_ends(made, 60) == datetime(2026, 10, 29, 10, 30)
+    assert sign_in_ends(made, 1) == datetime(2026, 10, 29, 9, 31)

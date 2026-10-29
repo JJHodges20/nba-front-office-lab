@@ -12,7 +12,7 @@ import json
 import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from front_office.domain.rag import CitedSource
 
@@ -54,6 +54,12 @@ def check_password(password: str) -> str:
     if len(password.encode("utf-8")) > PASSWORD_BYTES:
         raise AccountRuleError(f"a password may hold at most {PASSWORD_BYTES} bytes")
     return password
+
+
+def sign_in_ends(signed_in_at: datetime, minutes: int) -> datetime:
+    """When a sign-in made at ``signed_in_at`` stops counting. The workbench's sign-in lasts as
+    long as one of the API's tokens (``sign_in.token_minutes``, decision 0020)."""
+    return signed_in_at + timedelta(minutes=minutes)
 
 
 @dataclass(frozen=True, slots=True)

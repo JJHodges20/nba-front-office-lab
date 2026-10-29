@@ -11,6 +11,24 @@ browser.
 It runs on your machine only and reads the database `fol build` produced. If there is
 no data yet it says so and tells you to run `fol refresh`. Stop it with Ctrl+C.
 
+## Signing in
+
+Nothing opens without a sign-in ([decision 0020](decisions/0020-workbench-sign-in.md)).
+
+- **The sign-in page:** *Sign in* with a name and a password, or *Register* first: a name of
+  3 to 32 letters, digits, dots, hyphens or underscores, and a password of at least 8
+  characters. The password is kept only as a hash.
+- **One account for everything:** it is the same account as the lab's API, so it works on
+  *Ask the Docs* and at the API's `/docs` page too. When the API is running as you sign in,
+  *Ask the Docs* opens already signed in.
+- **How long it lasts:** a sign-in lasts an hour, as an API token does; after that the
+  workbench asks again. A new browser tab, or an address typed in, asks again too. An address
+  you open while signed out takes you to its page once you sign in.
+- **Signing out:** *Sign out*, in the sidebar above the data status, forgets everything the
+  session held, the sidebar's choices included.
+- **What is shared:** your questions to *Ask the Docs* are yours alone. The rosters, research
+  workspaces and data belong to the project, shared by everyone who signs in on this computer.
+
 ## The frame
 
 **Navigation** is the bar across the top, in six groups: League, Explore, Build,
@@ -400,8 +418,10 @@ HTTP API (the capstone's page: [CAPSTONE.md](CAPSTONE.md)). Start the API first 
 `fol api` (Docker Compose starts it for you); without it the page says so and the rest of
 the workbench works as before.
 
-- *Sign in or register*: a name and a password. Your questions and their answers are kept
-  under your name, for you alone; the password is kept only as a hash.
+- *Signed in already*: signing in to the workbench signs in to the API as well, when it is
+  running. If it was not, the page asks for the same name and password once. *Sign out* here
+  signs out of the whole workbench. Your questions and their answers are kept under your
+  name, for you alone.
 - *Build the index* the first time: the local model reads every passage of the documents,
   which took under twenty seconds on this computer's graphics card and takes longer without
   one. When the documents change, the page offers to build it again.

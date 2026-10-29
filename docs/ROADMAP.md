@@ -121,6 +121,7 @@ milestones back to back, each committed when its gate passes, nothing pushed wit
 | C5 | The workbench page | Sign in and ask the documents through the API | Done (2026-10-15) |
 | C6 | Docker | One image, Compose with the API, the workbench and Ollama; `docker compose up` | Done (2026-10-15) |
 | C7 | README and gate | Setup, an architecture diagram, a usage guide; the full suite; the requirement map closed | Done (2026-10-15) |
+| C8 | Sign-in for the whole workbench | No page, figure or sidebar without a sign-in, against the API's own accounts; one sign-in for the workbench and Ask the Docs; decision 0020 | Done (2026-10-29; the owner's request, a login "no matter what") |
 
 ## Completion gate for every milestone
 
