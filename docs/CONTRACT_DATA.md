@@ -172,16 +172,27 @@ On the way the script:
   since the lab's row is what the team owed that season and the import would otherwise
   reject the file. Four rows in the 2026-07-07 snapshot; each is reported;
 - names the Clippers as the league's team index does, spells 38 names as the league's
-  player index spells them, gives the league's id to 15 names two players share, and
-  leaves out one row - a camp signing the index does not hold, whose name, suffix
-  stripped, the lab would hand to a namesake - saying why;
+  player index spells them, gives the league's id to 17 names two players share and to
+  one the index has since renamed, and leaves out one row - a camp signing the index
+  does not hold, whose name, suffix stripped, the lab would hand to a namesake - saying
+  why;
 - lists the rows flagged `qualifying_offer` or `terminated`, which have no counterpart
   in the lab's file and are written like any other.
 
 The spellings and ids live in the script and were made from the import's own
-unmatched-row report; a later snapshot may need more. The 54 rows the import still
-cannot match are camp signings who never appeared in a game and are in no league index;
-the import lists them and leaves them out ($10.6M of $49.97B over twelve seasons). The
+unmatched-row report; a later snapshot may need more. So may a later copy of the
+league's player index, which `fol refresh` fetches again. Where a name fits two players
+the import takes the active one, so a change in who is active, a rename or a player
+leaving the index can take a name out of reach - the build's note on rows left out
+grows - or hand it to a namesake, which nothing reports. After a refresh that stores a
+new index, compare that note with the last one, and give a name that moved the league's
+id. On 2026-10-29 two names went out of reach (Kevin Porter Jr. was no longer active, RJ
+Nembhard Jr. was renamed), and the new index showed that the one of 2026-10-01 had
+handed the elder Jameer Nelson's salaries of 2015-16 to 2017-18 to a camp invitee,
+Jameer Nelson Jr. All three now carry the league's id. The 61 rows the import still
+cannot match are camp signings who never appeared in a game and are in no league index -
+seven of them dropped out of the index of 2026-10-29 after leaving their teams' rosters;
+the import lists them and leaves them out ($13.5M of $49.97B over twelve seasons). The
 seasons before 2024-25 have no rules file in `configs/seasons`, so their cap shares are
 blank. The record of what the file changed in the lab, and of the one figure in doubt,
 is [decision 0017](decisions/0017-contract-history.md).

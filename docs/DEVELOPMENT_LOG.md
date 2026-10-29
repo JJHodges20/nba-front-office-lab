@@ -3,6 +3,77 @@
 One entry per milestone: what was built, what was decided, and the evidence for the
 completion gate. Newest first.
 
+## Contract matching after the league's player index of 2026-10-29 (2026-10-29)
+
+Not a milestone. The owner's `fol refresh` loaded build 17 "with problems" and with fewer
+players and contracts than build 16. The owner approved the fixes below.
+
+**What the refresh showed**
+
+- **The error is the source's.** `team_seasons.league_is_balanced` failed for 2026-27:
+  15,538 points scored against 15,541 allowed. The game logs balance at 15,541; the season
+  totals stats.nba.com gave Dallas (568 points, its games 570) and Phoenix (327, its games
+  328) lag stat corrections that their opponents' points allowed already carry, and the
+  2026-27 rating warnings for both teams come from the same lag. Nothing to change in the
+  lab; a later refresh should clear it.
+- **The league's player index changed.** The copy fetched that day holds 5,196 players to
+  the 5,242 of 2026-10-01: 46 camp invitees, none with a game and none on a current roster,
+  left it. It renamed six players and no longer called Kevin Porter Jr. active. Matched
+  against it, the contract file lost 17 rows ($41.1M) and 12 contracts:
+  - Kevin Porter Jr.'s 9 rows, 2019-20 to 2026-27 ($37.6M): the file writes "Kevin Porter",
+    which, suffix stripped, is also the Kevin Porter of 1972-82, and the import's rule for
+    a shared name (the active one wins) had no active one left;
+  - RJ Nembhard Jr.'s row, now that the index calls him Ruben Nembhard Jr.;
+  - 7 rows ($3.0M) of camp invitees who left the index.
+- **It also showed a wrong match that nothing had reported.** Through build 16, Jameer
+  Nelson's four salaries (Denver and Detroit, 2015-16 to 2017-18, $15.9M) went to Jameer
+  Nelson Jr., a camp invitee the index of 2026-10-01 called active. With him gone, build 17
+  gave them to the elder.
+
+**Built**
+
+- `scripts/convert_salary_dataset.py`: `PLAYER_IDS` gives the league's id to Kevin Porter
+  (1629645), RJ Nembhard (1630612) and Jameer Nelson (2749), so the import matches them by
+  id, whatever the index calls them and whomever it calls active; comments say why.
+  `tests/unit/test_convert_salary_dataset.py`: one parametrised test, a case for each.
+- The file converted again, imported with the same source label and as-of date, and built
+  in (build 18): 4,182 contracts for 1,620 players, 7,222 contract seasons. 61 rows are left
+  out ($13.5M of $49.97B): the 54 of 2026-10-05 and the 7 camp invitees, who stay out by the
+  owner's choice rather than keep players the index has dropped.
+- Docs: [CONTRACT_DATA.md](CONTRACT_DATA.md) (the converter's lists, and what a new index
+  can do to them), the source register's row, the contract rule in `CLAUDE.md`.
+
+**Evidence**
+
+- The converted file differs from that of 2026-10-05 in 14 rows, each gaining its id.
+- A dry run with the import's own functions, before anything was stored: the new file
+  against the index of 2026-10-29 gives the same contract tables as the old file against
+  the index of 2026-10-01, apart from the 7 camp invitees' rows and Jameer Nelson's.
+- Every name in the file that fits two players in that index (8, such as Gary Payton II
+  and his father) goes to the one whose career spans the season. The same check on the
+  index of 2026-10-01 flags Jameer Nelson, and only him.
+- Build 18 against build 17: 10 contract seasons more (Porter's 9, Nembhard's 1, $38.1M),
+  none fewer; Milwaukee's 2026-27 salaries on file go from $162.2M to $167.6M.
+
+**Open**
+
+- A wrong match by the shared-name rule is silent. Choosing, among namesakes, the one whose
+  career spans the season - or a quality check that a contract season falls within its
+  player's career - would have caught Jameer Nelson in October. Either changes the matcher
+  or the checks, so it waits for the owner.
+- The 2026-27 balance error stays until the league's season totals catch up.
+
+**Gate**
+
+| Check | Result |
+| --- | --- |
+| `ruff check .`, `ruff format --check .` | Clean |
+| Targeted | `tests/unit/test_convert_salary_dataset.py` and `tests/unit/processing/test_contracts.py`: 113 passed |
+| Full suite | `pytest -n 6`: 4,275 passed (7 min 48 s), 3 new; the tests that read `docs/`, run again once this entry was written: 139 passed |
+| Data | Build 18: 57 checks, 49 passed, 7 with warnings, 1 with errors - the 2026-27 balance above, as in build 17; every contract check passed |
+| UI | Not affected |
+| Outgoing | One commit on `capstone`, not pushed; the old contract file and build 17's database kept in the session's scratch folder |
+
 ## Capstone C8 - sign-in for the whole workbench (2026-10-29)
 
 The owner asked for a sign-in "at every level": a login no matter what. The API already asked

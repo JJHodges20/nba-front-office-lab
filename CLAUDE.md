@@ -87,7 +87,9 @@ Build one roadmap milestone at a time. A milestone is finished only when:
   where `configs/seasons/` has no rules file (before 2024-25). A row the league's player
   index does not hold is reported and left out, never guessed; the converter's alias and
   id lists are the record of the spellings that differ
-  (`docs/decisions/0017-contract-history.md`).
+  (`docs/decisions/0017-contract-history.md`). A new player index from `fol refresh` can
+  move a name out of reach or to a namesake: compare the build's note on rows left out
+  with the last one (`docs/CONTRACT_DATA.md`, the log of 2026-10-29).
 - **Data contracts.** Every stored table has a `TableContract` in `domain/tables/`.
   Normalisers end with `conform_frame`. After changing a contract run
   `fol dictionary --write`.

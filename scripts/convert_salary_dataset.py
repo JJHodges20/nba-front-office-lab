@@ -21,14 +21,19 @@ an optional ``type`` and ``option``. This script writes that file. On the way it
   check would otherwise reject the file. Every such merge is reported;
 * names a team as the league's team index names it (``TEAM_ALIASES``), spells a name the
   way the league's player index spells it where the snapshot differs (``ALIASES``), and
-  gives the league's player id where the name alone fits two players (``PLAYER_IDS``);
+  gives the league's player id where the name alone fits two players, or the index has
+  since renamed the player (``PLAYER_IDS``);
 * leaves out a row whose player the league index does not hold and whose name the lab
   would otherwise hand to a namesake (``LEFT_OUT``), and says so.
 
 The lists were made from the lab's own unmatched-row report on the 2026-07-07 snapshot;
-a later snapshot may need more. Players the league index does not hold at all - camp
-signings who never played a game - are written as they are; the import reports them and
-leaves them out.
+a later snapshot may need more, and so may a later copy of the league's index: the one
+fetched on 2026-10-29 no longer called Kevin Porter Jr. active, which left his name to
+two players, and renamed RJ Nembhard Jr.; the one of 2026-10-01 called a camp invitee,
+Jameer Nelson Jr., the active Jameer Nelson, and the import gave him his namesake's
+salaries of 2015-16 to 2017-18. Players the league index does not hold at all -
+camp signings who never played a game - are written as they are; the import reports
+them and leaves them out.
 
 A ``qualifying_offer`` or ``terminated`` flag has no counterpart in the lab's file: rows
 carrying one are listed in the report and written like any other.
@@ -123,7 +128,8 @@ ALIASES: dict[str, str] = {
 }
 
 # The snapshot's spelling of a name -> the league's player id, where the name alone fits
-# two players in the league's index and neither is the active one.
+# two players in the league's index and the import's rule (the active one wins) would not
+# find the player meant, or where the index has since renamed the player.
 PLAYER_IDS: dict[str, int] = {
     "Christapher Johnson": 203187,  # the LSU Chris Johnson, 2012-13 to 2015-16
     "David Johnson": 1630525,
@@ -132,14 +138,17 @@ PLAYER_IDS: dict[str, int] = {
     "Gerald Henderson": 201945,
     "Glenn Robinson III": 203922,
     "Greg Smith": 202962,
+    "Jameer Nelson": 2749,  # not Jameer Nelson Jr., a camp invitee in the index of 2026-10-01
     "Jeenathan Williams": 1631466,  # the snapshot writes him as Nate Williams from 2023-24
     "John Lucas": 101249,  # John Lucas III
     "Johnny Davis": 1631098,
+    "Kevin Porter": 1629645,  # Kevin Porter Jr., not the Kevin Porter of 1972-82
     "Larry Drew II": 203580,
     "Mike Dunleavy": 2399,
     "Mike James": 1628455,
     "Nate Williams": 1631466,
     "Reggie Williams": 202130,
+    "RJ Nembhard": 1630612,  # the index renamed him Ruben Nembhard Jr. in October 2026
 }
 
 # The snapshot's spelling of a name -> why its rows are left out of the file.

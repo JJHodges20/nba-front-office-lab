@@ -279,3 +279,24 @@ def test_the_shipped_lists_name_real_differences_only() -> None:
     assert not set(ALIASES) & set(PLAYER_IDS)
     assert not set(LEFT_OUT) & (set(ALIASES) | set(PLAYER_IDS))
     assert all(league_id > 0 for league_id in PLAYER_IDS.values())
+
+
+@pytest.mark.parametrize(
+    ("name", "league_id"),
+    [
+        # Suffix stripped, his name is also the Kevin Porter of 1972-82; the index of
+        # 2026-10-29 no longer called him active, so the name alone fitted both.
+        ("Kevin Porter", 1_629_645),
+        # The index of 2026-10-29 renamed him Ruben Nembhard Jr.
+        ("RJ Nembhard", 1_630_612),
+        # The index of 2026-10-01 held a camp invitee, Jameer Nelson Jr., as the active
+        # one, and the import gave him the elder's salaries of 2015-16 to 2017-18.
+        ("Jameer Nelson", 2_749),
+    ],
+)
+def test_a_name_the_index_does_not_settle_is_given_the_league_id(name: str, league_id: int) -> None:
+    """The shipped list on an invented row: the import matches the id, whatever the index
+    calls the player and whomever it calls active."""
+    written, report = convert([row(name, "Boston Celtics", "2025-26", 100)])
+    assert written[0]["player_id"] == str(league_id)
+    assert report.ids == {name: 1}
